@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma-clients/jobber-auth';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const adapter = new PrismaPg({
-  connectionString: process.env.AUTH_DATABASE_URL,
+  connectionString: process.env.DATABASE_URL,
 });
 
 @Injectable()
