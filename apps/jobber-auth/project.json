@@ -48,7 +48,6 @@
       "continuous": true,
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": ["build"],
       "options": {
         "buildTarget": "jobber-auth:build",
         "runBuildTargetDependencies": true
