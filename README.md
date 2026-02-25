@@ -1,34 +1,178 @@
 # Jobber
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+## Purpose
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
+**Jobber** is a microservices-based backend application for **user authentication and background job management**. It's built as a distributed system using an **Nx monorepo** with two independent services.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/nest?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+---
+
+## Core Features
+
+| Service         | Feature                                                    |
+| --------------- | ---------------------------------------------------------- |
+| **jobber-auth** | User registration & login via GraphQL                      |
+| **jobber-auth** | JWT token generation stored in HttpOnly cookies            |
+| **jobber-auth** | Protected queries with guards and `@CurrentUser` decorator |
+| **jobber-auth** | Password hashing with bcryptjs                             |
+| **jobber-jobs** | Extensible job framework with abstract base class          |
+| **jobber-jobs** | `@Job()` decorator for metadata (name, description)        |
+| **jobber-jobs** | Example Fibonacci job implementation                       |
+
+---
+
+## Tech Stack
+
+### Core
+
+- **Runtime**: Node.js + TypeScript
+- **Framework**: NestJS v11
+- **Monorepo**: Nx v22
+
+### API Layer
+
+- **GraphQL** (v16) + Apollo Server (v5) — code-first schema generation
+- **Swagger/OpenAPI** — auto-generated REST docs
+
+### Database
+
+- **PostgreSQL** (Docker Compose for local dev)
+- **Prisma** v7 — ORM with type-safe client + `@prisma/adapter-pg`
+
+### Auth & Security
+
+- `@nestjs/jwt` + `passport-jwt` — JWT strategy
+- `bcryptjs` — password hashing
+- `cookie-parser` — HttpOnly cookie transport
+
+### Validation
+
+- `class-validator` + `class-transformer`
+
+### Dev Tooling
+
+- Jest v30, Husky, lint-staged, ESLint, Prettier, Compodoc
+
+---
+
+## Architecture
+
+```
+apps/
+├── jobber-auth/     ← GraphQL auth service (users, JWT, Prisma)
+├── jobber-jobs/     ← Job execution service (abstract jobs, decorators)
+├── jobber-auth-e2e/
+└── jobber-jobs-e2e/
+libs/
+└── nestjs/          ← Shared: AbstractModel, GqlContext interface
+```
+
+Each service is independently buildable. A shared `@jobber/nestjs` library provides common GraphQL base types and context interfaces.
+
+---
+
+## Authentication Flow
+
+```
+User → GraphQL Login Mutation → AuthResolver → AuthService
+→ UsersService → PrismaService → PostgreSQL
+→ JWT Generation → Cookie Response → Client
+```
+
+**Protected query access:**
+
+```
+Authenticated User → GraphQL Query with Cookie
+→ GqlAuthGuard → JwtStrategy → CurrentUser Decorator
+→ Resolver → Service → Database
+```
+
+---
+
+## Key Modules
+
+### jobber-auth
+
+- **AuthModule** — JWT config, guards, strategies
+- **AuthService** — login, password verification, token generation
+- **AuthResolver** — GraphQL `login` mutation
+- **UsersService** — create/find users with hashed passwords
+- **PrismaService** — PostgreSQL abstraction layer
+- **JwtStrategy** — Passport strategy reading JWT from cookies
+- **GqlAuthGuard** — GraphQL-specific authorization guard
+
+### jobber-jobs
+
+- **AbstractJob** — base class for all job implementations
+- **@Job() decorator** — attaches name/description metadata to job classes
+- **FibonacciJob** — example job implementation
+- **JobsModule** — job registration and management
+
+### @jobber/nestjs (shared lib)
+
+- **AbstractModel** — base GraphQL `ObjectType` with ID field
+- **GqlContext** — typed Express Request/Response for GraphQL context
+
+---
+
+## Summary
+
+A **professional-grade NestJS backend starter** demonstrating modern patterns: GraphQL-first API design, JWT cookie authentication, Prisma ORM, and Nx monorepo tooling — with a job processing system designed for future expansion into async/background task execution.
+
+[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/nest?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
 
 ## Finish your CI setup
 
 [Click here to finish setting up your workspace!](https://cloud.nx.app/connect/Q9ciqng6Ie)
 
+## Database
+
+Start the PostgreSQL container:
+
+```sh
+docker compose up -d
+```
+
+Stop it:
+
+```sh
+docker compose down
+```
+
+---
 
 ## Run tasks
 
-To run the dev server for your app, use:
+### Serve
 
 ```sh
-npx nx serve jobber-auth
+npx nx serve jobber-auth          # Serve auth app
+npx nx serve jobber-jobs          # Serve jobs app
+npx nx run-many -t serve          # Serve all apps in parallel
 ```
 
-To create a production bundle:
+### Build
 
 ```sh
-npx nx build jobber-auth
+npx nx build jobber-auth          # Build auth app
+npx nx build jobber-jobs          # Build jobs app
+npx nx run-many -t build          # Build all apps
 ```
 
-To see all available targets to run for a project, run:
+### Test & Lint
+
+```sh
+npx nx test jobber-auth           # Test auth app
+npx nx test jobber-jobs           # Test jobs app
+npx nx run-many -t test           # Test all apps
+npx nx lint jobber-auth           # Lint auth app
+npx nx lint jobber-jobs           # Lint jobs app
+```
+
+To see all available targets for a project, run:
 
 ```sh
 npx nx show project jobber-auth
+npx nx show project jobber-jobs
 ```
 
 These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
@@ -56,27 +200,3 @@ npx nx g @nx/node:lib mylib
 You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
 
 [Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/nx-api/nest?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
