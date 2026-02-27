@@ -17,7 +17,7 @@
           "args": ["--node-env=development"]
         }
       },
-      "dependsOn": ["generate-types"]
+      "dependsOn": ["generate-prisma", "generate-ts-proto"]
     },
     "prune-lockfile": {
       "dependsOn": ["build"],
@@ -66,19 +66,24 @@
       "options": {
         "passWithNoTests": true
       },
-      "dependsOn": ["generate-types"]
+      "dependsOn": ["generate-prisma"]
     },
-    "generate-types": {
+    "generate-prisma": {
       "command": "prisma generate",
       "options": {
-        "cwd": "apps/jobber-auth"
-      }
+        "cwd": "{projectRoot}",
+        "input": ["prisma/schema.prisma"]
+      },
+      "cache": true
     },
     "migrate-prisma": {
       "command": "prisma migrate dev",
       "options": {
-        "cwd": "apps/jobber-auth"
+        "cwd": "{projectRoot}"
       }
+    },
+    "generate-ts-proto": {
+      "command": "nx generate-ts-proto"
     }
   }
 }
