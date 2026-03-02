@@ -148,6 +148,9 @@ docker compose down
 npx nx serve jobber-auth          # Serve auth app
 npx nx serve jobber-jobs          # Serve jobs app
 npx nx run-many -t serve          # Serve all apps in parallel
+
+--skip-nx-cache                   # Run without cache
+
 ```
 
 ### Build

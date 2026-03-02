@@ -1,0 +1,7 @@
+{
+  "name": "@jobber/proto",
+  "projectType": "library",
+  "root": "types",
+  "sourceRoot": "types",
+  "targets": {}
+}
