@@ -40,9 +40,9 @@
       },
       "exclude": [
         "apps/jobber-auth-e2e/**/*",
-        "jobber-jobs-e2e/**/*",
+        "app/jobber-jobs-e2e/**/*",
         "apps/jobber-jobs-e2e/**/*",
-        "jobber-executor-e2e/**/*"
+        "app/jobber-executor-e2e/**/*"
       ]
     }
   ],

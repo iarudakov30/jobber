@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PulsarClient, PulsarConsumer } from '@jobber/pulsar';
+import { FIBONACCI_TOPIC, FibonacciData } from '@jobber/jobs';
 import { iterate } from 'fibonacci';
-import { FibonacciData } from './fibonacci-data.interface';
 
 @Injectable()
 export class FibonacciConsumer
@@ -9,7 +9,7 @@ export class FibonacciConsumer
   implements OnModuleInit
 {
   constructor(pulsarClient: PulsarClient) {
-    super(pulsarClient, 'Fibonacci');
+    super(pulsarClient, FIBONACCI_TOPIC);
   }
 
   protected async onMessage(data: FibonacciData): Promise<void> {

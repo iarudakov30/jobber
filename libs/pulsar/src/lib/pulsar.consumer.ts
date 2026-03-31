@@ -1,10 +1,10 @@
-import { deserialize } from './pulsar.consumer';
-import { PulsarClient } from './pulsar.client';
-import { Consumer, Message } from 'pulsar-client';
 import { Logger, OnModuleInit } from '@nestjs/common';
+import { Consumer, Message } from 'pulsar-client';
 
-export abstract class PulsarConsumer<T> implements OnModuleInit{
+import { deserialize } from './serialize';
+import { PulsarClient } from './pulsar.client';
 
+export abstract class PulsarConsumer<T> implements OnModuleInit {
   protected readonly logger = new Logger(this.topic);
   private consumer!: Consumer;
 
@@ -16,7 +16,7 @@ export abstract class PulsarConsumer<T> implements OnModuleInit{
   async onModuleInit() {
     this.consumer = await this.pulsarClient.createConsumer(
       this.topic,
-      this.listener.bind(this),
+      this.listener.bind(this)
     );
   }
 
