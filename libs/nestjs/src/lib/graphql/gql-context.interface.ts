@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 
 export interface GqlContext {
-  req: Request;
+  req: Request & { user?: unknown };
   res: Response;
 }

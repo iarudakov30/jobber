@@ -39,7 +39,6 @@ export class GqlAuthGuard implements CanActivate, OnModuleInit {
 
     return this.authService.authenticate({ token }).pipe(
       map((user: User) => {
-        // @ts-expect-error - req.user requires @types/passport which is not in lib tsconfig types
         this.getRequest(context).user = user;
         return true;
       }),

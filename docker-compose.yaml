@@ -2,6 +2,18 @@ services:
   postgres:
     image: postgres
     ports:
-      - "5432:5432"
+      - '5432:5432'
     environment:
       POSTGRES_PASSWORD: example
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+  pulsar:
+    image: apachepulsar/pulsar
+    command: >
+      /pulsar/bin/pulsar standalone
+    ports:
+      - '6650:6650'
+
+volumes:
+  postgres_data:
