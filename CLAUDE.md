@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Start all services
 
 ```bash
-npm start                          # serves jobber-auth, jobber-jobs, jobber-executor concurrently
+npm start                          # serves auth, jobs-lib, executor concurrently
 ```
 
 ### Individual app commands
@@ -19,12 +19,12 @@ npx nx test <app>                  # run tests
 npx nx lint <app>                  # lint
 ```
 
-Apps: `jobber-auth`, `jobber-jobs`, `jobber-executor`
+Apps: `auth`, `jobs`, `executor`
 
 ### Run a single test file
 
 ```bash
-npx nx test jobber-auth --testFile=apps/jobber-auth/src/app/auth/auth.service.spec.ts
+npx nx test auth --testFile=apps/auth/src/app/auth/auth.service.spec.ts
 ```
 
 ### Run all affected tasks (CI pattern)
@@ -43,8 +43,8 @@ docker compose down
 ### Database
 
 ```bash
-npx nx run jobber-auth:migrate-db  # run Prisma migrations
-npx nx run jobber-auth:generate    # regenerate Prisma client
+npx nx run auth:migrate-db  # run Prisma migrations
+npx nx run auth:generate    # regenerate Prisma client
 ```
 
 ### Proto generation
@@ -66,28 +66,28 @@ Nx monorepo with three NestJS microservices and two shared libraries.
 
 ### Services
 
-| Service           | Port | Role                                                     |
-| ----------------- | ---- | -------------------------------------------------------- |
-| `jobber-auth`     | 3000 | User auth (GraphQL + PostgreSQL/Prisma + gRPC server)    |
-| `jobber-jobs`     | 3001 | Job management (GraphQL + Pulsar producer + gRPC client) |
-| `jobber-executor` | 3002 | Job execution (Pulsar consumer)                          |
+| Service    | Port | Role                                                     |
+| ---------- | ---- | -------------------------------------------------------- |
+| `auth`     | 3000 | User auth (GraphQL + PostgreSQL/Prisma + gRPC server)    |
+| `jobs`     | 3001 | Job management (GraphQL + Pulsar producer + gRPC client) |
+| `executor` | 3002 | Job execution (Pulsar consumer)                          |
 
 ### Communication Patterns
 
-1. **GraphQL (external)** — clients talk to `jobber-auth` and `jobber-jobs` via Apollo GraphQL APIs
-2. **gRPC (internal)** — `jobber-jobs` calls `jobber-auth` to validate JWT tokens on every incoming request; contract in `proto/auth.proto`
-3. **Apache Pulsar (async)** — `jobber-jobs` publishes job messages to Pulsar topics; `jobber-executor` subscribes and processes them
+1. **GraphQL (external)** — clients talk to `auth` and `jobs` via Apollo GraphQL APIs
+2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request; contract in `proto/auth.proto`
+3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them
 
 ### Job Framework
 
-`jobber-jobs` has an extensible job system:
+`jobs` has an extensible job system:
 
 - Decorate a class with `@Job()` to register a new job type
 - `JobsService` uses `@golevelup/nestjs-discovery` to auto-discover all `@Job()` decorated classes
 - The discovered job class receives the job payload and publishes it to a Pulsar topic named after the job type
-- `jobber-executor` defines a corresponding `PulsarConsumer<T>` subclass that processes messages from that topic
+- `executor` defines a corresponding `PulsarConsumer<T>` subclass that processes messages from that topic
 
-See `apps/jobber-jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/jobber-executor/src/app/jobs/fibonacci/fibonacci.consumer.ts` for the reference implementation.
+See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/app/jobs/fibonacci/fibonacci.consumer.ts` for the reference implementation.
 
 ### Shared Libraries
 
@@ -96,14 +96,14 @@ See `apps/jobber-jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/jobber-
 
 ### Authentication Flow
 
-1. User logs in via `jobber-auth` GraphQL mutation → receives JWT in HttpOnly cookie
-2. Client sends cookie with requests to `jobber-jobs`
-3. `jobber-jobs` extracts JWT and calls `jobber-auth` gRPC `AuthService.Authenticate` to validate and retrieve the user
+1. User logs in via `auth` GraphQL mutation → receives JWT in HttpOnly cookie
+2. Client sends cookie with requests to `jobs`
+3. `jobs` extracts JWT and calls `auth` gRPC `AuthService.Authenticate` to validate and retrieve the user
 4. `GqlAuthGuard` attaches the resolved user to GraphQL context
 
 ### Infrastructure
 
-- PostgreSQL for `jobber-auth` user storage (Prisma ORM)
+- PostgreSQL for `auth` user storage (Prisma ORM)
 - Apache Pulsar for async job message passing (both running in Docker)
 
 ### Git Hooks

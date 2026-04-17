@@ -8,15 +8,15 @@
 
 ## Core Features
 
-| Service         | Feature                                                    |
-| --------------- | ---------------------------------------------------------- |
-| **jobber-auth** | User registration & login via GraphQL                      |
-| **jobber-auth** | JWT token generation stored in HttpOnly cookies            |
-| **jobber-auth** | Protected queries with guards and `@CurrentUser` decorator |
-| **jobber-auth** | Password hashing with bcryptjs                             |
-| **jobber-jobs** | Extensible job framework with abstract base class          |
-| **jobber-jobs** | `@Job()` decorator for metadata (name, description)        |
-| **jobber-jobs** | Example Fibonacci job implementation                       |
+| Service  | Feature                                                    |
+| -------- | ---------------------------------------------------------- |
+| **auth** | User registration & login via GraphQL                      |
+| **auth** | JWT token generation stored in HttpOnly cookies            |
+| **auth** | Protected queries with guards and `@CurrentUser` decorator |
+| **auth** | Password hashing with bcryptjs                             |
+| **jobs** | Extensible job framework with abstract base class          |
+| **jobs** | `@Job()` decorator for metadata (name, description)        |
+| **jobs** | Example Fibonacci job implementation                       |
 
 ---
 
@@ -58,10 +58,10 @@
 
 ```
 apps/
-├── jobber-auth/     ← GraphQL auth service (users, JWT, Prisma)
-├── jobber-jobs/     ← Job execution service (abstract jobs, decorators)
-├── jobber-auth-e2e/
-└── jobber-jobs-e2e/
+├── auth/     ← GraphQL auth service (users, JWT, Prisma)
+├── jobs/     ← Job execution service (abstract jobs, decorators)
+├── auth-e2e/
+└── jobs-e2e/
 libs/
 └── nestjs/          ← Shared: AbstractModel, GqlContext interface
 ```
@@ -90,7 +90,7 @@ Authenticated User → GraphQL Query with Cookie
 
 ## Key Modules
 
-### jobber-auth
+### auth
 
 - **AuthModule** — JWT config, guards, strategies
 - **AuthService** — login, password verification, token generation
@@ -100,7 +100,7 @@ Authenticated User → GraphQL Query with Cookie
 - **JwtStrategy** — Passport strategy reading JWT from cookies
 - **GqlAuthGuard** — GraphQL-specific authorization guard
 
-### jobber-jobs
+### jobs
 
 - **AbstractJob** — base class for all job implementations
 - **@Job() decorator** — attaches name/description metadata to job classes
@@ -145,8 +145,8 @@ docker compose down
 ### Serve
 
 ```sh
-npx nx serve jobber-auth          # Serve auth app
-npx nx serve jobber-jobs          # Serve jobs app
+npx nx serve auth          # Serve auth app
+npx nx serve jobs-lib          # Serve jobs-lib app
 npx nx run-many -t serve          # Serve all apps in parallel
 
 --skip-nx-cache                   # Run without cache
@@ -156,26 +156,26 @@ npx nx run-many -t serve          # Serve all apps in parallel
 ### Build
 
 ```sh
-npx nx build jobber-auth          # Build auth app
-npx nx build jobber-jobs          # Build jobs app
+npx nx build auth          # Build auth app
+npx nx build jobs-lib          # Build jobs-lib app
 npx nx run-many -t build          # Build all apps
 ```
 
 ### Test & Lint
 
 ```sh
-npx nx test jobber-auth           # Test auth app
-npx nx test jobber-jobs           # Test jobs app
+npx nx test auth           # Test auth app
+npx nx test jobs-lib           # Test jobs-lib app
 npx nx run-many -t test           # Test all apps
-npx nx lint jobber-auth           # Lint auth app
-npx nx lint jobber-jobs           # Lint jobs app
+npx nx lint auth           # Lint auth app
+npx nx lint jobs-lib           # Lint jobs-lib app
 ```
 
 To see all available targets for a project, run:
 
 ```sh
-npx nx show project jobber-auth
-npx nx show project jobber-jobs
+npx nx show project auth
+npx nx show project jobs-lib
 ```
 
 These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.

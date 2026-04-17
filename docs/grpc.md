@@ -2,7 +2,7 @@
 
 ## Overview
 
-gRPC is used for internal service-to-service communication. Currently `jobber-jobs` calls `jobber-auth` to validate a JWT token before serving GraphQL requests.
+gRPC is used for internal service-to-service communication. Currently `jobs` calls `auth` to validate a JWT token before serving GraphQL requests.
 
 ---
 
@@ -39,9 +39,9 @@ TypeScript types and decorators (`types/proto/auth.ts`) are generated from this 
 ## Request Flow
 
 ```
-Client → GraphQL (jobber-jobs)
+Client → GraphQL (jobs)
   → GqlAuthGuard extracts Authentication cookie
-    → gRPC call to jobber-auth: AuthService.Authenticate({ token })
+    → gRPC call to auth: AuthService.Authenticate({ token })
       → JwtAuthGuard validates JWT
       → UsersService.getUser() fetches full user
     ← User returned over gRPC
@@ -51,7 +51,7 @@ Client → GraphQL (jobber-jobs)
 
 ---
 
-## jobber-auth — gRPC Server
+## auth — gRPC Server
 
 **`main.ts`** boots both an HTTP server and a gRPC microservice in the same process:
 
@@ -122,7 +122,7 @@ The gRPC transport passes the `token` field from `AuthenticateRequest` directly 
 
 ---
 
-## jobber-jobs — gRPC Client
+## jobs — gRPC Client
 
 **`JobsModule`** registers the gRPC client pointing at the auth service:
 

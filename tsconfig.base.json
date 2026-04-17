@@ -17,7 +17,7 @@
     "paths": {
       "@jobber/nestjs": ["libs/nestjs/src/index.ts"],
       "@jobber/pulsar": ["libs/pulsar/src/index.ts"],
-      "@jobber/jobs": ["libs/jobs/src/index.ts"]
+      "@jobber/jobs-lib": ["libs/jobs-lib/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
