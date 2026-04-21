@@ -18,7 +18,7 @@
           "args": ["--node-env=development"]
         }
       },
-      "dependsOn": ["generate-prisma", "generate-ts-proto"]
+      "dependsOn": ["generate-prisma", "^build"]
     },
     "prune-lockfile": {
       "dependsOn": ["build"],
@@ -82,9 +82,6 @@
       "options": {
         "cwd": "{projectRoot}"
       }
-    },
-    "generate-ts-proto": {
-      "command": "nx generate-ts-proto"
     }
   }
 }

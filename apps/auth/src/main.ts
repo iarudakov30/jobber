@@ -1,10 +1,14 @@
+require('module-alias/register');
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app/app.module';
 import { GrpcOptions, Transport } from '@nestjs/microservices';
-import { AUTH_PACKAGE_NAME } from 'types/proto/auth';
+
 import { join } from 'path';
+
+import { AUTH_PACKAGE_NAME } from '@jobber/grpc';
 import { init } from '@jobber/nestjs';
+
+import { AppModule } from './app/app.module';
 
 async function bootstrap() {
   const app: INestApplication = await NestFactory.create(AppModule);
@@ -13,7 +17,7 @@ async function bootstrap() {
     transport: Transport.GRPC,
     options: {
       package: AUTH_PACKAGE_NAME,
-      protoPath: join(__dirname, 'proto/auth.proto'),
+      protoPath: join(__dirname, '../../libs/grpc/proto/auth.proto'),
     },
   });
   await app.startAllMicroservices();

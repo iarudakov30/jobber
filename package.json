@@ -7,18 +7,7 @@
     "cache-clean": "nx reset && npm cache clean --force",
     "start": "nx run-many -t serve -p auth jobs executor --output-style=stream",
     "stop": "fuser -k 3000/tcp 3001/tcp 3002/tcp 2>/dev/null; echo 'Ports cleared'",
-    "generate-ts-proto": "grpc_tools_node_protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./types ./proto/*.proto --ts_proto_opt=nestJs=true",
     "migrate-db": "docker exec -it jobber-postgres-1 psql -U postgres -c 'CREATE DATABASE auth cd apps/auth && npx prisma migrate deploy"
-  },
-  "nx": {
-    "targets": {
-      "generate-ts-proto": {
-        "inputs": [
-          "{workspaceRoot}/proto/*.proto"
-        ],
-        "cache": true
-      }
-    }
   },
   "workspaces": [
     "apps/*",
@@ -26,37 +15,27 @@
   ],
   "private": true,
   "dependencies": {
-    "@apollo/server": "5.4.0",
-    "@as-integrations/express5": "^1.1.2",
-    "@golevelup/nestjs-discovery": "^6.1.2",
-    "@grpc/grpc-js": "^1.14.3",
-    "@grpc/proto-loader": "^0.8.0",
-    "@nestjs/apollo": "^13.2.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.0",
-    "@nestjs/graphql": "^13.2.0",
-    "@nestjs/jwt": "^11.0.2",
     "@nestjs/microservices": "^11.1.14",
-    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.2.5",
-    "@prisma/adapter-pg": "^7.1.0",
-    "@prisma/client": "^7.1.0",
     "axios": "1.13.5",
-    "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "cookie-parser": "^1.4.7",
-    "fibonacci": "^1.6.12",
-    "graphql": "^16.12.0",
-    "graphql-type-json": "^0.3.2",
-    "passport": "^0.7.0",
-    "passport-jwt": "^4.0.1",
-    "pulsar-client": "^1.16.0",
+    "module-alias": "^2.3.4",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
     "ts-proto": "^2.11.4"
+  },
+  "_moduleAliases": {
+    "@jobber/grpc": "dist/libs/grpc/main",
+    "@jobber/graphql": "dist/libs/graphql/main",
+    "@jobber/pulsar": "dist/libs/pulsar/main",
+    "@jobber/nestjs": "dist/libs/nestjs/main",
+    "@jobber/prisma": "dist/libs/prisma/main"
   },
   "devDependencies": {
     "@compodoc/compodoc": "^1.2.1",

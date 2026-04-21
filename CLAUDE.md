@@ -50,7 +50,7 @@ npx nx run auth:generate    # regenerate Prisma client
 ### Proto generation
 
 ```bash
-npm run generate-ts-proto          # regenerate TypeScript from proto/auth.proto
+npx nx run grpc:generate-ts-proto  # regenerate TypeScript from libs/grpc/src/lib/proto/auth.proto
 ```
 
 ### Utilities
@@ -91,7 +91,10 @@ See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/a
 
 ### Shared Libraries
 
-- **`@jobber/nestjs`** (`libs/nestjs`) — `AbstractModel` (GraphQL base type), `GqlContext`, `GqlAuthGuard`, and the `init()` bootstrap helper used by all three apps
+- **`@jobber/graphql`** (`libs/graphql`) — `AbstractModel` (GraphQL base type), `GqlContext`, `GqlAuthGuard`
+- **`@jobber/nestjs`** (`libs/nestjs`) — `init()` bootstrap helper used by all three apps
+- **`@jobber/grpc`** (`libs/grpc`) — gRPC proto file and generated TypeScript types for `AuthService`
+- **`@jobber/prisma`** (`libs/prisma`) — Prisma client (placeholder)
 - **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), and abstract `PulsarConsumer<T>` base class with JSON serialization
 
 ### Authentication Flow

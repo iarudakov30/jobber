@@ -15,7 +15,7 @@ import {
   AUTH_SERVICE_NAME,
   AuthServiceClient,
   User,
-} from 'types/proto/auth';
+} from '@jobber/grpc';
 
 @Injectable()
 export class GqlAuthGuard implements CanActivate, OnModuleInit {

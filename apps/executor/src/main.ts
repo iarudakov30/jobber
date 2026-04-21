@@ -1,3 +1,4 @@
+require('module-alias/register');
 import { NestFactory } from '@nestjs/core';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from './app/app.module';

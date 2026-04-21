@@ -3,7 +3,8 @@ const { join } = require('path');
 
 module.exports = {
   output: {
-    path: join(__dirname, '../../dist/apps/jobs'),
+    path: join(__dirname, '../../dist/libs/jobs-lib'),
+    libraryTarget: 'commonjs2',
     clean: true,
     ...(process.env.NODE_ENV !== 'production' && {
       devtoolModuleFilenameTemplate: '[absolute-resource-path]',
@@ -13,9 +14,8 @@ module.exports = {
     new NxAppWebpackPlugin({
       target: 'node',
       compiler: 'tsc',
-      main: './src/main.ts',
-      tsConfig: './tsconfig.app.json',
-      assets: ['./src/assets'],
+      main: './src/index.ts',
+      tsConfig: './tsconfig.lib.json',
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: true,

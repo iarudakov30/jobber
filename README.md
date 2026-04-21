@@ -66,7 +66,7 @@ libs/
 └── nestjs/          ← Shared: AbstractModel, GqlContext interface
 ```
 
-Each service is independently buildable. A shared `@jobber/nestjs` library provides common GraphQL base types and context interfaces.
+Each service is independently buildable. A shared `@jobber/graphql` library provides common GraphQL base types and context interfaces.
 
 ---
 
@@ -107,7 +107,7 @@ Authenticated User → GraphQL Query with Cookie
 - **FibonacciJob** — example job implementation
 - **JobsModule** — job registration and management
 
-### @jobber/nestjs (shared lib)
+### @jobber/graphql (shared lib)
 
 - **AbstractModel** — base GraphQL `ObjectType` with ID field
 - **GqlContext** — typed Express Request/Response for GraphQL context
