@@ -40,6 +40,22 @@ docker compose up -d               # start PostgreSQL + Apache Pulsar
 docker compose down
 ```
 
+### Docker (per app)
+
+```bash
+# auth
+docker build -t auth -f apps/auth/Dockerfile .
+docker run auth
+
+# jobs
+docker build -t jobs -f apps/jobs/Dockerfile .
+docker run jobs
+
+# executor
+docker build -t executor -f apps/executor/Dockerfile .
+docker run executor
+```
+
 ### Database
 
 ```bash
