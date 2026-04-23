@@ -3,7 +3,6 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "prepare": "husky",
     "cache-clean": "nx reset && npm cache clean --force",
     "start": "nx run-many -t serve -p auth jobs executor --output-style=stream",
     "stop": "fuser -k 3000/tcp 3001/tcp 3002/tcp 2>/dev/null; echo 'Ports cleared'",
@@ -76,6 +75,7 @@
     "tslib": "^2.3.0",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.40.0",
-    "webpack-cli": "^5.1.4"
+    "webpack-cli": "^5.1.4",
+    "webpack-merge": "^6.0.1"
   }
 }
