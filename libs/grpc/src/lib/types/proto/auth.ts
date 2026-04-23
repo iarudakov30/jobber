@@ -27,7 +27,7 @@ export interface AuthServiceClient {
 
 export interface AuthServiceController {
   authenticate(
-    request: AuthenticateRequest
+    request: AuthenticateRequest,
   ): Promise<User> | Observable<User> | User;
 }
 
@@ -37,24 +37,24 @@ export function AuthServiceControllerMethods() {
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(
         constructor.prototype,
-        method
+        method,
       );
       GrpcMethod('AuthService', method)(
         constructor.prototype[method],
         method,
-        descriptor
+        descriptor,
       );
     }
     const grpcStreamMethods: string[] = [];
     for (const method of grpcStreamMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(
         constructor.prototype,
-        method
+        method,
       );
       GrpcStreamMethod('AuthService', method)(
         constructor.prototype[method],
         method,
-        descriptor
+        descriptor,
       );
     }
   };

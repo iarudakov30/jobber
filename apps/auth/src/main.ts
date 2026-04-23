@@ -11,7 +11,9 @@ import { init } from '@jobber/nestjs';
 import { AppModule } from './app/app.module';
 
 async function bootstrap() {
-  const app: INestApplication = await NestFactory.create(AppModule);
+  const app: INestApplication = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
   await init(app);
   app.connectMicroservice<GrpcOptions>({
     transport: Transport.GRPC,

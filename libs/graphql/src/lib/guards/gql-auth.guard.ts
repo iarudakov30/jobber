@@ -9,7 +9,7 @@ import {
 import { ClientGrpc } from '@nestjs/microservices';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Observable, map, catchError, of } from 'rxjs';
-import { GqlContext } from '../graphql';
+import { GqlContext } from '../interfaces/gql-context.interface';
 import {
   AUTH_PACKAGE_NAME,
   AUTH_SERVICE_NAME,
@@ -30,7 +30,7 @@ export class GqlAuthGuard implements CanActivate, OnModuleInit {
   }
 
   canActivate(
-    context: ExecutionContext
+    context: ExecutionContext,
   ): boolean | Promise<boolean> | Observable<boolean> {
     const token = this.getRequest(context).cookies?.Authentication;
     if (!token) {
@@ -45,7 +45,7 @@ export class GqlAuthGuard implements CanActivate, OnModuleInit {
       catchError((err) => {
         this.logger.error(err);
         return of(false);
-      })
+      }),
     );
   }
 
