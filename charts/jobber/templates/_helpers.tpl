@@ -51,12 +51,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Create the name of the service account to use
+Common environment variables shared across all services.
 */}}
-{{- define "jobber.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "jobber.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
+{{- define "common.env" -}}
+- name: NODE_ENV
+  value: production
+- name: PULSAR_SERVICE_URL
+  value: "pulsar://{{ .Release.Name }}-pulsar-broker.{{ .Values.pulsar.namespace }}.svc.cluster.local:6650"
 {{- end }}

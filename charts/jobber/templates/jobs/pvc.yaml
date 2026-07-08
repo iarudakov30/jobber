@@ -1,0 +1,15 @@
+{{- if .Values.jobs.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.jobs.uploads.storage }}
+  {{- if .Values.persistence.ebs }}
+  storageClassName: gp2
+  {{- end }}
+{{- end }}

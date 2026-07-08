@@ -14,6 +14,9 @@ export class GqlLoggingPlugin implements ApolloServerPlugin {
     requestContext: GraphQLRequestContext<BaseContext>,
   ): Promise<void | GraphQLRequestListener<BaseContext>> {
     const { request } = requestContext;
+
+    if (request.operationName === 'IntrospectionQuery') return;
+
     const start = Date.now();
     const requestId = uuidv4();
 
