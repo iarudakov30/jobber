@@ -5,10 +5,12 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { LoggerModule } from '@jobber/nestjs';
 import { GqlLoggingPlugin } from '@jobber/graphql';
 import { JobsModule } from './jobs.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
     LoggerModule,
+    UploadsModule,
     ConfigModule.forRoot({ isGlobal: true, envFilePath: 'apps/jobs/.env' }),
     JobsModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
