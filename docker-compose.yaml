@@ -14,6 +14,9 @@ services:
       /pulsar/bin/pulsar standalone
     ports:
       - '6650:6650'
+    volumes:
+      - pulsar_data:/pulsar/data
 
 volumes:
   postgres_data:
+  pulsar_data:
