@@ -5,7 +5,7 @@ import { DiscoveryModule } from '@golevelup/nestjs-discovery';
 
 import { join } from 'path';
 
-import { AUTH_PACKAGE_NAME } from '@jobber/grpc';
+import { Packages } from '@jobber/grpc';
 import { PulsarModule } from '@jobber/pulsar';
 
 import { FibonacciJob } from './jobs/fibonacci/fibonacci.job';
@@ -18,10 +18,10 @@ import { JobsResolver } from './jobs.resolver';
     PulsarModule,
     ClientsModule.register([
       {
-        name: AUTH_PACKAGE_NAME,
+        name: Packages.AUTH,
         transport: Transport.GRPC,
         options: {
-          package: AUTH_PACKAGE_NAME,
+          package: Packages.AUTH,
           protoPath: join(__dirname, '../../libs/grpc/proto/auth.proto'),
         },
       },
