@@ -1,9 +1,10 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { DATABASE_CONNECTION } from './database-connection';
 import { Pool } from 'pg';
+import { DATABASE_CONNECTION } from './database-connection';
 import * as productsSchema from '../products/schema';
+import * as categoriesSchema from '../categories/schema';
 
 @Global()
 @Module({
@@ -17,6 +18,7 @@ import * as productsSchema from '../products/schema';
         return drizzle(pool, {
           schema: {
             ...productsSchema,
+            ...categoriesSchema,
           },
         });
       },

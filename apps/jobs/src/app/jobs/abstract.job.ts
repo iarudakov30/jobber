@@ -11,34 +11,35 @@ export abstract class AbstractJob<T extends object> {
   protected constructor(private readonly pulsarClient: PulsarClient) {}
 
   async execute(data: T, job: string) {
-    await this.validateData(data);
     if (!this.producer) {
       this.producer = await this.pulsarClient.createProducer(job);
     }
     if (Array.isArray(data)) {
       for (const message of data) {
-        await this.send(message);
+        this.send(message);
       }
       return;
     }
-    await this.send(data);
+    this.send(data);
   }
 
-  private async send(data: T) {
-    await this.producer.send({ data: serialize(data) });
+  private send(data: T) {
+    this.validateData(data).then(() => {
+      this.producer.send({ data: serialize(data) });
+    });
   }
 
   private async validateData(data: T) {
     const items = Array.isArray(data) ? data : [data];
     const errors = (
       await Promise.all(
-        items.map((item) => validate(plainToInstance(this.messageClass, item)))
+        items.map((item) => validate(plainToInstance(this.messageClass, item))),
       )
     ).flat();
 
     if (errors.length) {
       throw new BadRequestException(
-        `Job data is invalid: ${JSON.stringify(errors)}`
+        `Job data is invalid: ${JSON.stringify(errors)}`,
       );
     }
   }

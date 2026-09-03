@@ -2,21 +2,27 @@
 
 ## Purpose
 
-**Jobber** is a microservices-based backend application for **user authentication and background job management**. It's built as a distributed system using an **Nx monorepo** with two independent services.
+**Jobber** is a microservices-based backend application for **user authentication, background job management, and product data processing**. It's built as a distributed system using an **Nx monorepo** with four independent services communicating over GraphQL, gRPC, and Apache Pulsar.
 
 ---
 
 ## Core Features
 
-| Service  | Feature                                                    |
-| -------- | ---------------------------------------------------------- |
-| **auth** | User registration & login via GraphQL                      |
-| **auth** | JWT token generation stored in HttpOnly cookies            |
-| **auth** | Protected queries with guards and `@CurrentUser` decorator |
-| **auth** | Password hashing with bcryptjs                             |
-| **jobs** | Extensible job framework with abstract base class          |
-| **jobs** | `@Job()` decorator for metadata (name, description)        |
-| **jobs** | Example Fibonacci job implementation                       |
+| Service      | Feature                                                       |
+| ------------ | ------------------------------------------------------------- |
+| **auth**     | User registration & login via GraphQL                         |
+| **auth**     | JWT token generation stored in HttpOnly cookies               |
+| **auth**     | Protected queries with guards and `@CurrentUser` decorator    |
+| **auth**     | Password hashing with bcryptjs                                |
+| **auth**     | gRPC server exposing `Authenticate` for internal token checks |
+| **jobs**     | Extensible job framework with abstract base class             |
+| **jobs**     | `@Job()` decorator for metadata (name, description)           |
+| **jobs**     | Publishes job messages to Pulsar (Fibonacci, LoadProducts)    |
+| **jobs**     | Validates incoming requests via gRPC call to `auth`           |
+| **executor** | Pulsar consumers that process published job messages          |
+| **executor** | Calls `products` over gRPC to persist enriched product data   |
+| **products** | gRPC service for product creation                             |
+| **products** | Drizzle ORM + PostgreSQL persistence                          |
 
 ---
 
@@ -30,13 +36,19 @@
 
 ### API Layer
 
-- **GraphQL** (v16) + Apollo Server (v5) — code-first schema generation
+- **GraphQL** (v16) + Apollo Server (v5) — code-first schema generation, used by `auth` and `jobs`
+- **gRPC** (`@nestjs/microservices`) — internal service-to-service calls (`auth` ↔ `jobs`, `executor` ↔ `products`)
 - **Swagger/OpenAPI** — auto-generated REST docs
+
+### Messaging
+
+- **Apache Pulsar** — async job queue; `jobs` publishes, `executor` consumes
 
 ### Database
 
 - **PostgreSQL** (Docker Compose for local dev)
-- **Prisma** v7 — ORM with type-safe client + `@prisma/adapter-pg`
+- **Prisma** v7 — ORM for `auth` (type-safe client + `@prisma/adapter-pg`)
+- **Drizzle ORM** — ORM for `products`
 
 ### Auth & Security
 
@@ -58,15 +70,21 @@
 
 ```
 apps/
-├── auth/     ← GraphQL auth service (users, JWT, Prisma)
-├── jobs/     ← Job execution service (abstract jobs, decorators)
+├── auth/       ← GraphQL auth service (users, JWT, Prisma) + gRPC server        (port 3000)
+├── jobs/       ← Job registration, GraphQL API, Pulsar producer, gRPC client    (port 3001)
+├── executor/   ← Pulsar consumer, executes jobs, gRPC client to products       (port 3002)
+├── products/   ← gRPC service, Drizzle ORM, PostgreSQL persistence             (port 3003)
 ├── auth-e2e/
 └── jobs-e2e/
 libs/
-└── nestjs/          ← Shared: AbstractModel, GqlContext interface
+├── graphql/    ← Shared: AbstractModel, GqlContext, GqlAuthGuard
+├── nestjs/     ← Shared: init() bootstrap helper, Jobs enum
+├── grpc/       ← gRPC proto files + generated TypeScript types (auth, products)
+├── prisma/     ← Prisma client (used by auth)
+└── pulsar/     ← PulsarModule, PulsarClient, PulsarConsumer base class, job messages
 ```
 
-Each service is independently buildable. A shared `@jobber/graphql` library provides common GraphQL base types and context interfaces.
+Each service is independently buildable and deployable. Shared libraries provide common contracts (GraphQL base types, gRPC stubs, Pulsar messaging) so services stay decoupled.
 
 ---
 
@@ -86,6 +104,24 @@ Authenticated User → GraphQL Query with Cookie
 → Resolver → Service → Database
 ```
 
+`jobs` also validates every incoming request by calling `auth`'s gRPC `Authenticate` method directly, independent of the GraphQL guard flow above.
+
+---
+
+## Job Processing Flow
+
+```
+Client → jobs (GraphQL mutation) → JobsService discovers @Job() class
+→ Job publishes message to Pulsar topic
+→ executor (PulsarConsumer subscribed to topic) → onMessage()
+→ (LoadProducts) → gRPC call to products → Drizzle insert → PostgreSQL
+```
+
+- Decorate a class with `@Job()` to register a new job type; `JobsService` auto-discovers all `@Job()` classes via `@golevelup/nestjs-discovery`.
+- Each job publishes to a Pulsar topic named after the job type.
+- `executor` defines a matching `PulsarConsumer<T>` subclass per topic.
+- The `LoadProducts` job/consumer pair additionally calls the `products` gRPC service to persist enriched product data.
+
 ---
 
 ## Key Modules
@@ -99,24 +135,39 @@ Authenticated User → GraphQL Query with Cookie
 - **PrismaService** — PostgreSQL abstraction layer
 - **JwtStrategy** — Passport strategy reading JWT from cookies
 - **GqlAuthGuard** — GraphQL-specific authorization guard
+- **AuthController** — gRPC `Authenticate` endpoint for internal calls
 
 ### jobs
 
 - **AbstractJob** — base class for all job implementations
 - **@Job() decorator** — attaches name/description metadata to job classes
-- **FibonacciJob** — example job implementation
-- **JobsModule** — job registration and management
+- **JobsService** — discovers `@Job()` classes and manages publishing
+- **FibonacciJob**, **LoadProductsJob** — job implementations
 
-### @jobber/graphql (shared lib)
+### executor
 
-- **AbstractModel** — base GraphQL `ObjectType` with ID field
-- **GqlContext** — typed Express Request/Response for GraphQL context
+- **FibonacciConsumer**, **LoadProductsConsumer** — `PulsarConsumer<T>` subclasses processing messages per job topic
+- **LoadProductsConsumer** also acts as a gRPC client to `products`
+
+### products
+
+- **ProductsController** — gRPC `createProduct` endpoint
+- **ProductsService** — Drizzle-based persistence
+- **schema.ts** — Drizzle table definitions
+
+### Shared libraries
+
+- **`@jobber/graphql`** — `AbstractModel`, `GqlContext`, `GqlAuthGuard`
+- **`@jobber/nestjs`** — `init()` bootstrap helper used by all apps, `Jobs` enum
+- **`@jobber/grpc`** — gRPC proto files and generated TypeScript types (`auth`, `products`)
+- **`@jobber/prisma`** — Prisma client
+- **`@jobber/pulsar`** — `PulsarModule`, `PulsarClient`, abstract `PulsarConsumer<T>` base class, job message DTOs
 
 ---
 
 ## Summary
 
-A **professional-grade NestJS backend starter** demonstrating modern patterns: GraphQL-first API design, JWT cookie authentication, Prisma ORM, and Nx monorepo tooling — with a job processing system designed for future expansion into async/background task execution.
+A **NestJS microservices backend** demonstrating GraphQL-first APIs, JWT cookie authentication, gRPC for internal service calls, and Apache Pulsar for async job processing — spanning four independently deployable services (`auth`, `jobs`, `executor`, `products`) in an Nx monorepo.
 
 [Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/nest?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
 
@@ -124,15 +175,15 @@ A **professional-grade NestJS backend starter** demonstrating modern patterns: G
 
 [Click here to finish setting up your workspace!](https://cloud.nx.app/connect/Q9ciqng6Ie)
 
-## Database
+## Infrastructure
 
-Start the PostgreSQL container:
+Start PostgreSQL and Apache Pulsar:
 
 ```sh
 docker compose up -d
 ```
 
-Stop it:
+Stop them:
 
 ```sh
 docker compose down
@@ -145,19 +196,16 @@ docker compose down
 ### Serve
 
 ```sh
-npx nx serve auth          # Serve auth app
-npx nx serve jobs-lib          # Serve jobs-lib app
+npx nx serve auth                 # Serve a single app (auth, jobs, executor, products)
 npx nx run-many -t serve          # Serve all apps in parallel
 
 --skip-nx-cache                   # Run without cache
-
 ```
 
 ### Build
 
 ```sh
 npx nx build auth          # Build auth app
-npx nx build jobs-lib          # Build jobs-lib app
 npx nx run-many -t build          # Build all apps
 ```
 
@@ -165,17 +213,14 @@ npx nx run-many -t build          # Build all apps
 
 ```sh
 npx nx test auth           # Test auth app
-npx nx test jobs-lib           # Test jobs-lib app
 npx nx run-many -t test           # Test all apps
 npx nx lint auth           # Lint auth app
-npx nx lint jobs-lib           # Lint jobs-lib app
 ```
 
 To see all available targets for a project, run:
 
 ```sh
 npx nx show project auth
-npx nx show project jobs-lib
 ```
 
 These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.

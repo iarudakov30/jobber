@@ -4,8 +4,8 @@
   "license": "MIT",
   "scripts": {
     "cache-clean": "nx reset && npm cache clean --force",
-    "start": "nx run-many -t serve -p auth jobs executor --output-style=stream",
-    "stop": "fuser -k 3000/tcp 3001/tcp 3002/tcp 2>/dev/null; echo 'Ports cleared'",
+    "start": "nx run-many -t serve -p auth jobs executor products --parallel 4 --output-style=stream",
+    "stop": "fuser -k 3000/tcp 3001/tcp 3002/tcp 3003/tcp 2>/dev/null; echo 'Ports cleared'",
     "migrate-db": "docker exec -it jobber-postgres-1 psql -U postgres -c 'CREATE DATABASE auth cd apps/auth && npx prisma migrate deploy"
   },
   "workspaces": [

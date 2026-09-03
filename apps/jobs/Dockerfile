@@ -20,7 +20,6 @@ COPY libs/grpc ./libs/grpc
 COPY libs/nestjs ./libs/nestjs
 COPY libs/pulsar ./libs/pulsar
 #COPY libs/prisma ./libs/prisma
-COPY libs/jobs-lib ./libs/jobs-lib
 
 # Install dependencies
 RUN npm install

@@ -8,6 +8,20 @@
       "when": 1786115232755,
       "tag": "0000_fancy_meteorite",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788424545633,
+      "tag": "0001_jittery_golden_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788425237433,
+      "tag": "0002_seed-categories",
+      "breakpoints": true
     }
   ]
 }

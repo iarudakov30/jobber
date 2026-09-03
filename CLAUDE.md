@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Start all services
 
 ```bash
-npm start                          # serves auth, jobs-lib, executor concurrently
+npm start                          # serves auth, executor concurrently
 ```
 
 ### Individual app commands
@@ -19,7 +19,7 @@ npx nx test <app>                  # run tests
 npx nx lint <app>                  # lint
 ```
 
-Apps: `auth`, `jobs`, `executor`
+Apps: `auth`, `jobs`, `executor`, `products`
 
 ### Run a single test file
 
@@ -54,6 +54,10 @@ docker run jobs
 # executor
 docker build -t executor -f apps/executor/Dockerfile .
 docker run executor
+
+# products
+docker build -t products -f apps/products/Dockerfile .
+docker run products
 ```
 
 ### Database
@@ -61,6 +65,9 @@ docker run executor
 ```bash
 npx nx run auth:migrate-db  # run Prisma migrations
 npx nx run auth:generate    # regenerate Prisma client
+
+npx nx run products:generate-drizzle  # generate Drizzle migrations from schema
+npx nx run products:migrate-drizzle   # run Drizzle migrations
 ```
 
 ### Proto generation
@@ -78,20 +85,21 @@ npm run cache-clean                # reset Nx cache and npm cache
 
 ## Architecture
 
-Nx monorepo with three NestJS microservices and two shared libraries.
+Nx monorepo with four NestJS microservices and five shared libraries.
 
 ### Services
 
-| Service    | Port | Role                                                     |
-| ---------- | ---- | -------------------------------------------------------- |
-| `auth`     | 3000 | User auth (GraphQL + PostgreSQL/Prisma + gRPC server)    |
-| `jobs`     | 3001 | Job management (GraphQL + Pulsar producer + gRPC client) |
-| `executor` | 3002 | Job execution (Pulsar consumer)                          |
+| Service    | Port | Role                                                        |
+| ---------- | ---- | ----------------------------------------------------------- |
+| `auth`     | 3000 | User auth (GraphQL + PostgreSQL/Prisma + gRPC server)       |
+| `jobs`     | 3001 | Job management (GraphQL + Pulsar producer + gRPC client)    |
+| `executor` | 3002 | Job execution (Pulsar consumer + gRPC client to `products`) |
+| `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
 
 ### Communication Patterns
 
 1. **GraphQL (external)** — clients talk to `auth` and `jobs` via Apollo GraphQL APIs
-2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request; contract in `proto/auth.proto`
+2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request; `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
 3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them
 
 ### Job Framework
@@ -105,13 +113,17 @@ Nx monorepo with three NestJS microservices and two shared libraries.
 
 See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/app/jobs/fibonacci/fibonacci.consumer.ts` for the reference implementation.
 
+The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) follows the same pattern but its consumer (`apps/executor/src/app/jobs/products/load-products.consumer.ts`) additionally calls the `products` service over gRPC to persist the enriched product data via Drizzle.
+
 ### Shared Libraries
 
 - **`@jobber/graphql`** (`libs/graphql`) — `AbstractModel` (GraphQL base type), `GqlContext`, `GqlAuthGuard`
-- **`@jobber/nestjs`** (`libs/nestjs`) — `init()` bootstrap helper used by all three apps
-- **`@jobber/grpc`** (`libs/grpc`) — gRPC proto file and generated TypeScript types for `AuthService`
-- **`@jobber/prisma`** (`libs/prisma`) — Prisma client (placeholder)
-- **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), and abstract `PulsarConsumer<T>` base class with JSON serialization
+- **`@jobber/nestjs`** (`libs/nestjs`) — `init()` bootstrap helper used by all apps, `Jobs` enum
+- **`@jobber/grpc`** (`libs/grpc`) — gRPC proto files and generated TypeScript types for `AuthService` and `ProductsService`, plus the `Packages` enum
+- **`@jobber/prisma`** (`libs/prisma`) — Prisma client used by `auth`
+- **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, and job message DTOs (`FibonacciMessage`, `LoadProductsMessage`)
+
+`products` uses Drizzle ORM (not Prisma) for its own PostgreSQL access — schema in `apps/products/src/app/products/schema.ts`, migrations managed via `nx run products:generate-drizzle` / `migrate-drizzle`.
 
 ### Authentication Flow
 
