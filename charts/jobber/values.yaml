@@ -61,8 +61,6 @@ jobs:
   port:
     http: 3001
     grpc: 5002
-  uploads:
-    storage: 1Gi
 
 executor:
   enabled: true

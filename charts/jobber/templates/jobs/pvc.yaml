@@ -1,15 +1,17 @@
-{{- if .Values.jobs.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: uploads-pvc
 spec:
   accessModes:
+    {{- if .Values.persistence.ebs }}
     - ReadWriteOnce
+    {{- else }}
+    - ReadWriteMany
+    {{- end }}
   resources:
     requests:
-      storage: {{ .Values.jobs.uploads.storage }}
+      storage: 5Gi
   {{- if .Values.persistence.ebs }}
-  storageClassName: gp2
-  {{- end }}
-{{- end }}
+  storageClassName: ebs-sc
+  {{- end}}

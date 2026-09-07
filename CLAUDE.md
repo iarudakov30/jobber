@@ -60,6 +60,57 @@ docker build -t products -f apps/products/Dockerfile .
 docker run products
 ```
 
+### Kubernetes (minikube)
+
+Local cluster used for testing the `charts/jobber` Helm chart.
+
+```bash
+minikube start                     # start/resume the local cluster (uses the docker driver)
+minikube stop                      # stop the cluster without deleting it
+minikube status                    # check whether the cluster is up
+minikube delete                    # tear down the cluster completely
+minikube service -n jobber <svc>   # open/tunnel a service from the jobber namespace
+```
+
+`minikube start` reassigns the local API server port on each start (kubeconfig at `~/.kube/config`
+is updated automatically) — if `kubectl` fails with `connection refused`, the cluster is most
+likely stopped; run `minikube start` first.
+
+```bash
+kubectl config current-context     # should print "minikube"
+kubectl get namespaces             # list namespaces
+kubectl get pods -A                # list pods across all namespaces
+kubectl get pods -n jobber         # list pods in the app's namespace (once installed)
+kubectl get pods -n postgresql     # list pods in the postgresql subchart's namespace
+kubectl get pods -n pulsar         # list pods in the pulsar subchart's namespace
+kubectl get svc -n jobber          # list services in the app's namespace
+kubectl exec --stdin --tty jobber-postgresql-0 -n postgresql -- sh   # shell into the postgres pod
+```
+
+```bash
+eval $(minikube docker-env)        # point the local docker CLI at minikube's daemon, so
+                                    # `docker build` output is usable by the cluster without a push
+```
+
+### Helm
+
+```bash
+# from the repo root
+helm upgrade --install jobber charts/jobber -n jobber --create-namespace
+
+# from charts/jobber
+helm upgrade jobber . -n jobber    # upgrade an existing release (chart path is ".")
+helm install jobber . -n jobber --create-namespace
+
+helm lint charts/jobber            # validate the chart
+helm template jobber charts/jobber -n jobber   # render manifests locally without applying
+helm diff upgrade jobber charts/jobber -n jobber   # requires the helm-diff plugin
+
+helm list -n jobber                # show installed releases
+helm status jobber -n jobber       # show release status
+helm uninstall jobber -n jobber
+```
+
 ### Database
 
 ```bash
