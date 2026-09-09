@@ -5,7 +5,7 @@ import {
   Logger,
   NestInterceptor,
 } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { Observable, tap } from 'rxjs';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class GrpcLoggingInterceptor implements NestInterceptor {
     const handler = context.getHandler().name;
     const args = context.getArgs()[0];
     const startTime = Date.now();
-    const requestId = uuidv4();
+    const requestId = randomUUID();
 
     this.logger.log({
       requestId,

@@ -5,6 +5,7 @@
   "scripts": {
     "cache-clean": "nx reset && npm cache clean --force",
     "build": "npx nx run-many -t build -p auth jobs executor products",
+    "test": "npx nx affected -t lint test build",
     "start": "nx run-many -t serve -p auth jobs executor products --parallel 4 --output-style=stream",
     "stop": "fuser -k 3000/tcp 3001/tcp 3002/tcp 3003/tcp 2>/dev/null; echo 'Ports cleared'",
     "migrate-db": "docker exec -it jobber-postgres-1 psql -U postgres -c 'CREATE DATABASE auth cd apps/auth && npx prisma migrate deploy"
@@ -30,8 +31,7 @@
     "pino-http": "^11.0.0",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
-    "ts-proto": "^2.11.4",
-    "uuid": "^14.0.0"
+    "ts-proto": "^2.11.4"
   },
   "_moduleAliases": {
     "@jobber/grpc": "dist/libs/grpc/main",

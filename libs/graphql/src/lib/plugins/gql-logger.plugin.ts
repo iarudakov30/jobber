@@ -4,7 +4,7 @@ import {
   GraphQLRequestContext,
   GraphQLRequestListener,
 } from '@apollo/server';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { Logger } from '@nestjs/common';
 
 export class GqlLoggingPlugin implements ApolloServerPlugin {
@@ -18,7 +18,7 @@ export class GqlLoggingPlugin implements ApolloServerPlugin {
     if (request.operationName === 'IntrospectionQuery') return;
 
     const start = Date.now();
-    const requestId = uuidv4();
+    const requestId = randomUUID();
 
     this.logger.log({
       requestId,
