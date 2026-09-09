@@ -10,13 +10,13 @@ export abstract class PulsarConsumer<T> implements OnModuleInit {
 
   protected constructor(
     private readonly pulsarClient: PulsarClient,
-    private readonly topic: string
+    private readonly topic: string,
   ) {}
 
   async onModuleInit() {
     this.consumer = await this.pulsarClient.createConsumer(
       this.topic,
-      this.listener.bind(this)
+      this.listener.bind(this),
     );
   }
 
@@ -29,10 +29,10 @@ export abstract class PulsarConsumer<T> implements OnModuleInit {
       this.logger.debug(`PulsarConsumer: ${JSON.stringify(data)}`);
 
       await this.onMessage(data);
+      await this.consumer.acknowledge(message);
     } catch (e) {
       this.logger.error(e);
-    } finally {
-      await this.consumer.acknowledge(message);
+      this.consumer.negativeAcknowledge(message);
     }
   }
 }
