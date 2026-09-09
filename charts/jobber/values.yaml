@@ -1,5 +1,5 @@
 global:
-  imagePullPolicy: Always
+  imagePullPolicy: Never
 
 ingress:
   alb: false
@@ -10,6 +10,7 @@ persistence:
 pulsar:
   namespace: pulsar
   namespaceCreate: true
+  defaultPulsarImageRepository: apachepulsar/pulsar
   components:
     proxy: false
   zookeeper:
@@ -43,6 +44,8 @@ pulsar:
 
 postgresql:
   namespaceOverride: postgresql
+  image:
+    tag: latest
   auth:
     username: postgres
     password: postgres
@@ -57,7 +60,7 @@ postgresql:
 jobs:
   enabled: true
   replicas: 1
-  image: '905418201315.dkr.ecr.us-east-1.amazonaws.com/jobber/jobs:latest'
+  image: 'jobs:latest'
   port:
     http: 3001
     grpc: 5002
@@ -65,13 +68,13 @@ jobs:
 executor:
   enabled: true
   replicas: 1
-  image: '905418201315.dkr.ecr.us-east-1.amazonaws.com/jobber/executor:latest'
+  image: 'executor:latest'
   port: 3002
 
 auth:
   enabled: true
   replicas: 1
-  image: '905418201315.dkr.ecr.us-east-1.amazonaws.com/jobber/auth:latest'
+  image: 'auth:latest'
   port:
     http: 3000
     grpc: 5000
@@ -83,7 +86,7 @@ auth:
 products:
   enabled: true
   replicas: 1
-  image: '905418201315.dkr.ecr.us-east-1.amazonaws.com/jobber/products:latest'
+  image: 'products:latest'
   port:
     http: 3003
     grpc: 5001

@@ -2,6 +2,7 @@ import { FibonacciMessage, PulsarClient } from '@jobber/pulsar';
 import { Jobs } from '@jobber/nestjs';
 import { Job } from '../../decorators/job.decorator';
 import { AbstractJob } from '../abstract.job';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Job({
   name: Jobs.FIBONACCI,
@@ -9,7 +10,7 @@ import { AbstractJob } from '../abstract.job';
 })
 export class FibonacciJob extends AbstractJob<FibonacciMessage> {
   protected messageClass = FibonacciMessage;
-  constructor(pulsarClient: PulsarClient) {
-    super(pulsarClient);
+  constructor(pulsarClient: PulsarClient, prismaService: PrismaService) {
+    super(pulsarClient, prismaService);
   }
 }

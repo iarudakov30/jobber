@@ -19,7 +19,7 @@ COPY libs/graphql ./libs/graphql
 COPY libs/grpc ./libs/grpc
 COPY libs/nestjs ./libs/nestjs
 COPY libs/pulsar ./libs/pulsar
-#COPY libs/prisma ./libs/prisma
+COPY libs/prisma ./libs/prisma
 
 # Install dependencies
 RUN npm install
@@ -27,7 +27,7 @@ RUN npm install
 RUN apt-get update && apt-get install -y protobuf-compiler
 
 # Generate Prisma client
-#RUN cd apps/jobs && npx prisma generate
+RUN cd apps/jobs && npx prisma generate
 
 RUN npx nx build jobs
 
@@ -43,14 +43,16 @@ COPY --from=builder /workspace/apps/jobs/package.json ./apps/jobs/package.json
 COPY --from=builder /workspace/libs/graphql/package.json ./libs/graphql/package.json
 COPY --from=builder /workspace/libs/grpc/package.json ./libs/grpc/package.json
 COPY --from=builder /workspace/libs/pulsar/package.json ./libs/pulsar/package.json
-#COPY --from=builder /workspace/apps/jobs/prisma ./prisma
-#COPY --from=builder /workspace/apps/jobs/prisma.config.ts ./prisma.config.ts
-#COPY --from=builder /workspace/libs/prisma/package.json ./libs/prisma/package.json
+COPY --from=builder /workspace/apps/jobs/prisma ./prisma
+COPY --from=builder /workspace/apps/jobs/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /workspace/libs/prisma/package.json ./libs/prisma/package.json
 COPY --from=builder /workspace/package-lock.json ./
 
 ENV NODE_ENV=production
 
 RUN npm ci
+
+COPY --from=builder /workspace/node_modules/@prisma-clients/jobs/ ./node_modules/@prisma-clients/jobs
 
 # Copy build output
 COPY --from=builder /workspace/dist ./dist

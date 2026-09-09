@@ -2,6 +2,7 @@
   "name": "@jobber/auth",
   "version": "0.0.0",
   "dependencies": {
+    "@as-integrations/express5": "^1.1.2",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "bcryptjs": "^3.0.3",

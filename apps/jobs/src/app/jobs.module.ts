@@ -13,11 +13,14 @@ import { FibonacciJob } from './jobs/fibonacci/fibonacci.job';
 import { JobsService } from './jobs.service';
 import { JobsResolver } from './jobs.resolver';
 import { LoadProductsJob } from './jobs/products/load-products.job';
+import { PrismaModule } from './prisma/prisma.module';
+import { JobsController } from './jobs.controller';
 
 @Module({
   imports: [
     DiscoveryModule,
     PulsarModule,
+    PrismaModule,
     ClientsModule.registerAsync([
       {
         name: Packages.AUTH,
@@ -33,6 +36,7 @@ import { LoadProductsJob } from './jobs/products/load-products.job';
       },
     ]),
   ],
+  controllers: [JobsController],
   providers: [FibonacciJob, JobsService, JobsResolver, LoadProductsJob],
 })
 export class JobsModule {}

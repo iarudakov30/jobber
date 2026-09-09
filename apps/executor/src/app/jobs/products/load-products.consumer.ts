@@ -1,9 +1,5 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import {
-  LoadProductsMessage,
-  PulsarClient,
-  PulsarConsumer,
-} from '@jobber/pulsar';
+import { LoadProductsMessage, PulsarClient } from '@jobber/pulsar';
 import { Jobs } from '@jobber/nestjs';
 import {
   Packages,
@@ -12,29 +8,32 @@ import {
 } from '@jobber/grpc';
 import { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
+import { JobsConsumer } from '../jobs.consumer';
 
 @Injectable()
 export class LoadProductsConsumer
-  extends PulsarConsumer<LoadProductsMessage>
+  extends JobsConsumer<LoadProductsMessage>
   implements OnModuleInit
 {
   private productsService: ProductsServiceClient;
 
   constructor(
     pulsarClient: PulsarClient,
-    @Inject(Packages.PRODUCTS) private client: ClientGrpc,
+    @Inject(Packages.JOBS) private clientJobs: ClientGrpc,
+    @Inject(Packages.PRODUCTS) private clientProducts: ClientGrpc,
   ) {
-    super(pulsarClient, Jobs.LOAD_PRODUCTS);
+    super(Jobs.LOAD_PRODUCTS, pulsarClient, clientJobs);
   }
 
   async onModuleInit(): Promise<void> {
     await super.onModuleInit();
-    this.productsService = this.client.getService<ProductsServiceClient>(
-      PRODUCTS_SERVICE_NAME,
-    );
+    this.productsService =
+      this.clientProducts.getService<ProductsServiceClient>(
+        PRODUCTS_SERVICE_NAME,
+      );
   }
 
-  protected async onMessage(data: LoadProductsMessage): Promise<void> {
+  protected async execute(data: LoadProductsMessage): Promise<void> {
     this.logger.log(`LoadProductsConsumer: ${JSON.stringify(data)}`);
     await firstValueFrom(this.productsService.createProduct(data));
   }

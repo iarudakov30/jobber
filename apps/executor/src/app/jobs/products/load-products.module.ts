@@ -8,10 +8,12 @@ import { Packages } from '@jobber/grpc';
 import { join } from 'path';
 
 import { LoadProductsConsumer } from './load-products.consumer';
+import { JobClientsModule } from '../job-clients.module';
 
 @Module({
   imports: [
     PulsarModule,
+    JobClientsModule,
     ClientsModule.registerAsync([
       {
         name: Packages.PRODUCTS,

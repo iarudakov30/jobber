@@ -1,4 +1,5 @@
 export enum Packages {
   AUTH = 'auth',
-  PRODUCTS = 'products'
+  PRODUCTS = 'products',
+  JOBS = 'jobs',
 }
