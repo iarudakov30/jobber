@@ -22,7 +22,7 @@ spec:
           command: ["sh", "-c"]
           args:
             - |
-              npx prisma migrate deploy --schema=apps/jobs/prisma/schema.prisma
+              npx prisma migrate deploy --schema=prisma/schema.prisma
           env:
             {{- include "common.env" . | nindent 12 }}
             - name: DATABASE_URL
