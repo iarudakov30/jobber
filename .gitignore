@@ -46,3 +46,6 @@ Thumbs.db
 
 data/*
 apps/jobs/uploads
+
+# Helm dependency archives (regenerate with `helm dependency build`)
+charts/**/charts/*.tgz

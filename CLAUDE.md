@@ -94,6 +94,14 @@ eval $(minikube docker-env)        # point the local docker CLI at minikube's da
 
 ### Helm
 
+Dependency subcharts (`pulsar`, `postgresql`) are not committed — `charts/jobber/charts/*.tgz` is
+gitignored and regenerated from `Chart.lock`. Run this once after cloning, and whenever
+`Chart.yaml`/`Chart.lock` changes, before `install`/`upgrade`/`template`/`lint`:
+
+```bash
+helm dependency build charts/jobber
+```
+
 ```bash
 # from the repo root
 helm upgrade --install jobber charts/jobber -n jobber --create-namespace
