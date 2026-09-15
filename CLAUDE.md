@@ -92,6 +92,16 @@ eval $(minikube docker-env)        # point the local docker CLI at minikube's da
                                     # `docker build` output is usable by the cluster without a push
 ```
 
+Images are tagged `:latest` and pulled with a static policy, so after rebuilding an image with
+`docker build` (under `minikube docker-env`), Kubernetes won't notice the new image on its own —
+`helm upgrade` reapplies manifests but does not restart pods when the tag is unchanged. Restart the
+deployment manually to pick up the new image:
+
+```bash
+kubectl rollout restart deployment/<app> -n jobber
+kubectl rollout status deployment/<app> -n jobber
+```
+
 ### Helm
 
 Dependency subcharts (`pulsar`, `postgresql`) are not committed — `charts/jobber/charts/*.tgz` is
