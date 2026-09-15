@@ -25,6 +25,7 @@ import { AuthModule } from './auth/auth.module';
       },
       context: ({ req, res }) => ({ req, res }),
       autoSchemaFile: true,
+      useGlobalPrefix: true,
     }),
     UsersModule,
     AuthModule,

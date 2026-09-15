@@ -15,7 +15,7 @@ async function bootstrap() {
   const app: INestApplication = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
-  await init(app);
+  await init(app, 'auth');
   app.connectMicroservice<GrpcOptions>({
     transport: Transport.GRPC,
     options: {

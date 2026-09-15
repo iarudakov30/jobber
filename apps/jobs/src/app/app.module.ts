@@ -25,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module';
       },
       context: ({ req, res }) => ({ req, res }),
       autoSchemaFile: true,
+      useGlobalPrefix: true,
     }),
   ],
   controllers: [],
