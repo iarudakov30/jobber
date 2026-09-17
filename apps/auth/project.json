@@ -52,7 +52,8 @@
       "options": {
         "buildTarget": "auth:build",
         "runBuildTargetDependencies": true,
-        "watch": true
+        "watch": true,
+        "port": 9229
       },
       "configurations": {
         "development": {

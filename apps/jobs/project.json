@@ -51,7 +51,8 @@
       "options": {
         "buildTarget": "jobs:build",
         "runBuildTargetDependencies": true,
-        "watch": true
+        "watch": true,
+        "port": 9230
       },
       "configurations": {
         "development": {

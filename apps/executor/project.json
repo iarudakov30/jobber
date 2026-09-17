@@ -50,7 +50,8 @@
       "options": {
         "buildTarget": "executor:build",
         "runBuildTargetDependencies": true,
-        "watch": true
+        "watch": true,
+        "port": 9231
       },
       "configurations": {
         "development": {
