@@ -114,12 +114,14 @@ kubectl get svc -n jobber auth-http jobs-http   # watch EXTERNAL-IP move from <p
 ```
 
 Both `auth` and `jobs` set a NestJS global prefix matching their app name
-(`libs/nestjs/src/lib/init.ts`), and `useGlobalPrefix: true` on the GraphQL module makes GraphQL
-inherit it, so the endpoints are not served at bare `/graphql`:
+(`libs/nestjs/src/lib/init.ts`), but the GraphQL module sets its own explicit `path` (`auth`/`jobs`)
+instead of inheriting that prefix via `useGlobalPrefix`, so the endpoints are served directly at
+that path (not `/graphql` or `/auth/graphql`/`/jobs/graphql`). `graphiql: true` also enables the
+embedded GraphiQL IDE at that same endpoint:
 
 ```
-http://127.0.0.1:3000/auth/graphql
-http://127.0.0.1:3001/jobs/graphql
+http://127.0.0.1:3000/auth
+http://127.0.0.1:3001/jobs
 ```
 
 These bypass the `jobber.local` ingress entirely. On a real cloud cluster (e.g. EKS), prefer the
