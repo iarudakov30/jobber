@@ -47,5 +47,9 @@ Thumbs.db
 data/*
 apps/jobs/uploads
 
+# Generated Prisma clients
+apps/auth/src/generated/
+apps/jobs/src/generated/
+
 # Helm dependency archives (regenerate with `helm dependency build`)
 charts/**/charts/*.tgz

@@ -54,8 +54,6 @@ ENV NODE_ENV=production
 # Install production dependencies
 RUN npm ci
 
-COPY --from=builder /workspace/node_modules/@prisma-clients/auth/ ./node_modules/@prisma-clients/auth
-
 # Copy build output
 COPY --from=builder /workspace/dist ./dist
 

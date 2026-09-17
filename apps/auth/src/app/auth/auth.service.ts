@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { compare } from 'bcryptjs';
 
-import { User as UserPrisma } from '@prisma-clients/auth';
+import { User as UserPrisma } from '../../generated/prisma/client';
 
 import { UsersService } from '../users/users.service';
 import { User } from '../users/models/user.model';
@@ -18,18 +18,18 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
-    private readonly jwtService: JwtService
+    private readonly jwtService: JwtService,
   ) {}
   async login(
     { email, password }: LoginInput,
-    response: Response
+    response: Response,
   ): Promise<User> {
     const user: UserPrisma = await this.verifyUser(email, password);
 
     const expires = new Date();
     expires.setMilliseconds(
       expires.getTime() +
-        parseInt(this.configService.getOrThrow('JWT_EXPIRATION_MS'))
+        parseInt(this.configService.getOrThrow('JWT_EXPIRATION_MS')),
     );
     const tokenPayload: TokenPayload = {
       userId: user.id,
@@ -49,7 +49,7 @@ export class AuthService {
 
   private async verifyUser(
     email: string,
-    password: string
+    password: string,
   ): Promise<UserPrisma> {
     try {
       const user: UserPrisma = await this.usersService.getUser({ email });

@@ -52,8 +52,6 @@ ENV NODE_ENV=production
 
 RUN npm ci
 
-COPY --from=builder /workspace/node_modules/@prisma-clients/jobs/ ./node_modules/@prisma-clients/jobs
-
 # Copy build output
 COPY --from=builder /workspace/dist ./dist
 

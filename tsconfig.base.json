@@ -13,6 +13,7 @@
     "lib": ["es2020", "dom"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
+    "rewriteRelativeImportExtensions": true,
     "baseUrl": ".",
     "paths": {
       "@jobber/graphql": ["libs/graphql/src/index.ts"],
