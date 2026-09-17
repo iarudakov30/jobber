@@ -102,6 +102,31 @@ kubectl rollout restart deployment/<app> -n jobber
 kubectl rollout status deployment/<app> -n jobber
 ```
 
+`auth-http` and `jobs-http` are `type: LoadBalancer` services (see
+`charts/jobber/templates/auth/service-http.yaml` and `charts/jobber/templates/jobs/service-http.yaml`).
+Minikube has no cloud provider to satisfy `LoadBalancer`, so their `EXTERNAL-IP` stays `<pending>`
+until you run `minikube tunnel` (separate terminal, prompts for sudo) — it then assigns a routable
+`EXTERNAL-IP` (typically `127.0.0.1`):
+
+```bash
+minikube tunnel                        # keep running in its own terminal
+kubectl get svc -n jobber auth-http jobs-http   # watch EXTERNAL-IP move from <pending>
+```
+
+Both `auth` and `jobs` set a NestJS global prefix matching their app name
+(`libs/nestjs/src/lib/init.ts`), and `useGlobalPrefix: true` on the GraphQL module makes GraphQL
+inherit it, so the endpoints are not served at bare `/graphql`:
+
+```
+http://127.0.0.1:3000/auth/graphql
+http://127.0.0.1:3001/jobs/graphql
+```
+
+These bypass the `jobber.local` ingress entirely. On a real cloud cluster (e.g. EKS), prefer the
+ALB ingress path (`ingress.alb: true` in `charts/jobber/values.yaml`) over per-service
+`LoadBalancer` — one ALB fans out by path/host instead of provisioning a separate billed load
+balancer per service.
+
 ### Helm
 
 Dependency subcharts (`pulsar`, `postgresql`) are not committed — `charts/jobber/charts/*.tgz` is

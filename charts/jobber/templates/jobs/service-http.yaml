@@ -6,7 +6,7 @@ metadata:
   labels:
     app: jobs
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: jobs
   ports:
