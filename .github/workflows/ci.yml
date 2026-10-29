@@ -20,7 +20,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Angular 22 requires Node ^22.22.3 || ^24.15.0 || >=26
+          node-version: 24
           cache: 'npm'
 
       - name: Setup protoc
