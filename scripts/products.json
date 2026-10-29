@@ -1,0 +1,1602 @@
+[
+  {
+    "name": "Collectible Dollhouse",
+    "category": "Toys & Games",
+    "price": 70.49,
+    "stock": 427,
+    "rating": 4.7,
+    "description": "Hours of fun for kids and adults alike with this exciting collectible dollhouse."
+  },
+  {
+    "name": "Vintage T-Shirt",
+    "category": "Apparel",
+    "price": 32.49,
+    "stock": 88,
+    "rating": 1,
+    "description": "Comfortable and stylish vintage t-shirt perfect for any occasion."
+  },
+  {
+    "name": "Performance Resistance Bands",
+    "category": "Sports & Outdoors",
+    "price": 287.17,
+    "stock": 333,
+    "rating": 4.4,
+    "description": "Built for performance, this performance resistance bands is ideal for athletes of all levels."
+  },
+  {
+    "name": "Vitamin-Enriched Nail Kit",
+    "category": "Health & Beauty",
+    "price": 29.49,
+    "stock": 279,
+    "rating": 4.3,
+    "description": "Clinically tested vitamin-enriched nail kit that delivers visible results in weeks."
+  },
+  {
+    "name": "Quick-Dry Fishing Rod",
+    "category": "Sports & Outdoors",
+    "price": 313.06,
+    "stock": 57,
+    "rating": 3.6,
+    "description": "Durable quick-dry fishing rod designed to withstand tough outdoor conditions."
+  },
+  {
+    "name": "Foldable Dining Table",
+    "category": "Furniture",
+    "price": 2815.49,
+    "stock": 372,
+    "rating": 3.2,
+    "description": "Sturdy and elegant foldable dining table designed for both comfort and style."
+  },
+  {
+    "name": "Multipack Sticky Notes",
+    "category": "Office Supplies",
+    "price": 151.99,
+    "stock": 379,
+    "rating": 2.9,
+    "description": "A must-have multipack sticky notes for any professional or student."
+  },
+  {
+    "name": "Advanced Power Bank",
+    "category": "Electronics",
+    "price": 420.59,
+    "stock": 240,
+    "rating": 1.7,
+    "description": "Feature-packed advanced power bank offering excellent value and durability."
+  },
+  {
+    "name": "Artisan Oatmeal",
+    "category": "Grocery",
+    "price": 12.49,
+    "stock": 230,
+    "rating": 2.2,
+    "description": "A wholesome artisan oatmeal the whole family will love."
+  },
+  {
+    "name": "Anti-Aging Eye Cream",
+    "category": "Health & Beauty",
+    "price": 139.49,
+    "stock": 212,
+    "rating": 2.4,
+    "description": "Clinically tested anti-aging eye cream that delivers visible results in weeks."
+  },
+  {
+    "name": "Advanced Webcam",
+    "category": "Electronics",
+    "price": 1042.11,
+    "stock": 317,
+    "rating": 3.7,
+    "description": "Sleek and reliable advanced webcam designed for tech enthusiasts."
+  },
+  {
+    "name": "Creative Play Dough Set",
+    "category": "Toys & Games",
+    "price": 26.49,
+    "stock": 119,
+    "rating": 4.3,
+    "description": "A perfect gift that provides entertainment for the whole family."
+  },
+  {
+    "name": "Interactive Card Game",
+    "category": "Toys & Games",
+    "price": 83.99,
+    "stock": 337,
+    "rating": 2,
+    "description": "Spark creativity and imagination with this engaging interactive card game."
+  },
+  {
+    "name": "Solid Wood Wardrobe",
+    "category": "Furniture",
+    "price": 1884.39,
+    "stock": 444,
+    "rating": 1.2,
+    "description": "Beautifully crafted solid wood wardrobe that elevates any living space."
+  },
+  {
+    "name": "Ergonomic Coffee Table",
+    "category": "Furniture",
+    "price": 1353.99,
+    "stock": 246,
+    "rating": 3.4,
+    "description": "Sturdy and elegant ergonomic coffee table designed for both comfort and style."
+  },
+  {
+    "name": "Remote Control Action Figure",
+    "category": "Toys & Games",
+    "price": 148.99,
+    "stock": 382,
+    "rating": 1.9,
+    "description": "A perfect gift that provides entertainment for the whole family."
+  },
+  {
+    "name": "Farm Fresh Dark Chocolate",
+    "category": "Grocery",
+    "price": 9.99,
+    "stock": 303,
+    "rating": 4.5,
+    "description": "A wholesome farm fresh dark chocolate the whole family will love."
+  },
+  {
+    "name": "Ultra-Moisturizing Conditioner",
+    "category": "Health & Beauty",
+    "price": 68.6,
+    "stock": 12,
+    "rating": 2.7,
+    "description": "Pamper yourself with this luxurious ultra-moisturizing conditioner made from natural ingredients."
+  },
+  {
+    "name": "Rustic Office Chair",
+    "category": "Furniture",
+    "price": 1793.49,
+    "stock": 309,
+    "rating": 4.6,
+    "description": "Beautifully crafted rustic office chair that elevates any living space."
+  },
+  {
+    "name": "Athletic Polo Shirt",
+    "category": "Apparel",
+    "price": 78.99,
+    "stock": 232,
+    "rating": 3.9,
+    "description": "Comfortable and stylish athletic polo shirt perfect for any occasion."
+  },
+  {
+    "name": "Deluxe Coffee Maker",
+    "category": "Home & Kitchen",
+    "price": 454.49,
+    "stock": 364,
+    "rating": 3.4,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean deluxe coffee maker."
+  },
+  {
+    "name": "Farm Fresh Granola",
+    "category": "Grocery",
+    "price": 20.49,
+    "stock": 184,
+    "rating": 1.7,
+    "description": "Delicious farm fresh granola sourced from the finest ingredients."
+  },
+  {
+    "name": "Interactive Dollhouse",
+    "category": "Toys & Games",
+    "price": 31.99,
+    "stock": 195,
+    "rating": 3.6,
+    "description": "A perfect gift that provides entertainment for the whole family."
+  },
+  {
+    "name": "Educational Stuffed Animal",
+    "category": "Toys & Games",
+    "price": 11.43,
+    "stock": 209,
+    "rating": 2.4,
+    "description": "Spark creativity and imagination with this engaging educational stuffed animal."
+  },
+  {
+    "name": "Gluten-Free Granola",
+    "category": "Grocery",
+    "price": 9.99,
+    "stock": 251,
+    "rating": 2.4,
+    "description": "Enjoy the rich authentic flavor of this carefully selected gluten-free granola."
+  },
+  {
+    "name": "Magnetic Board Game",
+    "category": "Toys & Games",
+    "price": 72.99,
+    "stock": 248,
+    "rating": 2.5,
+    "description": "Spark creativity and imagination with this engaging magnetic board game."
+  },
+  {
+    "name": "Rustic Dining Table",
+    "category": "Furniture",
+    "price": 1802.99,
+    "stock": 138,
+    "rating": 1.8,
+    "description": "Beautifully crafted rustic dining table that elevates any living space."
+  },
+  {
+    "name": "Pro USB Hub",
+    "category": "Electronics",
+    "price": 1081.99,
+    "stock": 33,
+    "rating": 4.9,
+    "description": "High-performance pro usb hub with cutting-edge technology for everyday use."
+  },
+  {
+    "name": "Premium Hard Drive",
+    "category": "Electronics",
+    "price": 93.96,
+    "stock": 225,
+    "rating": 4.5,
+    "description": "High-performance premium hard drive with cutting-edge technology for everyday use."
+  },
+  {
+    "name": "Revitalizing Conditioner",
+    "category": "Health & Beauty",
+    "price": 66.99,
+    "stock": 297,
+    "rating": 1.5,
+    "description": "Pamper yourself with this luxurious revitalizing conditioner made from natural ingredients."
+  },
+  {
+    "name": "All-Weather Cycling Gloves",
+    "category": "Sports & Outdoors",
+    "price": 484.96,
+    "stock": 441,
+    "rating": 4.1,
+    "description": "Built for performance, this all-weather cycling gloves is ideal for athletes of all levels."
+  },
+  {
+    "name": "Insulated Cookware Set",
+    "category": "Home & Kitchen",
+    "price": 280.99,
+    "stock": 367,
+    "rating": 4.9,
+    "description": "Durable insulated cookware set built to last through years of daily use."
+  },
+  {
+    "name": "Educational Board Game",
+    "category": "Toys & Games",
+    "price": 45.45,
+    "stock": 187,
+    "rating": 1.2,
+    "description": "Spark creativity and imagination with this engaging educational board game."
+  },
+  {
+    "name": "Whole Grain Rice",
+    "category": "Grocery",
+    "price": 28.49,
+    "stock": 349,
+    "rating": 2.9,
+    "description": "Delicious whole grain rice sourced from the finest ingredients."
+  },
+  {
+    "name": "Giant Building Blocks",
+    "category": "Toys & Games",
+    "price": 123.99,
+    "stock": 273,
+    "rating": 3.8,
+    "description": "Hours of fun for kids and adults alike with this exciting giant building blocks."
+  },
+  {
+    "name": "Vitamin-Enriched Conditioner",
+    "category": "Health & Beauty",
+    "price": 65.99,
+    "stock": 50,
+    "rating": 2.7,
+    "description": "Clinically tested vitamin-enriched conditioner that delivers visible results in weeks."
+  },
+  {
+    "name": "Modern Side Table",
+    "category": "Furniture",
+    "price": 2295.99,
+    "stock": 437,
+    "rating": 4.3,
+    "description": "Beautifully crafted modern side table that elevates any living space."
+  },
+  {
+    "name": "Ceramic Knife Set",
+    "category": "Home & Kitchen",
+    "price": 5.32,
+    "stock": 97,
+    "rating": 1.9,
+    "description": "Durable ceramic knife set built to last through years of daily use."
+  },
+  {
+    "name": "Quick-Dry Cycling Gloves",
+    "category": "Sports & Outdoors",
+    "price": 624.99,
+    "stock": 377,
+    "rating": 4.5,
+    "description": "Take your training to the next level with this top-rated quick-dry cycling gloves."
+  },
+  {
+    "name": "All-Weather Foam Roller",
+    "category": "Sports & Outdoors",
+    "price": 439.99,
+    "stock": 18,
+    "rating": 3.9,
+    "description": "Take your training to the next level with this top-rated all-weather foam roller."
+  },
+  {
+    "name": "Gentle Lip Balm",
+    "category": "Health & Beauty",
+    "price": 115.67,
+    "stock": 439,
+    "rating": 4.3,
+    "description": "Gentle yet effective gentle lip balm suitable for all skin types."
+  },
+  {
+    "name": "Electric Toaster",
+    "category": "Home & Kitchen",
+    "price": 147.87,
+    "stock": 445,
+    "rating": 3.9,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean electric toaster."
+  },
+  {
+    "name": "Premium Desk Lamp",
+    "category": "Office Supplies",
+    "price": 178.49,
+    "stock": 417,
+    "rating": 1.8,
+    "description": "Reliable premium desk lamp that boosts productivity at home or in the office."
+  },
+  {
+    "name": "Vitamin-Enriched Lip Balm",
+    "category": "Health & Beauty",
+    "price": 77.88,
+    "stock": 433,
+    "rating": 2.7,
+    "description": "Pamper yourself with this luxurious vitamin-enriched lip balm made from natural ingredients."
+  },
+  {
+    "name": "Classic Puzzle",
+    "category": "Toys & Games",
+    "price": 79.49,
+    "stock": 218,
+    "rating": 4.6,
+    "description": "Hours of fun for kids and adults alike with this exciting classic puzzle."
+  },
+  {
+    "name": "Comfort Hoodie",
+    "category": "Apparel",
+    "price": 60.99,
+    "stock": 17,
+    "rating": 1.8,
+    "description": "Trendy comfort hoodie that combines fashion with functionality."
+  },
+  {
+    "name": "Electric Blender",
+    "category": "Home & Kitchen",
+    "price": 476.49,
+    "stock": 337,
+    "rating": 1,
+    "description": "Durable electric blender built to last through years of daily use."
+  },
+  {
+    "name": "Compact Earbuds",
+    "category": "Electronics",
+    "price": 1123.41,
+    "stock": 394,
+    "rating": 4.4,
+    "description": "Feature-packed compact earbuds offering excellent value and durability."
+  },
+  {
+    "name": "Vintage Chinos",
+    "category": "Apparel",
+    "price": 118.01,
+    "stock": 90,
+    "rating": 4.7,
+    "description": "Comfortable and stylish vintage chinos perfect for any occasion."
+  },
+  {
+    "name": "Deep Cleansing Shampoo",
+    "category": "Health & Beauty",
+    "price": 98.99,
+    "stock": 317,
+    "rating": 1.8,
+    "description": "Gentle yet effective deep cleansing shampoo suitable for all skin types."
+  },
+  {
+    "name": "Casual Hoodie",
+    "category": "Apparel",
+    "price": 21.42,
+    "stock": 420,
+    "rating": 2.4,
+    "description": "Made from premium materials, this casual hoodie offers all-day comfort."
+  },
+  {
+    "name": "Farm Fresh Almonds",
+    "category": "Grocery",
+    "price": 4.99,
+    "stock": 389,
+    "rating": 4.8,
+    "description": "A wholesome farm fresh almonds the whole family will love."
+  },
+  {
+    "name": "Slim Fit Jacket",
+    "category": "Apparel",
+    "price": 245.49,
+    "stock": 13,
+    "rating": 2.6,
+    "description": "Trendy slim fit jacket that combines fashion with functionality."
+  },
+  {
+    "name": "Insulated Slow Cooker",
+    "category": "Home & Kitchen",
+    "price": 182.99,
+    "stock": 447,
+    "rating": 3.8,
+    "description": "Essential insulated slow cooker that makes cooking and kitchen tasks a breeze."
+  },
+  {
+    "name": "Trail Foam Roller",
+    "category": "Sports & Outdoors",
+    "price": 245.99,
+    "stock": 230,
+    "rating": 1.1,
+    "description": "Take your training to the next level with this top-rated trail foam roller."
+  },
+  {
+    "name": "Sugar-Free Maple Syrup",
+    "category": "Grocery",
+    "price": 40.48,
+    "stock": 208,
+    "rating": 3.6,
+    "description": "Enjoy the rich authentic flavor of this carefully selected sugar-free maple syrup."
+  },
+  {
+    "name": "Athletic Cardigan",
+    "category": "Apparel",
+    "price": 149.99,
+    "stock": 30,
+    "rating": 4.9,
+    "description": "Trendy athletic cardigan that combines fashion with functionality."
+  },
+  {
+    "name": "Adhesive Sticky Notes",
+    "category": "Office Supplies",
+    "price": 21.99,
+    "stock": 485,
+    "rating": 3.9,
+    "description": "A must-have adhesive sticky notes for any professional or student."
+  },
+  {
+    "name": "Slim Fit Polo Shirt",
+    "category": "Apparel",
+    "price": 89.49,
+    "stock": 495,
+    "rating": 3.2,
+    "description": "Made from premium materials, this slim fit polo shirt offers all-day comfort."
+  },
+  {
+    "name": "Foldable Backpack",
+    "category": "Sports & Outdoors",
+    "price": 134.49,
+    "stock": 345,
+    "rating": 2.5,
+    "description": "Take your training to the next level with this top-rated foldable backpack."
+  },
+  {
+    "name": "Glow-in-the-Dark Art Kit",
+    "category": "Toys & Games",
+    "price": 39.99,
+    "stock": 49,
+    "rating": 2.6,
+    "description": "Spark creativity and imagination with this engaging glow-in-the-dark art kit."
+  },
+  {
+    "name": "Stainless Steel Cutting Board",
+    "category": "Home & Kitchen",
+    "price": 157.49,
+    "stock": 45,
+    "rating": 2,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean stainless steel cutting board."
+  },
+  {
+    "name": "Whole Grain Maple Syrup",
+    "category": "Grocery",
+    "price": 11.78,
+    "stock": 224,
+    "rating": 2,
+    "description": "A wholesome whole grain maple syrup the whole family will love."
+  },
+  {
+    "name": "Adjustable Sofa",
+    "category": "Furniture",
+    "price": 287.49,
+    "stock": 197,
+    "rating": 4.6,
+    "description": "Sturdy and elegant adjustable sofa designed for both comfort and style."
+  },
+  {
+    "name": "Whole Grain Green Tea",
+    "category": "Grocery",
+    "price": 15.99,
+    "stock": 406,
+    "rating": 3.7,
+    "description": "Enjoy the rich authentic flavor of this carefully selected whole grain green tea."
+  },
+  {
+    "name": "Premium Trail Mix",
+    "category": "Grocery",
+    "price": 4.49,
+    "stock": 41,
+    "rating": 1.7,
+    "description": "Delicious premium trail mix sourced from the finest ingredients."
+  },
+  {
+    "name": "Professional Cutting Board",
+    "category": "Home & Kitchen",
+    "price": 13.99,
+    "stock": 0,
+    "rating": 4.2,
+    "description": "Essential professional cutting board that makes cooking and kitchen tasks a breeze."
+  },
+  {
+    "name": "Foldable Office Chair",
+    "category": "Furniture",
+    "price": 1853.99,
+    "stock": 159,
+    "rating": 3.8,
+    "description": "Sturdy and elegant foldable office chair designed for both comfort and style."
+  },
+  {
+    "name": "Organic Face Cream",
+    "category": "Health & Beauty",
+    "price": 114.24,
+    "stock": 109,
+    "rating": 2.2,
+    "description": "Clinically tested organic face cream that delivers visible results in weeks."
+  },
+  {
+    "name": "Ergonomic Desk Organizer",
+    "category": "Office Supplies",
+    "price": 79.92,
+    "stock": 111,
+    "rating": 3.3,
+    "description": "Keep your workspace organized with this practical ergonomic desk organizer."
+  },
+  {
+    "name": "Professional Mixing Bowl",
+    "category": "Home & Kitchen",
+    "price": 485.99,
+    "stock": 398,
+    "rating": 3.8,
+    "description": "Durable professional mixing bowl built to last through years of daily use."
+  },
+  {
+    "name": "Heavy-Duty Camping Stove",
+    "category": "Sports & Outdoors",
+    "price": 542.11,
+    "stock": 35,
+    "rating": 1,
+    "description": "Take your training to the next level with this top-rated heavy-duty camping stove."
+  },
+  {
+    "name": "Artisan Almonds",
+    "category": "Grocery",
+    "price": 13.49,
+    "stock": 151,
+    "rating": 2.1,
+    "description": "Delicious artisan almonds sourced from the finest ingredients."
+  },
+  {
+    "name": "Ceramic Spice Rack",
+    "category": "Home & Kitchen",
+    "price": 176.99,
+    "stock": 442,
+    "rating": 1.2,
+    "description": "Durable ceramic spice rack built to last through years of daily use."
+  },
+  {
+    "name": "Mini Power Bank",
+    "category": "Electronics",
+    "price": 774.99,
+    "stock": 94,
+    "rating": 3.1,
+    "description": "High-performance mini power bank with cutting-edge technology for everyday use."
+  },
+  {
+    "name": "Competition Water Bottle",
+    "category": "Sports & Outdoors",
+    "price": 700.99,
+    "stock": 296,
+    "rating": 2.3,
+    "description": "Durable competition water bottle designed to withstand tough outdoor conditions."
+  },
+  {
+    "name": "Minimalist Bed Frame",
+    "category": "Furniture",
+    "price": 183.99,
+    "stock": 249,
+    "rating": 1.1,
+    "description": "Sturdy and elegant minimalist bed frame designed for both comfort and style."
+  },
+  {
+    "name": "Multi-Purpose Can Opener",
+    "category": "Home & Kitchen",
+    "price": 347.85,
+    "stock": 75,
+    "rating": 1.1,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean multi-purpose can opener."
+  },
+  {
+    "name": "Natural Pasta",
+    "category": "Grocery",
+    "price": 46.99,
+    "stock": 320,
+    "rating": 1.3,
+    "description": "Delicious natural pasta sourced from the finest ingredients."
+  },
+  {
+    "name": "Adhesive Paper Shredder",
+    "category": "Office Supplies",
+    "price": 199.49,
+    "stock": 500,
+    "rating": 1.1,
+    "description": "A must-have adhesive paper shredder for any professional or student."
+  },
+  {
+    "name": "Classic Toy Car",
+    "category": "Toys & Games",
+    "price": 144.49,
+    "stock": 330,
+    "rating": 1.9,
+    "description": "A perfect gift that provides entertainment for the whole family."
+  },
+  {
+    "name": "Lightweight Cycling Gloves",
+    "category": "Sports & Outdoors",
+    "price": 317.02,
+    "stock": 240,
+    "rating": 3,
+    "description": "Take your training to the next level with this top-rated lightweight cycling gloves."
+  },
+  {
+    "name": "Solid Wood Bar Stool",
+    "category": "Furniture",
+    "price": 2246.99,
+    "stock": 372,
+    "rating": 4.7,
+    "description": "Beautifully crafted solid wood bar stool that elevates any living space."
+  },
+  {
+    "name": "Multi-Purpose Slow Cooker",
+    "category": "Home & Kitchen",
+    "price": 117.43,
+    "stock": 457,
+    "rating": 4.3,
+    "description": "Essential multi-purpose slow cooker that makes cooking and kitchen tasks a breeze."
+  },
+  {
+    "name": "Ultra-Moisturizing Toothpaste",
+    "category": "Health & Beauty",
+    "price": 4.91,
+    "stock": 276,
+    "rating": 2.9,
+    "description": "Clinically tested ultra-moisturizing toothpaste that delivers visible results in weeks."
+  },
+  {
+    "name": "Nourishing Toothpaste",
+    "category": "Health & Beauty",
+    "price": 56.99,
+    "stock": 227,
+    "rating": 1.4,
+    "description": "Pamper yourself with this luxurious nourishing toothpaste made from natural ingredients."
+  },
+  {
+    "name": "Essential Shorts",
+    "category": "Apparel",
+    "price": 87.99,
+    "stock": 64,
+    "rating": 3.5,
+    "description": "Made from premium materials, this essential shorts offers all-day comfort."
+  },
+  {
+    "name": "Recycled Whiteboard",
+    "category": "Office Supplies",
+    "price": 96.35,
+    "stock": 39,
+    "rating": 4.9,
+    "description": "Keep your workspace organized with this practical recycled whiteboard."
+  },
+  {
+    "name": "Casual Dress Shirt",
+    "category": "Apparel",
+    "price": 153.99,
+    "stock": 439,
+    "rating": 1.5,
+    "description": "Trendy casual dress shirt that combines fashion with functionality."
+  },
+  {
+    "name": "Competition Cycling Gloves",
+    "category": "Sports & Outdoors",
+    "price": 575.99,
+    "stock": 105,
+    "rating": 2.8,
+    "description": "Built for performance, this competition cycling gloves is ideal for athletes of all levels."
+  },
+  {
+    "name": "Electric Measuring Cups",
+    "category": "Home & Kitchen",
+    "price": 352.99,
+    "stock": 446,
+    "rating": 4.8,
+    "description": "Essential electric measuring cups that makes cooking and kitchen tasks a breeze."
+  },
+  {
+    "name": "Natural Granola",
+    "category": "Grocery",
+    "price": 1.99,
+    "stock": 68,
+    "rating": 1.4,
+    "description": "A wholesome natural granola the whole family will love."
+  },
+  {
+    "name": "Hydrating Nail Kit",
+    "category": "Health & Beauty",
+    "price": 103.99,
+    "stock": 500,
+    "rating": 1.5,
+    "description": "Clinically tested hydrating nail kit that delivers visible results in weeks."
+  },
+  {
+    "name": "Magnetic Spinning Top",
+    "category": "Toys & Games",
+    "price": 38.64,
+    "stock": 252,
+    "rating": 2.8,
+    "description": "Spark creativity and imagination with this engaging magnetic spinning top."
+  },
+  {
+    "name": "Classic Board Game",
+    "category": "Toys & Games",
+    "price": 37.99,
+    "stock": 326,
+    "rating": 1.1,
+    "description": "Hours of fun for kids and adults alike with this exciting classic board game."
+  },
+  {
+    "name": "Pro Smartwatch",
+    "category": "Electronics",
+    "price": 1731.43,
+    "stock": 331,
+    "rating": 2.1,
+    "description": "Sleek and reliable pro smartwatch designed for tech enthusiasts."
+  },
+  {
+    "name": "Portable Keyboard",
+    "category": "Electronics",
+    "price": 795.99,
+    "stock": 444,
+    "rating": 1.8,
+    "description": "Feature-packed portable keyboard offering excellent value and durability."
+  },
+  {
+    "name": "Magnetic Desk Organizer",
+    "category": "Office Supplies",
+    "price": 170.49,
+    "stock": 26,
+    "rating": 2.3,
+    "description": "Keep your workspace organized with this practical magnetic desk organizer."
+  },
+  {
+    "name": "Non-Stick Food Processor",
+    "category": "Home & Kitchen",
+    "price": 385.99,
+    "stock": 236,
+    "rating": 2.4,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean non-stick food processor."
+  },
+  {
+    "name": "Remote Control Spinning Top",
+    "category": "Toys & Games",
+    "price": 12.99,
+    "stock": 426,
+    "rating": 1.5,
+    "description": "A perfect gift that provides entertainment for the whole family."
+  },
+  {
+    "name": "Organic Quinoa",
+    "category": "Grocery",
+    "price": 32.38,
+    "stock": 81,
+    "rating": 4.8,
+    "description": "Delicious organic quinoa sourced from the finest ingredients."
+  },
+  {
+    "name": "Interactive Science Kit",
+    "category": "Toys & Games",
+    "price": 105.49,
+    "stock": 100,
+    "rating": 3.1,
+    "description": "Hours of fun for kids and adults alike with this exciting interactive science kit."
+  },
+  {
+    "name": "Premium Honey",
+    "category": "Grocery",
+    "price": 17.49,
+    "stock": 93,
+    "rating": 4.6,
+    "description": "Enjoy the rich authentic flavor of this carefully selected premium honey."
+  },
+  {
+    "name": "Foldable Resistance Bands",
+    "category": "Sports & Outdoors",
+    "price": 323.49,
+    "stock": 388,
+    "rating": 4.3,
+    "description": "Built for performance, this foldable resistance bands is ideal for athletes of all levels."
+  },
+  {
+    "name": "Color-Coded Calculator",
+    "category": "Office Supplies",
+    "price": 29.99,
+    "stock": 474,
+    "rating": 1.2,
+    "description": "Keep your workspace organized with this practical color-coded calculator."
+  },
+  {
+    "name": "Athletic Shorts",
+    "category": "Apparel",
+    "price": 87.28,
+    "stock": 31,
+    "rating": 3.3,
+    "description": "Made from premium materials, this athletic shorts offers all-day comfort."
+  },
+  {
+    "name": "Comfort Jacket",
+    "category": "Apparel",
+    "price": 214.99,
+    "stock": 407,
+    "rating": 3.1,
+    "description": "Trendy comfort jacket that combines fashion with functionality."
+  },
+  {
+    "name": "Magnetic Binder Clips",
+    "category": "Office Supplies",
+    "price": 7.99,
+    "stock": 182,
+    "rating": 2.1,
+    "description": "Reliable magnetic binder clips that boosts productivity at home or in the office."
+  },
+  {
+    "name": "Classic Chinos",
+    "category": "Apparel",
+    "price": 183.58,
+    "stock": 154,
+    "rating": 2.8,
+    "description": "Trendy classic chinos that combines fashion with functionality."
+  },
+  {
+    "name": "Extra Virgin Pasta",
+    "category": "Grocery",
+    "price": 49.97,
+    "stock": 6,
+    "rating": 1.8,
+    "description": "A wholesome extra virgin pasta the whole family will love."
+  },
+  {
+    "name": "Soothing Face Mask",
+    "category": "Health & Beauty",
+    "price": 113.49,
+    "stock": 187,
+    "rating": 4.6,
+    "description": "Clinically tested soothing face mask that delivers visible results in weeks."
+  },
+  {
+    "name": "Minimalist Recliner",
+    "category": "Furniture",
+    "price": 1760.99,
+    "stock": 400,
+    "rating": 2.5,
+    "description": "Space-saving minimalist recliner with a timeless design that fits any room."
+  },
+  {
+    "name": "Lightweight Dumbbells",
+    "category": "Sports & Outdoors",
+    "price": 165.35,
+    "stock": 27,
+    "rating": 3.3,
+    "description": "Durable lightweight dumbbells designed to withstand tough outdoor conditions."
+  },
+  {
+    "name": "Solid Wood Bed Frame",
+    "category": "Furniture",
+    "price": 1442.99,
+    "stock": 376,
+    "rating": 2.4,
+    "description": "Space-saving solid wood bed frame with a timeless design that fits any room."
+  },
+  {
+    "name": "Advanced Mouse",
+    "category": "Electronics",
+    "price": 341.99,
+    "stock": 2,
+    "rating": 1.7,
+    "description": "Feature-packed advanced mouse offering excellent value and durability."
+  },
+  {
+    "name": "Stainless Steel Tea Kettle",
+    "category": "Home & Kitchen",
+    "price": 355.41,
+    "stock": 485,
+    "rating": 4.7,
+    "description": "Essential stainless steel tea kettle that makes cooking and kitchen tasks a breeze."
+  },
+  {
+    "name": "Anti-Aging Serum",
+    "category": "Health & Beauty",
+    "price": 122.29,
+    "stock": 436,
+    "rating": 3.6,
+    "description": "Gentle yet effective anti-aging serum suitable for all skin types."
+  },
+  {
+    "name": "Farm Fresh Oatmeal",
+    "category": "Grocery",
+    "price": 44.49,
+    "stock": 88,
+    "rating": 2.3,
+    "description": "A wholesome farm fresh oatmeal the whole family will love."
+  },
+  {
+    "name": "Upholstered Recliner",
+    "category": "Furniture",
+    "price": 1300.49,
+    "stock": 105,
+    "rating": 4.8,
+    "description": "Beautifully crafted upholstered recliner that elevates any living space."
+  },
+  {
+    "name": "Wireless Monitor",
+    "category": "Electronics",
+    "price": 891.49,
+    "stock": 238,
+    "rating": 3.6,
+    "description": "Feature-packed wireless monitor offering excellent value and durability."
+  },
+  {
+    "name": "Deep Cleansing Hair Oil",
+    "category": "Health & Beauty",
+    "price": 60.99,
+    "stock": 145,
+    "rating": 1.1,
+    "description": "Pamper yourself with this luxurious deep cleansing hair oil made from natural ingredients."
+  },
+  {
+    "name": "Color-Coded Binder Clips",
+    "category": "Office Supplies",
+    "price": 81.49,
+    "stock": 404,
+    "rating": 3.3,
+    "description": "A must-have color-coded binder clips for any professional or student."
+  },
+  {
+    "name": "Sugar-Free Trail Mix",
+    "category": "Grocery",
+    "price": 25.99,
+    "stock": 201,
+    "rating": 3.6,
+    "description": "Enjoy the rich authentic flavor of this carefully selected sugar-free trail mix."
+  },
+  {
+    "name": "Slim Fit Hoodie",
+    "category": "Apparel",
+    "price": 60.49,
+    "stock": 128,
+    "rating": 1.3,
+    "description": "Comfortable and stylish slim fit hoodie perfect for any occasion."
+  },
+  {
+    "name": "Adjustable Cycling Gloves",
+    "category": "Sports & Outdoors",
+    "price": 237.99,
+    "stock": 210,
+    "rating": 3.8,
+    "description": "Durable adjustable cycling gloves designed to withstand tough outdoor conditions."
+  },
+  {
+    "name": "Multipack Tape Dispenser",
+    "category": "Office Supplies",
+    "price": 83.99,
+    "stock": 244,
+    "rating": 4.2,
+    "description": "Keep your workspace organized with this practical multipack tape dispenser."
+  },
+  {
+    "name": "Ergonomic Whiteboard",
+    "category": "Office Supplies",
+    "price": 38.99,
+    "stock": 297,
+    "rating": 4.4,
+    "description": "Keep your workspace organized with this practical ergonomic whiteboard."
+  },
+  {
+    "name": "Recycled Stapler",
+    "category": "Office Supplies",
+    "price": 13.99,
+    "stock": 365,
+    "rating": 3.8,
+    "description": "Keep your workspace organized with this practical recycled stapler."
+  },
+  {
+    "name": "Mid-Century Side Table",
+    "category": "Furniture",
+    "price": 688.99,
+    "stock": 195,
+    "rating": 2.5,
+    "description": "Beautifully crafted mid-century side table that elevates any living space."
+  },
+  {
+    "name": "Non-Stick Air Fryer",
+    "category": "Home & Kitchen",
+    "price": 398.99,
+    "stock": 485,
+    "rating": 3,
+    "description": "Durable non-stick air fryer built to last through years of daily use."
+  },
+  {
+    "name": "Quick-Dry Yoga Mat",
+    "category": "Sports & Outdoors",
+    "price": 583.49,
+    "stock": 206,
+    "rating": 2,
+    "description": "Built for performance, this quick-dry yoga mat is ideal for athletes of all levels."
+  },
+  {
+    "name": "Interactive Art Kit",
+    "category": "Toys & Games",
+    "price": 5.11,
+    "stock": 488,
+    "rating": 2.7,
+    "description": "Hours of fun for kids and adults alike with this exciting interactive art kit."
+  },
+  {
+    "name": "Premium Sticky Notes",
+    "category": "Office Supplies",
+    "price": 154.94,
+    "stock": 330,
+    "rating": 2,
+    "description": "Keep your workspace organized with this practical premium sticky notes."
+  },
+  {
+    "name": "Lightweight Soccer Ball",
+    "category": "Sports & Outdoors",
+    "price": 771.27,
+    "stock": 267,
+    "rating": 2,
+    "description": "Built for performance, this lightweight soccer ball is ideal for athletes of all levels."
+  },
+  {
+    "name": "Vintage Joggers",
+    "category": "Apparel",
+    "price": 12.49,
+    "stock": 90,
+    "rating": 4.2,
+    "description": "Trendy vintage joggers that combines fashion with functionality."
+  },
+  {
+    "name": "Pro Backpack",
+    "category": "Sports & Outdoors",
+    "price": 480.01,
+    "stock": 228,
+    "rating": 2.7,
+    "description": "Take your training to the next level with this top-rated pro backpack."
+  },
+  {
+    "name": "Pro Dumbbells",
+    "category": "Sports & Outdoors",
+    "price": 161.79,
+    "stock": 261,
+    "rating": 2.4,
+    "description": "Take your training to the next level with this top-rated pro dumbbells."
+  },
+  {
+    "name": "Lightweight Yoga Mat",
+    "category": "Sports & Outdoors",
+    "price": 90.91,
+    "stock": 256,
+    "rating": 4.4,
+    "description": "Built for performance, this lightweight yoga mat is ideal for athletes of all levels."
+  },
+  {
+    "name": "Rustic Sofa",
+    "category": "Furniture",
+    "price": 1176.32,
+    "stock": 79,
+    "rating": 3,
+    "description": "Space-saving rustic sofa with a timeless design that fits any room."
+  },
+  {
+    "name": "Stainless Steel Mixing Bowl",
+    "category": "Home & Kitchen",
+    "price": 342.99,
+    "stock": 339,
+    "rating": 1.2,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean stainless steel mixing bowl."
+  },
+  {
+    "name": "Natural Almonds",
+    "category": "Grocery",
+    "price": 37.99,
+    "stock": 99,
+    "rating": 2.5,
+    "description": "Delicious natural almonds sourced from the finest ingredients."
+  },
+  {
+    "name": "Extra Virgin Coconut Water",
+    "category": "Grocery",
+    "price": 27.49,
+    "stock": 284,
+    "rating": 3.1,
+    "description": "Delicious extra virgin coconut water sourced from the finest ingredients."
+  },
+  {
+    "name": "Premium Tablet",
+    "category": "Electronics",
+    "price": 1015.99,
+    "stock": 170,
+    "rating": 1,
+    "description": "Sleek and reliable premium tablet designed for tech enthusiasts."
+  },
+  {
+    "name": "Premium Keyboard",
+    "category": "Electronics",
+    "price": 26.99,
+    "stock": 234,
+    "rating": 2.7,
+    "description": "Feature-packed premium keyboard offering excellent value and durability."
+  },
+  {
+    "name": "Athletic Sneakers",
+    "category": "Apparel",
+    "price": 180.99,
+    "stock": 96,
+    "rating": 4.2,
+    "description": "Trendy athletic sneakers that combines fashion with functionality."
+  },
+  {
+    "name": "Premium Tape Dispenser",
+    "category": "Office Supplies",
+    "price": 86.87,
+    "stock": 38,
+    "rating": 1.8,
+    "description": "Keep your workspace organized with this practical premium tape dispenser."
+  },
+  {
+    "name": "Solid Wood Side Table",
+    "category": "Furniture",
+    "price": 1822.99,
+    "stock": 448,
+    "rating": 3.6,
+    "description": "Beautifully crafted solid wood side table that elevates any living space."
+  },
+  {
+    "name": "Foldable Bar Stool",
+    "category": "Furniture",
+    "price": 2691.99,
+    "stock": 60,
+    "rating": 2.2,
+    "description": "Sturdy and elegant foldable bar stool designed for both comfort and style."
+  },
+  {
+    "name": "Essential Tank Top",
+    "category": "Apparel",
+    "price": 119.49,
+    "stock": 54,
+    "rating": 3.6,
+    "description": "Comfortable and stylish essential tank top perfect for any occasion."
+  },
+  {
+    "name": "Slim Fit Dress Shirt",
+    "category": "Apparel",
+    "price": 236.99,
+    "stock": 474,
+    "rating": 5,
+    "description": "Comfortable and stylish slim fit dress shirt perfect for any occasion."
+  },
+  {
+    "name": "Adjustable TV Stand",
+    "category": "Furniture",
+    "price": 1871.99,
+    "stock": 277,
+    "rating": 1.7,
+    "description": "Beautifully crafted adjustable tv stand that elevates any living space."
+  },
+  {
+    "name": "Advanced USB Hub",
+    "category": "Electronics",
+    "price": 657.99,
+    "stock": 270,
+    "rating": 2.3,
+    "description": "Feature-packed advanced usb hub offering excellent value and durability."
+  },
+  {
+    "name": "Advanced Headphones",
+    "category": "Electronics",
+    "price": 462.2,
+    "stock": 21,
+    "rating": 2.9,
+    "description": "Feature-packed advanced headphones offering excellent value and durability."
+  },
+  {
+    "name": "Mini Keyboard",
+    "category": "Electronics",
+    "price": 434.99,
+    "stock": 432,
+    "rating": 4,
+    "description": "High-performance mini keyboard with cutting-edge technology for everyday use."
+  },
+  {
+    "name": "Digital Power Bank",
+    "category": "Electronics",
+    "price": 1722.2,
+    "stock": 266,
+    "rating": 3.3,
+    "description": "High-performance digital power bank with cutting-edge technology for everyday use."
+  },
+  {
+    "name": "Deep Cleansing Toothpaste",
+    "category": "Health & Beauty",
+    "price": 131.4,
+    "stock": 211,
+    "rating": 2.2,
+    "description": "Clinically tested deep cleansing toothpaste that delivers visible results in weeks."
+  },
+  {
+    "name": "Mini Earbuds",
+    "category": "Electronics",
+    "price": 1240.49,
+    "stock": 384,
+    "rating": 4.5,
+    "description": "Feature-packed mini earbuds offering excellent value and durability."
+  },
+  {
+    "name": "Pro Mouse",
+    "category": "Electronics",
+    "price": 1105.28,
+    "stock": 362,
+    "rating": 4,
+    "description": "High-performance pro mouse with cutting-edge technology for everyday use."
+  },
+  {
+    "name": "Adjustable Running Shoes",
+    "category": "Sports & Outdoors",
+    "price": 77.99,
+    "stock": 191,
+    "rating": 3.6,
+    "description": "Take your training to the next level with this top-rated adjustable running shoes."
+  },
+  {
+    "name": "Classic Art Kit",
+    "category": "Toys & Games",
+    "price": 33.45,
+    "stock": 238,
+    "rating": 2.9,
+    "description": "Spark creativity and imagination with this engaging classic art kit."
+  },
+  {
+    "name": "Hydrating Eye Cream",
+    "category": "Health & Beauty",
+    "price": 55.99,
+    "stock": 287,
+    "rating": 4.9,
+    "description": "Gentle yet effective hydrating eye cream suitable for all skin types."
+  },
+  {
+    "name": "Executive Sticky Notes",
+    "category": "Office Supplies",
+    "price": 101.99,
+    "stock": 182,
+    "rating": 1.6,
+    "description": "Reliable executive sticky notes that boosts productivity at home or in the office."
+  },
+  {
+    "name": "Electric Cutting Board",
+    "category": "Home & Kitchen",
+    "price": 172.45,
+    "stock": 182,
+    "rating": 1.9,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean electric cutting board."
+  },
+  {
+    "name": "Anti-Aging Hair Oil",
+    "category": "Health & Beauty",
+    "price": 77.99,
+    "stock": 241,
+    "rating": 2.2,
+    "description": "Gentle yet effective anti-aging hair oil suitable for all skin types."
+  },
+  {
+    "name": "Digital Router",
+    "category": "Electronics",
+    "price": 1481.09,
+    "stock": 119,
+    "rating": 4.6,
+    "description": "Sleek and reliable digital router designed for tech enthusiasts."
+  },
+  {
+    "name": "Deep Cleansing Hand Cream",
+    "category": "Health & Beauty",
+    "price": 13.99,
+    "stock": 301,
+    "rating": 3.8,
+    "description": "Pamper yourself with this luxurious deep cleansing hand cream made from natural ingredients."
+  },
+  {
+    "name": "Ultra Microphone",
+    "category": "Electronics",
+    "price": 1369.9,
+    "stock": 147,
+    "rating": 1.7,
+    "description": "Sleek and reliable ultra microphone designed for tech enthusiasts."
+  },
+  {
+    "name": "Adhesive Planner",
+    "category": "Office Supplies",
+    "price": 156.95,
+    "stock": 488,
+    "rating": 2.7,
+    "description": "Reliable adhesive planner that boosts productivity at home or in the office."
+  },
+  {
+    "name": "Competition Running Shoes",
+    "category": "Sports & Outdoors",
+    "price": 47.99,
+    "stock": 347,
+    "rating": 1,
+    "description": "Built for performance, this competition running shoes is ideal for athletes of all levels."
+  },
+  {
+    "name": "Mid-Century Bed Frame",
+    "category": "Furniture",
+    "price": 2768.99,
+    "stock": 230,
+    "rating": 1.4,
+    "description": "Sturdy and elegant mid-century bed frame designed for both comfort and style."
+  },
+  {
+    "name": "Multipack Binder Clips",
+    "category": "Office Supplies",
+    "price": 158.01,
+    "stock": 172,
+    "rating": 4.5,
+    "description": "Reliable multipack binder clips that boosts productivity at home or in the office."
+  },
+  {
+    "name": "Imported Rice",
+    "category": "Grocery",
+    "price": 39.53,
+    "stock": 203,
+    "rating": 4.5,
+    "description": "Delicious imported rice sourced from the finest ingredients."
+  },
+  {
+    "name": "Electric Spice Rack",
+    "category": "Home & Kitchen",
+    "price": 154.22,
+    "stock": 175,
+    "rating": 1.9,
+    "description": "Durable electric spice rack built to last through years of daily use."
+  },
+  {
+    "name": "Advanced Router",
+    "category": "Electronics",
+    "price": 88.49,
+    "stock": 444,
+    "rating": 2.3,
+    "description": "Feature-packed advanced router offering excellent value and durability."
+  },
+  {
+    "name": "Adjustable Storage Cabinet",
+    "category": "Furniture",
+    "price": 1275.99,
+    "stock": 211,
+    "rating": 1.2,
+    "description": "Sturdy and elegant adjustable storage cabinet designed for both comfort and style."
+  },
+  {
+    "name": "Essential Chinos",
+    "category": "Apparel",
+    "price": 231.99,
+    "stock": 355,
+    "rating": 3.6,
+    "description": "Made from premium materials, this essential chinos offers all-day comfort."
+  },
+  {
+    "name": "Vintage Sweater",
+    "category": "Apparel",
+    "price": 41.25,
+    "stock": 443,
+    "rating": 3.4,
+    "description": "Trendy vintage sweater that combines fashion with functionality."
+  },
+  {
+    "name": "Recycled Planner",
+    "category": "Office Supplies",
+    "price": 189.99,
+    "stock": 175,
+    "rating": 1.8,
+    "description": "Keep your workspace organized with this practical recycled planner."
+  },
+  {
+    "name": "Designer Joggers",
+    "category": "Apparel",
+    "price": 145.99,
+    "stock": 132,
+    "rating": 4,
+    "description": "Made from premium materials, this designer joggers offers all-day comfort."
+  },
+  {
+    "name": "Multi-Purpose Knife Set",
+    "category": "Home & Kitchen",
+    "price": 326.49,
+    "stock": 150,
+    "rating": 1.2,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean multi-purpose knife set."
+  },
+  {
+    "name": "Classic Stuffed Animal",
+    "category": "Toys & Games",
+    "price": 113.99,
+    "stock": 299,
+    "rating": 4.7,
+    "description": "A perfect gift that provides entertainment for the whole family."
+  },
+  {
+    "name": "Color-Coded Desk Organizer",
+    "category": "Office Supplies",
+    "price": 106.95,
+    "stock": 413,
+    "rating": 3,
+    "description": "A must-have color-coded desk organizer for any professional or student."
+  },
+  {
+    "name": "Premium Mouse",
+    "category": "Electronics",
+    "price": 1862.04,
+    "stock": 321,
+    "rating": 2.6,
+    "description": "Feature-packed premium mouse offering excellent value and durability."
+  },
+  {
+    "name": "Recycled Label Maker",
+    "category": "Office Supplies",
+    "price": 44.99,
+    "stock": 443,
+    "rating": 3.9,
+    "description": "A must-have recycled label maker for any professional or student."
+  },
+  {
+    "name": "Hydrating Conditioner",
+    "category": "Health & Beauty",
+    "price": 135.39,
+    "stock": 430,
+    "rating": 1.2,
+    "description": "Gentle yet effective hydrating conditioner suitable for all skin types."
+  },
+  {
+    "name": "Adjustable Wardrobe",
+    "category": "Furniture",
+    "price": 84.99,
+    "stock": 348,
+    "rating": 1.9,
+    "description": "Space-saving adjustable wardrobe with a timeless design that fits any room."
+  },
+  {
+    "name": "Hydrating Perfume",
+    "category": "Health & Beauty",
+    "price": 46.16,
+    "stock": 117,
+    "rating": 1.5,
+    "description": "Clinically tested hydrating perfume that delivers visible results in weeks."
+  },
+  {
+    "name": "Glow-in-the-Dark Train Set",
+    "category": "Toys & Games",
+    "price": 128.53,
+    "stock": 10,
+    "rating": 1.7,
+    "description": "Spark creativity and imagination with this engaging glow-in-the-dark train set."
+  },
+  {
+    "name": "Solid Wood Sofa",
+    "category": "Furniture",
+    "price": 2502.99,
+    "stock": 326,
+    "rating": 3.8,
+    "description": "Beautifully crafted solid wood sofa that elevates any living space."
+  },
+  {
+    "name": "Sugar-Free Olive Oil",
+    "category": "Grocery",
+    "price": 9.49,
+    "stock": 386,
+    "rating": 4.7,
+    "description": "Enjoy the rich authentic flavor of this carefully selected sugar-free olive oil."
+  },
+  {
+    "name": "All-Weather Dumbbells",
+    "category": "Sports & Outdoors",
+    "price": 777.99,
+    "stock": 368,
+    "rating": 3.2,
+    "description": "Take your training to the next level with this top-rated all-weather dumbbells."
+  },
+  {
+    "name": "Revitalizing Serum",
+    "category": "Health & Beauty",
+    "price": 99.26,
+    "stock": 439,
+    "rating": 2.8,
+    "description": "Pamper yourself with this luxurious revitalizing serum made from natural ingredients."
+  },
+  {
+    "name": "Remote Control Card Game",
+    "category": "Toys & Games",
+    "price": 67.99,
+    "stock": 445,
+    "rating": 3.7,
+    "description": "Spark creativity and imagination with this engaging remote control card game."
+  },
+  {
+    "name": "Modern Cardigan",
+    "category": "Apparel",
+    "price": 63.65,
+    "stock": 185,
+    "rating": 3.1,
+    "description": "Trendy modern cardigan that combines fashion with functionality."
+  },
+  {
+    "name": "Magnetic Building Blocks",
+    "category": "Toys & Games",
+    "price": 120.49,
+    "stock": 386,
+    "rating": 4.9,
+    "description": "A perfect gift that provides entertainment for the whole family."
+  },
+  {
+    "name": "Magnetic Pen Set",
+    "category": "Office Supplies",
+    "price": 163.99,
+    "stock": 194,
+    "rating": 4.2,
+    "description": "Keep your workspace organized with this practical magnetic pen set."
+  },
+  {
+    "name": "Smart Microphone",
+    "category": "Electronics",
+    "price": 802.29,
+    "stock": 395,
+    "rating": 2.5,
+    "description": "High-performance smart microphone with cutting-edge technology for everyday use."
+  },
+  {
+    "name": "Electric Food Processor",
+    "category": "Home & Kitchen",
+    "price": 438.5,
+    "stock": 13,
+    "rating": 1.7,
+    "description": "Essential electric food processor that makes cooking and kitchen tasks a breeze."
+  },
+  {
+    "name": "Bamboo Blender",
+    "category": "Home & Kitchen",
+    "price": 151.49,
+    "stock": 11,
+    "rating": 1.9,
+    "description": "Upgrade your kitchen with this versatile and easy-to-clean bamboo blender."
+  },
+  {
+    "name": "Designer T-Shirt",
+    "category": "Apparel",
+    "price": 73.84,
+    "stock": 390,
+    "rating": 4.8,
+    "description": "Made from premium materials, this designer t-shirt offers all-day comfort."
+  }
+]
