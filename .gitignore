@@ -56,3 +56,6 @@ charts/**/charts/*.tgz
 
 .nx/migrate-runs
 .claude/worktrees
+.angular
+
+__screenshots__/

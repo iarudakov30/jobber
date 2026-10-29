@@ -1,0 +1,59 @@
+<div class="layout">
+  <app-execute-job />
+
+  <section class="card">
+    <h2>Jobs</h2>
+
+    @if (jobs.hasValue()) {
+      @if (sortedJobs().length === 0) {
+        <p class="muted">No jobs yet. Run one to get started.</p>
+      } @else {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Started</th>
+                <th>Ended</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (job of sortedJobs(); track job.id) {
+                <tr>
+                  <td>
+                    <a [routerLink]="['/jobs', job.id]">#{{ job.id }}</a>
+                  </td>
+                  <td>{{ job.name }}</td>
+                  <td><app-job-status-badge [status]="job.status" /></td>
+                  <td>
+                    <div class="progress-cell">
+                      <progress
+                        [value]="job.completed"
+                        [max]="job.size"
+                      ></progress>
+                      <span class="muted"
+                        >{{ job.completed }}/{{ job.size }}</span
+                      >
+                    </div>
+                  </td>
+                  <td>{{ job.started | date: 'short' }}</td>
+                  <td>{{ job.ended ? (job.ended | date: 'short') : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    } @else if (jobs.error()) {
+      <p class="alert" role="alert">
+        Could not load jobs.
+        <button class="btn" type="button" (click)="jobs.reload()">Retry</button>
+      </p>
+    } @else {
+      <p class="muted">Loading jobs…</p>
+    }
+  </section>
+</div>

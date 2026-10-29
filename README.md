@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**Jobber** is a microservices-based backend application for **user authentication, background job management, and product data processing**. It's built as a distributed system using an **Nx monorepo** with four independent services communicating over GraphQL, gRPC, and Apache Pulsar.
+**Jobber** is a microservices-based application for **user authentication, background job management, and product data processing**. It's built as a distributed system using an **Nx monorepo** with four independent backend services communicating over GraphQL, gRPC, and Apache Pulsar, plus an **Angular web UI** for signing in and running jobs.
 
 ---
 
@@ -23,6 +23,9 @@
 | **executor** | Calls `products` over gRPC to persist enriched product data   |
 | **products** | gRPC service for product creation                             |
 | **products** | Drizzle ORM + PostgreSQL persistence                          |
+| **ui**       | Register / sign in against `auth` (HttpOnly cookie session)   |
+| **ui**       | Run jobs with a JSON payload, prefilled per job type          |
+| **ui**       | Live job list and job detail pages with progress polling      |
 
 ---
 
@@ -31,8 +34,15 @@
 ### Core
 
 - **Runtime**: Node.js + TypeScript
-- **Framework**: NestJS v11
-- **Monorepo**: Nx v22
+- **Framework**: NestJS v12
+- **Monorepo**: Nx v24
+
+### Frontend
+
+- **Angular** v22 — zoneless, standalone components, lazy routes
+- **Apollo Client** v4 via `apollo-angular` — GraphQL client for `auth` and `jobs`
+- Signal forms, resource API (`rxResource`), signal inputs, `linkedSignal`
+- **Vitest** for unit tests (`@angular/build:unit-test`)
 
 ### API Layer
 
@@ -74,6 +84,7 @@ apps/
 ├── jobs/       ← Job registration, GraphQL API, Pulsar producer, gRPC client    (port 3001)
 ├── executor/   ← Pulsar consumer, executes jobs, gRPC client to products       (port 3002)
 ├── products/   ← gRPC service, Drizzle ORM, PostgreSQL persistence             (port 3003)
+├── ui/         ← Angular web UI, Apollo Client against auth + jobs              (port 4200)
 ├── auth-e2e/
 └── jobs-e2e/
 libs/
@@ -121,6 +132,49 @@ Client → jobs (GraphQL mutation) → JobsService discovers @Job() class
 - Each job publishes to a Pulsar topic named after the job type.
 - `executor` defines a matching `PulsarConsumer<T>` subclass per topic.
 - The `LoadProducts` job/consumer pair additionally calls the `products` gRPC service to persist enriched product data.
+- Job data is validated before the job is created, so a rejected payload never leaves a job stuck in progress.
+
+---
+
+## Web UI
+
+The `ui` app is an Angular 22 frontend for the `auth` and `jobs` GraphQL APIs.
+
+| Route       | Page                                                                  |
+| ----------- | --------------------------------------------------------------------- |
+| `/register` | Create an account (then signs you in)                                 |
+| `/login`    | Sign in; the `auth` service sets the HttpOnly `Authentication` cookie |
+| `/jobs`     | Run a job and watch the job list update live (signed-in only)         |
+| `/jobs/:id` | Progress, start and end time of a single job (signed-in only)         |
+
+### Run it
+
+```sh
+docker compose up -d   # PostgreSQL + Apache Pulsar
+npm start              # all four services + the UI
+```
+
+On a fresh database, run the migrations once before `npm start`: `npx nx run auth:migrate-db`, `npx nx run jobs:migrate-prisma` and `npx nx run products:migrate-drizzle`.
+
+Then open <http://localhost:4200>, create an account and run a **Fibonacci** or **LoadProducts** job.
+
+### How it talks to the backend
+
+- During `nx serve ui`, the dev server proxies `/api/auth` → `localhost:3000/auth` and `/api/jobs` → `localhost:3001/jobs` (`apps/ui/proxy.conf.json`). The browser sees a single origin, so the HttpOnly cookie works without CORS. The `/api` prefix keeps the proxy from capturing the UI's own `/jobs` routes on a page refresh.
+- Two Apollo clients are configured in `apps/ui/src/app/graphql.provider.ts`: the default one for `jobs` and a named `auth` client.
+- The cookie can't be read from JavaScript, so the UI remembers the signed-in user locally. If `jobs` answers `FORBIDDEN` (expired or missing cookie), the session is cleared and you are sent back to the login page.
+- Server validation messages (e.g. "password is not strong enough") are shown under the field they refer to.
+
+### Commands
+
+```sh
+npx nx serve ui    # dev server on http://localhost:4200 (needs the backend running)
+npx nx build ui    # production build to dist/apps/ui
+npx nx test ui     # unit tests (Vitest)
+npx nx lint ui
+```
+
+The UI isn't containerized or part of the Helm chart yet.
 
 ---
 
@@ -167,7 +221,7 @@ Client → jobs (GraphQL mutation) → JobsService discovers @Job() class
 
 ## Summary
 
-A **NestJS microservices backend** demonstrating GraphQL-first APIs, JWT cookie authentication, gRPC for internal service calls, and Apache Pulsar for async job processing — spanning four independently deployable services (`auth`, `jobs`, `executor`, `products`) in an Nx monorepo.
+A **NestJS microservices backend** demonstrating GraphQL-first APIs, JWT cookie authentication, gRPC for internal service calls, and Apache Pulsar for async job processing — spanning four independently deployable services (`auth`, `jobs`, `executor`, `products`) in an Nx monorepo, with an **Angular** web UI (`ui`) on top.
 
 [Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/nest?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
 
@@ -196,7 +250,7 @@ docker compose down
 ### Serve
 
 ```sh
-npx nx serve auth                 # Serve a single app (auth, jobs, executor, products)
+npx nx serve auth                 # Serve a single app (auth, jobs, executor, products, ui)
 npx nx run-many -t serve          # Serve all apps in parallel
 
 --skip-nx-cache                   # Run without cache

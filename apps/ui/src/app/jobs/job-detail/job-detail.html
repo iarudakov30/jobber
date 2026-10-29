@@ -1,0 +1,34 @@
+<div class="narrow">
+  <p><a routerLink="/jobs">← All jobs</a></p>
+
+  <section class="card">
+    @if (job.hasValue()) {
+      @let j = job.value();
+      <header class="detail-header">
+        <h1>{{ j.name }} #{{ j.id }}</h1>
+        <app-job-status-badge [status]="j.status" />
+      </header>
+
+      <progress [value]="j.completed" [max]="j.size"></progress>
+      <p class="muted">
+        {{ j.completed }} of {{ j.size }} processed ({{
+          j.size ? (j.completed / j.size | percent) : '—'
+        }})
+      </p>
+
+      <dl class="details">
+        <dt>Started</dt>
+        <dd>{{ j.started | date: 'medium' }}</dd>
+        <dt>Ended</dt>
+        <dd>{{ j.ended ? (j.ended | date: 'medium') : '—' }}</dd>
+      </dl>
+    } @else if (job.error()) {
+      <p class="alert" role="alert">
+        Job #{{ id() }} could not be loaded.
+        <button class="btn" type="button" (click)="job.reload()">Retry</button>
+      </p>
+    } @else {
+      <p class="muted">Loading job #{{ id() }}…</p>
+    }
+  </section>
+</div>

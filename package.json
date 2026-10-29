@@ -4,10 +4,10 @@
   "license": "MIT",
   "scripts": {
     "cache-clean": "nx reset && npm cache clean --force",
-    "build": "npx nx run-many -t build -p auth jobs executor products",
+    "build": "npx nx run-many -t build -p auth jobs executor products ui",
     "test": "npx nx affected -t lint test build",
-    "start": "nx run-many -t serve -p auth jobs executor products --parallel 4 --output-style=stream",
-    "stop": "fuser -k 3000/tcp 3001/tcp 3002/tcp 3003/tcp 2>/dev/null; echo 'Ports cleared'",
+    "start": "nx run-many -t serve -p auth jobs executor products ui --parallel 5 --output-style=stream",
+    "stop": "fuser -k 3000/tcp 3001/tcp 3002/tcp 3003/tcp 4200/tcp 2>/dev/null; echo 'Ports cleared'",
     "migrate-db": "docker exec jobber-postgres-1 psql -U postgres -c \"SELECT 'ok' FROM pg_database WHERE datname='jobber-auth'\" | grep -q ok || docker exec jobber-postgres-1 psql -U postgres -c 'CREATE DATABASE \"jobber-auth\";' && cd apps/auth && npx prisma migrate deploy"
   },
   "workspaces": [
@@ -45,10 +45,17 @@
     "@apollo/server": "^5.5.1"
   },
   "devDependencies": {
+    "@angular-devkit/core": "~22.2.0",
+    "@angular-devkit/schematics": "~22.2.0",
+    "@angular/build": "~22.2.0",
+    "@angular/cli": "~22.2.0",
+    "@angular/compiler-cli": "~22.2.0",
+    "@angular/language-service": "~22.2.0",
     "@compodoc/compodoc": "^2.0.0",
     "@eslint/js": "^10.0.1",
     "@nestjs/schematics": "^12.0.12",
     "@nestjs/testing": "^12.3.2",
+    "@nx/angular": "24.0.2",
     "@nx/eslint": "24.0.2",
     "@nx/eslint-plugin": "24.0.2",
     "@nx/jest": "24.0.2",
@@ -58,6 +65,7 @@
     "@nx/web": "24.0.2",
     "@nx/webpack": "24.0.2",
     "@nx/workspace": "24.0.2",
+    "@schematics/angular": "~22.2.0",
     "@swc-node/register": "~1.12.1",
     "@swc/core": "~1.16.20",
     "@swc/helpers": "0.5.23",
@@ -65,6 +73,8 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.15.0",
     "@types/pg": "^8.15.6",
+    "@typescript-eslint/utils": "^8.58.0",
+    "angular-eslint": "^22.5.0",
     "eslint": "^10.0.1",
     "eslint-config-prettier": "^10.0.0",
     "grpc-tools": "^1.13.1",
@@ -72,6 +82,7 @@
     "jest": "^30.0.2",
     "jest-environment-node": "^30.0.2",
     "jest-util": "^30.0.2",
+    "jsdom": "^27.1.0",
     "lint-staged": "^16.4.0",
     "nx": "24.0.2",
     "pino-pretty": "^13.1.3",
@@ -82,6 +93,8 @@
     "tslib": "^2.8.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.40.0",
+    "vitest": "^4.0.8",
+    "webpack": "^5.112.2",
     "webpack-cli": "^6.0.1",
     "webpack-merge": "^6.0.1"
   }

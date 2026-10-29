@@ -4,3 +4,5 @@ charts/**/*.yaml
 /coverage
 /.nx/cache
 /.nx/workspace-data
+
+.angular

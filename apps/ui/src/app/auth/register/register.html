@@ -1,0 +1,41 @@
+<section class="card narrow">
+  <h1>Create account</h1>
+
+  <form [formRoot]="registerForm">
+    <label class="field">
+      <span>Email</span>
+      <input
+        type="email"
+        [formField]="registerForm.email"
+        autocomplete="email"
+      />
+      <app-field-errors [field]="registerForm.email" />
+    </label>
+
+    <label class="field">
+      <span>Password</span>
+      <input
+        type="password"
+        [formField]="registerForm.password"
+        autocomplete="new-password"
+      />
+      <small class="hint">
+        At least 8 characters, with an uppercase letter, a lowercase letter, a
+        number and a symbol.
+      </small>
+      <app-field-errors [field]="registerForm.password" />
+    </label>
+
+    <app-form-errors [form]="registerForm" />
+
+    <button
+      class="btn primary"
+      type="submit"
+      [disabled]="registerForm().submitting()"
+    >
+      {{ registerForm().submitting() ? 'Creating account…' : 'Create account' }}
+    </button>
+  </form>
+
+  <p class="muted">Already registered? <a routerLink="/login">Sign in</a></p>
+</section>

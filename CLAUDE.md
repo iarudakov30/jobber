@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Start all services
 
 ```bash
-npm start                          # serves auth, executor concurrently
+npm start                          # serves auth, jobs, executor, products and ui concurrently
 ```
 
 ### Individual app commands
@@ -19,12 +19,13 @@ npx nx test <app>                  # run tests
 npx nx lint <app>                  # lint
 ```
 
-Apps: `auth`, `jobs`, `executor`, `products`
+Apps: `auth`, `jobs`, `executor`, `products`, `ui`
 
 ### Run a single test file
 
 ```bash
 npx nx test auth --testFile=apps/auth/src/app/auth/auth.service.spec.ts
+npx nx test ui --include=apps/ui/src/app/auth/session.spec.ts   # ui uses Vitest, not Jest
 ```
 
 ### Run all affected tasks (CI pattern)
@@ -181,7 +182,7 @@ npm run cache-clean                # reset Nx cache and npm cache
 
 ## Architecture
 
-Nx monorepo with four NestJS microservices and five shared libraries.
+Nx monorepo with four NestJS microservices, an Angular frontend, and five shared libraries.
 
 ### Services
 
@@ -191,6 +192,7 @@ Nx monorepo with four NestJS microservices and five shared libraries.
 | `jobs`     | 3001 | Job management (GraphQL + Pulsar producer + gRPC client)    |
 | `executor` | 3002 | Job execution (Pulsar consumer + gRPC client to `products`) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
+| `ui`       | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
 
 ### Communication Patterns
 
@@ -210,6 +212,33 @@ Nx monorepo with four NestJS microservices and five shared libraries.
 See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/app/jobs/fibonacci/fibonacci.consumer.ts` for the reference implementation.
 
 The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) follows the same pattern but its consumer (`apps/executor/src/app/jobs/products/load-products.consumer.ts`) additionally calls the `products` service over gRPC to persist the enriched product data via Drizzle.
+
+### Frontend (`ui`)
+
+Zoneless, standalone Angular 22 app (signals, lazy routes, Vitest via `@angular/build:unit-test`).
+It deliberately uses the newest Angular APIs; keep new code on them:
+
+- **Signal forms** (`@angular/forms/signals`: `form()`, `[formField]`, `[formRoot]`, submission
+  `action`), not reactive forms. Server errors go through `serverErrors()`
+  (`apps/ui/src/app/shared/error-message.ts`), which attaches class-validator messages to the
+  field they name. `signalFormsConfig` is provided per form component (not in `app.config.ts`)
+  to keep signal forms out of the initial bundle.
+- **Resource API** — Apollo queries are exposed as plain data streams by `JobsService` and
+  consumed via `rxResource` (`value()`/`hasValue()`/`error()`/`reload()`). Guard `value()` with
+  `hasValue()`: it throws in the error state.
+- **Signal inputs** (`input()`, bound from route params/query via `withComponentInputBinding`),
+  `linkedSignal` for derived-but-editable state, `@let` in templates.
+- GraphQL stays on Apollo for now; new direct (non-GraphQL) HTTP calls should use `httpResource`.
+
+- `apps/ui/src/app/graphql.provider.ts` — two Apollo clients: the default one for `jobs` and a
+  named `auth` client (`AUTH_CLIENT`). An error link clears the session and redirects to `/login`
+  on a `FORBIDDEN` response from `GqlAuthGuard`.
+- Endpoints are relative (`/api/auth`, `/api/jobs`); `apps/ui/proxy.conf.json` strips `/api` and
+  forwards to ports 3000/3001 during `nx serve ui`, so the HttpOnly cookie is same-origin. The
+  `/api` prefix keeps the proxy from capturing the UI's own `/jobs` routes on a page refresh.
+- The JWT cookie is unreadable from JS and `auth` has no "current user" query, so `Session`
+  (`apps/ui/src/app/auth/session.ts`) remembers the user returned by `login` in `localStorage`.
+- `job(id)` takes `Float!`, not `Int!` (the resolver arg is an untyped TS `number`).
 
 ### Shared Libraries
 

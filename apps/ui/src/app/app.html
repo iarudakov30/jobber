@@ -1,0 +1,16 @@
+<header class="topbar">
+  <a class="brand" routerLink="/">Jobber</a>
+  <nav>
+    @if (session.user(); as user) {
+      <a routerLink="/jobs" routerLinkActive="active">Jobs</a>
+      <span class="muted">{{ user.email }}</span>
+    } @else {
+      <a routerLink="/login" routerLinkActive="active">Sign in</a>
+      <a routerLink="/register" routerLinkActive="active">Create account</a>
+    }
+  </nav>
+</header>
+
+<main>
+  <router-outlet />
+</main>

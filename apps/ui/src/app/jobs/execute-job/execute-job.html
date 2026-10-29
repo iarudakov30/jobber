@@ -1,0 +1,56 @@
+<section class="card">
+  <h2>Run a job</h2>
+
+  @if (metadata.hasValue()) {
+    <form [formRoot]="payloadForm">
+      <label class="field">
+        <span>Job type</span>
+        <select [formField]="jobType">
+          @for (meta of metadata.value(); track meta.name) {
+            <option [value]="meta.name">{{ meta.name }}</option>
+          }
+        </select>
+        @if (description(); as text) {
+          <small class="hint">{{ text }}</small>
+        }
+      </label>
+
+      <label class="field">
+        <span>Data (JSON)</span>
+        <textarea
+          [formField]="payloadForm"
+          rows="10"
+          spellcheck="false"
+          class="mono"
+        ></textarea>
+        <!-- The payload is the form's root, so server errors land here too. -->
+        <app-field-errors [field]="payloadForm" />
+      </label>
+
+      @if (started(); as job) {
+        <p class="notice" role="status">
+          Started
+          <a [routerLink]="['/jobs', job.id]">{{ job.name }} #{{ job.id }}</a
+          >.
+        </p>
+      }
+
+      <button
+        class="btn primary"
+        type="submit"
+        [disabled]="payloadForm().submitting()"
+      >
+        {{ payloadForm().submitting() ? 'Starting…' : 'Run job' }}
+      </button>
+    </form>
+  } @else if (metadata.error()) {
+    <p class="alert" role="alert">
+      Could not load job types.
+      <button class="btn" type="button" (click)="metadata.reload()">
+        Retry
+      </button>
+    </p>
+  } @else {
+    <p class="muted">Loading job types…</p>
+  }
+</section>

@@ -1,0 +1,12 @@
+{
+  "/api/auth": {
+    "target": "http://localhost:3000",
+    "pathRewrite": { "^/api": "" },
+    "secure": false
+  },
+  "/api/jobs": {
+    "target": "http://localhost:3001",
+    "pathRewrite": { "^/api": "" },
+    "secure": false
+  }
+}
