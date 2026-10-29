@@ -16,7 +16,7 @@ export default [
           enforceBuildableLibDependency: true,
           allow: [
             '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
-            '^.*/webpack\\.app\\.config(\\.js)?$',
+            '^.*/webpack\\.(app|lib)\\.config(\\.js)?$',
           ],
           depConstraints: [
             {
