@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "dependencies": {
     "@as-integrations/express5": "^1.1.2",
-    "@golevelup/nestjs-discovery": "^6.1.1",
+    "@golevelup/nestjs-discovery": "^7.1.0",
     "graphql-type-json": "^0.3.2",
     "pino": "^10.1.0",
     "pg": "^8.22.0"

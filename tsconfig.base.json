@@ -1,6 +1,7 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "rootDir": ".",
     "sourceMap": true,
     "declaration": false,
@@ -11,6 +12,7 @@
     "target": "es2015",
     "module": "esnext",
     "lib": ["es2020", "dom"],
+    "strict": false,
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "rewriteRelativeImportExtensions": true,

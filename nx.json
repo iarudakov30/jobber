@@ -18,6 +18,15 @@
       "{workspaceRoot}/webpack.app.config.js"
     ]
   },
+  "targetDefaults": {
+    "test": {
+      "options": {
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
+      }
+    }
+  },
   "plugins": [
     {
       "plugin": "@nx/webpack/plugin",

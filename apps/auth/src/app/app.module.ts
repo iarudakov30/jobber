@@ -20,11 +20,7 @@ import { AuthModule } from './auth/auth.module';
       plugins: [new GqlLoggingPlugin()],
       graphiql: true,
       path: 'auth',
-      playground: {
-        settings: {
-          'request.credentials': 'include',
-        },
-      },
+      playground: false,
       context: ({ req, res }) => ({ req, res }),
       autoSchemaFile: true,
     }),

@@ -1,6 +1,5 @@
 import {
   ApolloServerPlugin,
-  BaseContext,
   GraphQLRequestContext,
   GraphQLRequestListener,
 } from '@apollo/server';
@@ -11,8 +10,8 @@ export class GqlLoggingPlugin implements ApolloServerPlugin {
   private readonly logger = new Logger(GqlLoggingPlugin.name);
 
   async requestDidStart(
-    requestContext: GraphQLRequestContext<BaseContext>,
-  ): Promise<void | GraphQLRequestListener<BaseContext>> {
+    requestContext: GraphQLRequestContext<any>,
+  ): Promise<void | GraphQLRequestListener<any>> {
     const { request } = requestContext;
 
     if (request.operationName === 'IntrospectionQuery') return;

@@ -53,3 +53,6 @@ apps/jobs/src/generated/
 
 # Helm dependency archives (regenerate with `helm dependency build`)
 charts/**/charts/*.tgz
+
+.nx/migrate-runs
+.claude/worktrees

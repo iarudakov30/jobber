@@ -20,11 +20,7 @@ import { PrismaModule } from './prisma/prisma.module';
       plugins: [new GqlLoggingPlugin()],
       graphiql: true,
       path: 'jobs',
-      playground: {
-        settings: {
-          'request.credentials': 'include',
-        },
-      },
+      playground: false,
       context: ({ req, res }) => ({ req, res }),
       autoSchemaFile: true,
     }),
