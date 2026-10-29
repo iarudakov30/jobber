@@ -6,7 +6,7 @@
   "tags": [],
   "targets": {
     "build": {
-      "dependsOn": ["generate-ts-proto"],
+      "dependsOn": [],
       "options": {
         "assets": [
           {

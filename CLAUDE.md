@@ -236,3 +236,155 @@ The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) 
 ### Git Hooks
 
 Pre-commit runs `lint-staged`: TypeScript files get auto-fixed with ESLint, all files get formatted with Prettier.
+
+## API Examples
+
+All GraphQL queries use the embedded GraphiQL IDE in the browser. All `jobs` queries require
+authentication — log in at the `auth` endpoint first so the JWT cookie is set.
+
+### 1. Create a user
+
+**Endpoint:** `http://localhost:3000/auth`
+
+```graphql
+mutation {
+  createUser(createUserInput: {
+    email: "test@example.com"
+    password: "Test@1234"
+  }) {
+    id
+    email
+  }
+}
+```
+
+Password must be strong (uppercase, lowercase, number, special character).
+
+### 2. Login
+
+**Endpoint:** `http://localhost:3000/auth`
+
+```graphql
+mutation {
+  login(loginInput: {
+    email: "test@example.com"
+    password: "Test@1234"
+  }) {
+    id
+    email
+  }
+}
+```
+
+Sets an HttpOnly JWT cookie (`Authentication`) used to authorize requests to the `jobs` service.
+
+### 3. List available job types
+
+**Endpoint:** `http://localhost:3001/jobs` (requires auth cookie)
+
+```graphql
+query {
+  jobsMetadata {
+    name
+    description
+  }
+}
+```
+
+### 4. Execute the Fibonacci job
+
+**Endpoint:** `http://localhost:3001/jobs` (requires auth cookie)
+
+```graphql
+mutation {
+  executeJob(executeJobInput: {
+    name: "Fibonacci"
+    data: { iterations: 10 }
+  }) {
+    id
+    name
+    size
+    status
+  }
+}
+```
+
+### 5. Execute the LoadProducts job (inline data)
+
+**Endpoint:** `http://localhost:3001/jobs` (requires auth cookie)
+
+```graphql
+mutation {
+  executeJob(executeJobInput: {
+    name: "LoadProducts"
+    data: [
+      { name: "Widget", category: "Electronics", price: 29.99, stock: 100, rating: 4.5, description: "A cool widget" },
+      { name: "Gadget", category: "Tools", price: 49.99, stock: 50, rating: 3.8, description: "A handy gadget" }
+    ]
+  }) {
+    id
+    name
+    size
+    status
+  }
+}
+```
+
+### 6. Execute the LoadProducts job (file upload)
+
+Upload a JSON file first, then execute the job with the returned filename.
+
+**Upload** (use `curl.exe` on Windows to avoid the PowerShell alias):
+
+```bash
+curl.exe -X POST http://localhost:3001/jobs/uploads/upload \
+  -F "file=@products.json;type=application/json" \
+  --cookie "Authentication=<your-jwt>"
+```
+
+Returns `{ "message": "Uploaded file: file-123456.json" }`.
+
+Sample `products.json`:
+
+```json
+[
+  { "name": "Widget", "category": "Electronics", "price": 29.99, "stock": 100, "rating": 4.5, "description": "A cool widget" },
+  { "name": "Gadget", "category": "Tools", "price": 49.99, "stock": 50, "rating": 3.8, "description": "A handy gadget" }
+]
+```
+
+### 7. List all jobs
+
+**Endpoint:** `http://localhost:3001/jobs` (requires auth cookie)
+
+```graphql
+query {
+  jobs {
+    id
+    name
+    size
+    completed
+    status
+    started
+    ended
+  }
+}
+```
+
+### 8. Get a specific job by ID
+
+**Endpoint:** `http://localhost:3001/jobs` (requires auth cookie)
+
+```graphql
+query {
+  job(id: 1) {
+    id
+    name
+    size
+    completed
+    status
+    started
+    ended
+  }
+}
+```

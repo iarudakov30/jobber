@@ -8,7 +8,7 @@
     "test": "npx nx affected -t lint test build",
     "start": "nx run-many -t serve -p auth jobs executor products --parallel 4 --output-style=stream",
     "stop": "fuser -k 3000/tcp 3001/tcp 3002/tcp 3003/tcp 2>/dev/null; echo 'Ports cleared'",
-    "migrate-db": "docker exec -it jobber-postgres-1 psql -U postgres -c 'CREATE DATABASE auth cd apps/auth && npx prisma migrate deploy"
+    "migrate-db": "docker exec jobber-postgres-1 psql -U postgres -c \"SELECT 'ok' FROM pg_database WHERE datname='jobber-auth'\" | grep -q ok || docker exec jobber-postgres-1 psql -U postgres -c 'CREATE DATABASE \"jobber-auth\";' && cd apps/auth && npx prisma migrate deploy"
   },
   "workspaces": [
     "apps/*",
