@@ -3,6 +3,14 @@ import {
   Logger,
   OnApplicationBootstrap,
 } from '@nestjs/common';
+import {
+  ROOT_CONTEXT,
+  SpanKind,
+  SpanStatusCode,
+  context,
+  propagation,
+  trace,
+} from '@opentelemetry/api';
 
 import {
   OutboxPublisher,
@@ -112,14 +120,43 @@ export class OutboxRelay
     }
   }
 
-  private publish(record: OutboxRecord): Promise<void> {
+  /**
+   * Publishes inside a PRODUCER span that continues the trace saved at enqueue time, and passes
+   * that span on in the headers so the consumer's span becomes its child.
+   */
+  private async publish(record: OutboxRecord): Promise<void> {
     const publisher = this.publishers.get(record.transport);
     if (!publisher) {
-      return Promise.reject(
-        new Error(`No outbox publisher for transport "${record.transport}"`),
+      throw new Error(
+        `No outbox publisher for transport "${record.transport}"`,
       );
     }
-    return publisher.publish(record);
+    const parent = propagation.extract(ROOT_CONTEXT, record.headers);
+    const span = tracer.startSpan(
+      `${record.destination} publish`,
+      {
+        kind: SpanKind.PRODUCER,
+        attributes: {
+          'messaging.system': record.transport,
+          'messaging.destination.name': record.destination,
+          'outbox.id': record.id.toString(),
+        },
+      },
+      parent,
+    );
+    const spanContext = trace.setSpan(parent, span);
+    const headers = { ...record.headers };
+    propagation.inject(spanContext, headers);
+    try {
+      await context.with(spanContext, () =>
+        publisher.publish({ ...record, headers }),
+      );
+    } catch (e) {
+      span.setStatus({ code: SpanStatusCode.ERROR, message: errorText(e) });
+      throw e;
+    } finally {
+      span.end();
+    }
   }
 
   private sleep(ms: number): Promise<void> {
@@ -137,3 +174,5 @@ export class OutboxRelay
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
+
+const tracer = trace.getTracer('@jobber/outbox');

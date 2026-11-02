@@ -23,7 +23,8 @@
       "@jobber/nestjs": ["libs/nestjs/src/index.ts"],
       "@jobber/grpc": ["libs/grpc/src/index.ts"],
       "@jobber/prisma": ["libs/prisma/src/index.ts"],
-      "@jobber/outbox": ["libs/outbox/src/index.ts"]
+      "@jobber/outbox": ["libs/outbox/src/index.ts"],
+      "@jobber/tracing": ["libs/tracing/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

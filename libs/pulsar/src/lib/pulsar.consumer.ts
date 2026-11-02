@@ -1,4 +1,12 @@
 import { Logger, OnModuleInit } from '@nestjs/common';
+import {
+  ROOT_CONTEXT,
+  SpanKind,
+  SpanStatusCode,
+  context,
+  propagation,
+  trace,
+} from '@opentelemetry/api';
 import { Consumer, Message, Producer } from 'pulsar-client';
 
 import { deserialize } from './serialize';
@@ -50,15 +58,48 @@ export abstract class PulsarConsumer<T> implements OnModuleInit {
 
   protected abstract onMessage(data: T, meta: MessageMeta): Promise<void>;
 
+  /**
+   * Handles one message inside a CONSUMER span that continues the producer's trace (from the
+   * `traceparent` property), so work done in `onMessage` (gRPC calls, queries) joins it.
+   */
   private async listener(message: Message) {
     const meta = messageMeta(message);
+    const parent = propagation.extract(ROOT_CONTEXT, meta.properties);
+    const span = tracer.startSpan(
+      `${this.topic} process`,
+      {
+        kind: SpanKind.CONSUMER,
+        attributes: {
+          'messaging.system': 'pulsar',
+          'messaging.destination.name': this.topic,
+          'messaging.message.id': meta.messageId,
+          'messaging.pulsar.redelivery_count': meta.redeliveryCount,
+        },
+      },
+      parent,
+    );
+    try {
+      const outcome = await context.with(trace.setSpan(parent, span), () =>
+        this.processMessage(message, meta),
+      );
+      span.setAttribute('messaging.outcome', outcome);
+      if (outcome !== 'acked') {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: outcome });
+      }
+    } finally {
+      span.end();
+    }
+  }
 
+  private async processMessage(
+    message: Message,
+    meta: MessageMeta,
+  ): Promise<Outcome> {
     let data: T;
     try {
       data = deserialize<T>(message.getData());
     } catch (e) {
-      await this.deadLetter(message, `Unparseable payload: ${errorText(e)}`);
-      return;
+      return this.deadLetter(message, `Unparseable payload: ${errorText(e)}`);
     }
 
     try {
@@ -66,14 +107,13 @@ export abstract class PulsarConsumer<T> implements OnModuleInit {
       await this.onMessage(data, meta);
     } catch (e) {
       if (e instanceof NonRetryableError) {
-        await this.deadLetter(message, e.message);
-        return;
+        return this.deadLetter(message, e.message);
       }
       this.logger.error(
         `Message ${meta.messageId} failed (delivery ${meta.redeliveryCount + 1}): ${errorText(e)}`,
       );
       this.consumer.negativeAcknowledge(message);
-      return;
+      return 'nacked';
     }
 
     // Outside the try above: if only the ack fails, the work is done and must not be nacked
@@ -84,10 +124,11 @@ export abstract class PulsarConsumer<T> implements OnModuleInit {
     } catch (e) {
       this.logger.error(`Ack of ${meta.messageId} failed: ${errorText(e)}`);
     }
+    return 'acked';
   }
 
   /** Publishes the message unchanged to the dead-letter topic, then acks the original. */
-  private async deadLetter(message: Message, reason: string) {
+  private async deadLetter(message: Message, reason: string): Promise<Outcome> {
     const meta = messageMeta(message);
     try {
       this.deadLetterProducer ??= this.pulsarClient.createProducer(
@@ -113,12 +154,17 @@ export abstract class PulsarConsumer<T> implements OnModuleInit {
         `Dead-lettering ${meta.messageId} failed: ${errorText(e)}`,
       );
       this.consumer.negativeAcknowledge(message);
-      return;
+      return 'nacked';
     }
     this.logger.warn(`Message ${meta.messageId} dead-lettered: ${reason}`);
     await this.consumer.acknowledge(message);
+    return 'dead-lettered';
   }
 }
+
+type Outcome = 'acked' | 'nacked' | 'dead-lettered';
+
+const tracer = trace.getTracer('@jobber/pulsar');
 
 function messageMeta(message: Message): MessageMeta {
   const key = message.getPartitionKey();

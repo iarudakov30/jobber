@@ -37,9 +37,22 @@ npx nx affected -t lint test build
 ### Infrastructure
 
 ```bash
-docker compose up -d               # start PostgreSQL + Apache Pulsar
+docker compose up -d               # start PostgreSQL, Pulsar, Redis, Mailpit and Jaeger
+docker compose up -d pulsar jaeger # or just what you need
 docker compose down
 ```
+
+| Service  | Port(s)                | UI                     |
+| -------- | ---------------------- | ---------------------- |
+| Postgres | 5432                   |                        |
+| Pulsar   | 6650                   |                        |
+| Redis    | 6379                   |                        |
+| Mailpit  | 1025 (SMTP)            | http://localhost:8025  |
+| Jaeger   | 4318 (OTLP/HTTP)       | http://localhost:16686 |
+
+Pulsar runs with `brokerDeduplicationEnabled=true` (applied by `apply-config-from-env.py` in the
+compose `command`): a resend with the same producer name and `sequenceId` is dropped. Changing the
+compose config needs `docker compose up -d pulsar` to recreate the container.
 
 ### Docker (per app)
 
@@ -182,7 +195,7 @@ npm run cache-clean                # reset Nx cache and npm cache
 
 ## Architecture
 
-Nx monorepo with four NestJS microservices, an Angular frontend, and six shared libraries.
+Nx monorepo with four NestJS microservices, an Angular frontend, and seven shared libraries.
 
 ### Services
 
@@ -248,6 +261,7 @@ It deliberately uses the newest Angular APIs; keep new code on them:
 - **`@jobber/nestjs`** (`libs/nestjs`) — `init()` bootstrap helper used by all apps, `Jobs` enum
 - **`@jobber/grpc`** (`libs/grpc`) — gRPC proto files and generated TypeScript types for `AuthService` and `ProductsService`, plus the `Packages` enum
 - **`@jobber/prisma`** (`libs/prisma`) — Prisma client used by `auth`
+- **`@jobber/tracing`** (`libs/tracing`) — `startTracing(serviceName)`: OpenTelemetry SDK with http, express, Nest, GraphQL, gRPC and pg (only inside a traced request) instrumentation, exporting over OTLP/HTTP. Call it on the line right after `require('module-alias/register')` in `main.ts`, before anything loads NestJS: instrumentations patch modules when they are first required. Pulsar isn't instrumented; `send()` and the outbox write `traceparent` into message properties and `PulsarConsumer` continues the trace from them.
 - **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. Delivery is at-least-once.
 - **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, a `send()` helper (key, properties, `sequenceId`), and job message DTOs (`FibonacciMessage`, `LoadProductsMessage`)
   - Consumers take `ConsumerOptions`: subscription (default `jobber`, which job consumers keep), type (default `Shared`), redelivery delay (5 s) and max redeliveries (5) before Pulsar moves the message to `<topic>-<subscription>-DLQ`. Give each service that consumes the same topic its own subscription, or they split the messages instead of each getting all of them.
@@ -267,6 +281,13 @@ It deliberately uses the newest Angular APIs; keep new code on them:
 
 - PostgreSQL for `auth` user storage (Prisma ORM)
 - Apache Pulsar for async job message passing (both running in Docker)
+- Jaeger for traces. Every backend app calls `startTracing(<service>)` from `@jobber/tracing` and
+  exports to `OTEL_EXPORTER_OTLP_ENDPOINT` (set in each `apps/*/.env`; unset it, or set
+  `OTEL_SDK_DISABLED=true`, to turn tracing off). One job shows as one trace: the `jobs` GraphQL
+  request → outbox `<topic> publish` → executor `<topic> process` → `Acknowledge` gRPC back into
+  `jobs`. Known gap: `auth`'s gRPC server records no spans yet, though the `jobs` side of that
+  call does.
+- Redis and Mailpit run in compose but no app uses them until NexusPay phases 2–3.
 
 ### Git Hooks
 

@@ -10,12 +10,37 @@ services:
 
   pulsar:
     image: apachepulsar/pulsar
+    # apply-config-from-env.py copies matching environment variables into standalone.conf.
     command: >
-      /pulsar/bin/pulsar standalone
+      sh -c "bin/apply-config-from-env.py conf/standalone.conf && bin/pulsar standalone"
+    environment:
+      # Drops a resent message whose producer name + sequenceId it has already seen, which is
+      # how the outbox relay's resends after a crash are deduplicated.
+      brokerDeduplicationEnabled: 'true'
     ports:
       - '6650:6650'
     volumes:
       - pulsar_data:/pulsar/data
+
+  # Not used yet: rate limits, idempotency locks and quotes from phase 2 on.
+  redis:
+    image: redis:7
+    ports:
+      - '6379:6379'
+
+  # Catches outgoing email (SMTP on 1025); UI at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
+  # Receives OpenTelemetry traces over OTLP/HTTP on 4318; UI at http://localhost:16686.
+  jaeger:
+    image: jaegertracing/jaeger
+    ports:
+      - '4318:4318'
+      - '16686:16686'
 
 volumes:
   postgres_data:

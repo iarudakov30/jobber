@@ -1,3 +1,5 @@
+import { context, propagation } from '@opentelemetry/api';
+
 import {
   BatchResult,
   NewOutboxRecord,
@@ -45,11 +47,20 @@ export class PrismaOutboxStore implements OutboxStore {
     private readonly transactionTimeoutMs = 60_000,
   ) {}
 
-  /** Writes `records` inside the caller's transaction `tx`. */
+  /**
+   * Writes `records` inside the caller's transaction `tx`. The active trace context is saved in
+   * each record's headers, so publishing later (outside the request) stays in the same trace.
+   */
   async enqueue(
     tx: PrismaRawClient,
     records: NewOutboxRecord[],
   ): Promise<void> {
+    const trace: Record<string, string> = {};
+    propagation.inject(context.active(), trace);
+    records = records.map((r) => ({
+      ...r,
+      headers: { ...trace, ...r.headers },
+    }));
     for (let i = 0; i < records.length; i += INSERT_CHUNK) {
       const chunk = records.slice(i, i + INSERT_CHUNK);
       await tx.$executeRaw`

@@ -1,6 +1,7 @@
-import { GrpcOptions, Transport } from '@nestjs/microservices';
-
 require('module-alias/register');
+// Before anything that loads NestJS, http, gRPC or pg: instrumentation patches them on require.
+require('@jobber/tracing').startTracing('jobs');
+import { GrpcOptions, Transport } from '@nestjs/microservices';
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';

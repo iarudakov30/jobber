@@ -19,6 +19,7 @@ COPY libs/graphql ./libs/graphql
 COPY libs/grpc ./libs/grpc
 COPY libs/nestjs ./libs/nestjs
 COPY libs/prisma ./libs/prisma
+COPY libs/tracing ./libs/tracing
 
 # Install dependencies
 RUN npm install
@@ -41,6 +42,7 @@ WORKDIR /app
 # Copy necessary files
 COPY --from=builder /workspace/package.json ./
 COPY --from=builder /workspace/apps/auth/package.json ./apps/auth/package.json
+COPY --from=builder /workspace/libs/tracing/package.json ./libs/tracing/package.json
 COPY --from=builder /workspace/libs/graphql/package.json ./libs/graphql/package.json
 COPY --from=builder /workspace/libs/grpc/package.json ./libs/grpc/package.json
 COPY --from=builder /workspace/apps/auth/prisma ./prisma

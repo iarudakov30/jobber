@@ -4,6 +4,8 @@
  */
 
 require('module-alias/register');
+// Before anything that loads NestJS, http, gRPC or pg: instrumentation patches them on require.
+require('@jobber/tracing').startTracing('products');
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app/app.module';
