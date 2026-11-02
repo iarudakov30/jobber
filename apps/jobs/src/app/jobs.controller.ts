@@ -13,7 +13,7 @@ export class JobsController implements JobsServiceController {
   constructor(private readonly jobsService: JobsService) {}
 
   async acknowledge(request: AcknowledgeRequest): Promise<AcknowledgeResponse> {
-    await this.jobsService.acknowledge(request.jobId);
+    await this.jobsService.acknowledge(request.jobId, request.index);
     return {};
   }
 }

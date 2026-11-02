@@ -8,6 +8,8 @@ service JobsService {
 
 message AcknowledgeRequest {
   int32 jobId = 1;
+  // Position of the item in the job; acknowledging the same index twice counts once.
+  int32 index = 2;
 }
 
 message AcknowledgeResponse {}

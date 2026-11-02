@@ -8,4 +8,7 @@ export const products = pgTable('products', {
   stock: integer('stock'),
   rating: real('rating'),
   description: text('description'),
+  // Where the product came from (e.g. "job:<jobId>:<index>"). Unique, so a redelivered
+  // LoadProducts message inserts nothing the second time; null for rows loaded before it existed.
+  sourceRef: text('source_ref').unique(),
 });

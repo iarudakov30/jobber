@@ -208,6 +208,8 @@ Nx monorepo with four NestJS microservices, an Angular frontend, and six shared 
 - `JobsService` uses `@golevelup/nestjs-discovery` to auto-discover all `@Job()` decorated classes
 - The discovered job class validates the payload (at most `MAX_JOB_ITEMS`, 10,000 items), then in one transaction creates the `Job` row and writes one outbox record per item; the outbox relay publishes them to a Pulsar topic named after the job type. A crash can therefore never leave a job whose messages weren't sent.
 - `executor` defines a corresponding `PulsarConsumer<T>` subclass that processes messages from that topic
+- Each message carries `jobId` and its item `index`. After `execute`, the executor calls `Acknowledge({ jobId, index })`; `JobsService.acknowledge` inserts a `JobItem (jobId, index)` row and bumps `completed` in one statement, so a redelivered message is counted once. `execute` must be safe to repeat too: `LoadProducts` sends `sourceRef = job:<jobId>:<index>` and `products` ignores a second insert with the same `source_ref`.
+- Test hook: start the executor with `FAULT_ACK_FAILURES=<n>` (ignored when `NODE_ENV=production`) and its first n messages fail after `execute`, forcing redeliveries.
 
 See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/app/jobs/fibonacci/fibonacci.consumer.ts` for the reference implementation.
 

@@ -35,6 +35,17 @@ export class LoadProductsConsumer
 
   protected async execute(data: LoadProductsMessage): Promise<void> {
     this.logger.log(`LoadProductsConsumer: ${JSON.stringify(data)}`);
-    await firstValueFrom(this.productsService.createProduct(data));
+    // The job item's identity makes a redelivered message insert nothing the second time.
+    await firstValueFrom(
+      this.productsService.createProduct({
+        name: data.name,
+        category: data.category,
+        price: data.price,
+        stock: data.stock,
+        rating: data.rating,
+        description: data.description,
+        sourceRef: `job:${data.jobId}:${data.index}`,
+      }),
+    );
   }
 }

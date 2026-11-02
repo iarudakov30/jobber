@@ -92,7 +92,7 @@ describe('AbstractJob', () => {
         transport: 'pulsar',
         destination: 'Fibonacci',
         key: '7',
-        payload: { iterations: 10, jobId: 7 },
+        payload: { iterations: 10, jobId: 7, index: 0 },
       },
     ]);
   });
@@ -135,8 +135,8 @@ describe('AbstractJob', () => {
 
     expect(job).toMatchObject({ size: 2 });
     expect(sent()).toEqual([
-      { ...product, jobId: 7 },
-      { ...product, name: 'Gadget', jobId: 7 },
+      { ...product, jobId: 7, index: 0 },
+      { ...product, name: 'Gadget', jobId: 7, index: 1 },
     ]);
   });
 

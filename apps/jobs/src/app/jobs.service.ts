@@ -63,32 +63,43 @@ export class JobsService implements OnModuleInit {
     );
   }
 
-  async acknowledge(jobId: number) {
-    const job = await this.prismaService.job.findUnique({
-      where: { id: jobId },
-    });
+  /**
+   * Counts item `index` of job `jobId` as done, at most once: a redelivered message acknowledges
+   * the same index again, and the `JobItem` primary key turns that into a no-op. One statement,
+   * so the count and the COMPLETED transition can't race; in the `SET` clause `completed` is the
+   * value before this acknowledgement.
+   */
+  async acknowledge(jobId: number, index: number) {
+    const [job] = await this.prismaService.$queryRaw<
+      { id: number; size: number; completed: number; status: string }[]
+    >`
+      WITH acked AS (
+        INSERT INTO "JobItem" ("jobId", "index")
+        SELECT id, ${index}::int FROM "Job"
+        WHERE id = ${jobId}::int AND ${index}::int >= 0 AND ${index}::int < size
+        ON CONFLICT DO NOTHING
+        RETURNING 1
+      )
+      UPDATE "Job" SET
+        completed = completed + (SELECT count(*) FROM acked),
+        status = CASE
+          WHEN status = ${JobStatus.IN_PROGRESS}
+            AND completed + (SELECT count(*) FROM acked) = size
+          THEN ${JobStatus.COMPLETED} ELSE status END,
+        ended = CASE
+          WHEN status = ${JobStatus.IN_PROGRESS}
+            AND completed + (SELECT count(*) FROM acked) = size
+          THEN now() ELSE ended END
+      WHERE id = ${jobId}::int
+      RETURNING id, size, completed, status`;
 
     if (!job) {
       throw new BadRequestException(`Job ${jobId} not found.`);
     }
-
-    if (job.ended) {
-      return;
+    if (index < 0 || index >= job.size) {
+      throw new BadRequestException(`Job ${jobId} has no item ${index}.`);
     }
-
-    const updatedJob = await this.prismaService.job.update({
-      where: { id: jobId },
-      data: { completed: { increment: 1 } },
-    });
-
-    if (updatedJob.completed === job.size) {
-      await this.prismaService.job.update({
-        where: { id: jobId },
-        data: { status: JobStatus.COMPLETED, ended: new Date() },
-      });
-    }
-
-    return updatedJob;
+    return job;
   }
 
   private getFile(fileName?: string) {

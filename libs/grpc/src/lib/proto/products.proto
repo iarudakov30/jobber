@@ -13,6 +13,8 @@ message CreateProductRequest {
   int32 stock = 4;
   float rating = 5;
   string description = 6;
+  // Unique per product source (e.g. "job:<jobId>:<index>"); a repeat insert is ignored.
+  string sourceRef = 7;
 }
 
 message CreateProductResponse {}

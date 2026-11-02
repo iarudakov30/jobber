@@ -10,6 +10,8 @@ import { Observable } from 'rxjs';
 
 export interface AcknowledgeRequest {
   jobId: number;
+  /** Position of the item in the job; acknowledging the same index twice counts once. */
+  index: number;
 }
 
 export interface AcknowledgeResponse {}

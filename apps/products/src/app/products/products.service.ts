@@ -18,9 +18,12 @@ export class ProductsService {
     const category = await this.categoriesService.getCategoryByName(
       product.category,
     );
-    await this.database.insert(schema.products).values({
-      ...product,
-      price: category ? product.price + category.charge : product.price,
-    });
+    await this.database
+      .insert(schema.products)
+      .values({
+        ...product,
+        price: category ? product.price + category.charge : product.price,
+      })
+      .onConflictDoNothing({ target: schema.products.sourceRef });
   }
 }

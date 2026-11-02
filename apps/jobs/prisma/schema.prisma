@@ -16,6 +16,18 @@ model Job {
   status    String
   started   DateTime  @default(now())
   ended     DateTime?
+  items     JobItem[]
+}
+
+/// One row per acknowledged item, inserted by `JobsService.acknowledge`. The primary key makes a
+/// redelivered message's second acknowledgement a no-op instead of counting it twice.
+model JobItem {
+  jobId   Int
+  index   Int
+  ackedAt DateTime @default(now())
+  job     Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, index])
 }
 
 /// The `outbox` table `@jobber/outbox` reads and writes with raw SQL; keep it matching the

@@ -22,6 +22,13 @@
       "when": 1788425237433,
       "tag": "0002_seed-categories",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793655913863,
+      "tag": "0003_products_source_ref",
+      "breakpoints": true
     }
   ]
 }

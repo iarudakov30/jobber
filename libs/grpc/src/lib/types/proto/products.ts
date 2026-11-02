@@ -15,6 +15,8 @@ export interface CreateProductRequest {
   stock: number;
   rating: number;
   description: string;
+  /** Unique per product source (e.g. "job:<jobId>:<index>"); a repeat insert is ignored. */
+  sourceRef: string;
 }
 
 export interface CreateProductResponse {}

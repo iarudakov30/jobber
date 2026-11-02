@@ -37,11 +37,11 @@ export abstract class AbstractJob<T extends object> {
         });
         await this.outbox.enqueue(
           tx,
-          items.map((item) => ({
+          items.map((item, index) => ({
             transport: 'pulsar' as const,
             destination: name,
             key: String(job.id),
-            payload: { ...item, jobId: job.id },
+            payload: { ...item, jobId: job.id, index },
           })),
         );
         return job;
