@@ -197,6 +197,10 @@ npm run cache-clean                # reset Nx cache and npm cache
 
 Nx monorepo with four NestJS microservices, an Angular frontend, and seven shared libraries.
 
+NexusPay (the wallet/payments learning project being built in this repo) is documented in
+`docs/nexuspay/`: purpose and architecture, repo guide, roadmap, and a step-by-step log of what
+was built and why (`docs/nexuspay/README.md` is the entry point).
+
 ### Services
 
 | Service    | Port | Role                                                        |
