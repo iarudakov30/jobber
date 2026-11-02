@@ -20,6 +20,7 @@ COPY libs/grpc ./libs/grpc
 COPY libs/nestjs ./libs/nestjs
 COPY libs/pulsar ./libs/pulsar
 COPY libs/prisma ./libs/prisma
+COPY libs/outbox ./libs/outbox
 
 # Install dependencies
 RUN npm install
@@ -43,6 +44,7 @@ COPY --from=builder /workspace/apps/jobs/package.json ./apps/jobs/package.json
 COPY --from=builder /workspace/libs/graphql/package.json ./libs/graphql/package.json
 COPY --from=builder /workspace/libs/grpc/package.json ./libs/grpc/package.json
 COPY --from=builder /workspace/libs/pulsar/package.json ./libs/pulsar/package.json
+COPY --from=builder /workspace/libs/outbox/package.json ./libs/outbox/package.json
 COPY --from=builder /workspace/apps/jobs/prisma ./prisma
 COPY --from=builder /workspace/apps/jobs/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /workspace/libs/prisma/package.json ./libs/prisma/package.json

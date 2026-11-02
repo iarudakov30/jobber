@@ -3,10 +3,14 @@ import {
   FibonacciMessage,
   LoadProductsMessage,
   MAX_FIBONACCI_ITERATIONS,
-  PulsarClient,
-  deserialize,
 } from '@jobber/pulsar';
+import {
+  NewOutboxRecord,
+  OutboxRelay,
+  PrismaOutboxStore,
+} from '@jobber/outbox';
 import { PrismaService } from '../prisma/prisma.service';
+import { MAX_JOB_ITEMS } from './abstract.job';
 import { FibonacciJob } from './fibonacci/fibonacci.job';
 import { LoadProductsJob } from './products/load-products.job';
 
@@ -20,14 +24,13 @@ const product = {
 };
 
 describe('AbstractJob', () => {
-  let producer: { send: jest.Mock };
-  let pulsarClient: { createProducer: jest.Mock };
-  let prismaService: { job: { create: jest.Mock } };
+  let tx: { job: { create: jest.Mock } };
+  let prismaService: { $transaction: jest.Mock };
+  let outbox: { enqueue: jest.Mock };
+  let outboxRelay: { poke: jest.Mock };
 
   beforeEach(() => {
-    producer = { send: jest.fn().mockResolvedValue(undefined) };
-    pulsarClient = { createProducer: jest.fn().mockResolvedValue(producer) };
-    prismaService = {
+    tx = {
       job: {
         create: jest
           .fn()
@@ -36,21 +39,30 @@ describe('AbstractJob', () => {
           ),
       },
     };
+    prismaService = {
+      $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+    };
+    outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    outboxRelay = { poke: jest.fn() };
   });
 
+  const deps = () =>
+    [
+      prismaService as unknown as PrismaService,
+      outbox as unknown as PrismaOutboxStore,
+      outboxRelay as unknown as OutboxRelay,
+    ] as const;
   // Job data arrives as untyped GraphQL JSON without `jobId`, which `execute()` adds.
   const runFibonacci = (data: unknown) =>
-    new FibonacciJob(
-      pulsarClient as unknown as PulsarClient,
-      prismaService as unknown as PrismaService,
-    ).execute(data as FibonacciMessage, 'Fibonacci');
+    new FibonacciJob(...deps()).execute(data as FibonacciMessage, 'Fibonacci');
   const runLoadProducts = (data: unknown) =>
-    new LoadProductsJob(
-      pulsarClient as unknown as PulsarClient,
-      prismaService as unknown as PrismaService,
-    ).execute(data as LoadProductsMessage[], 'LoadProducts');
-  const sent = () =>
-    producer.send.mock.calls.map(([{ data }]) => deserialize(data));
+    new LoadProductsJob(...deps()).execute(
+      data as LoadProductsMessage[],
+      'LoadProducts',
+    );
+  const enqueued = (): NewOutboxRecord[] =>
+    outbox.enqueue.mock.calls.flatMap(([, records]) => records);
+  const sent = () => enqueued().map((record) => record.payload);
 
   async function rejection(promise: Promise<unknown>) {
     const error = await promise.then(
@@ -66,16 +78,53 @@ describe('AbstractJob', () => {
   }
 
   function expectNothingCreated() {
-    expect(prismaService.job.create).not.toHaveBeenCalled();
-    expect(pulsarClient.createProducer).not.toHaveBeenCalled();
-    expect(producer.send).not.toHaveBeenCalled();
+    expect(prismaService.$transaction).not.toHaveBeenCalled();
+    expect(outbox.enqueue).not.toHaveBeenCalled();
   }
 
-  it('creates the job and sends a single message', async () => {
+  it('creates the job and enqueues its message in the same transaction', async () => {
     const job = await runFibonacci({ iterations: 10 });
 
     expect(job).toMatchObject({ id: 7, size: 1, status: 'IN_PROGRESS' });
-    expect(sent()).toEqual([{ iterations: 10, jobId: 7 }]);
+    expect(outbox.enqueue).toHaveBeenCalledWith(tx, expect.any(Array));
+    expect(enqueued()).toEqual([
+      {
+        transport: 'pulsar',
+        destination: 'Fibonacci',
+        key: '7',
+        payload: { iterations: 10, jobId: 7 },
+      },
+    ]);
+  });
+
+  it('wakes the relay only after the transaction commits', async () => {
+    prismaService.$transaction.mockImplementation(async (fn) => {
+      const result = await fn(tx);
+      expect(outboxRelay.poke).not.toHaveBeenCalled();
+      return result;
+    });
+
+    await runFibonacci({ iterations: 10 });
+
+    expect(outboxRelay.poke).toHaveBeenCalledTimes(1);
+  });
+
+  it('enqueues nothing when the transaction fails', async () => {
+    prismaService.$transaction.mockRejectedValue(new Error('db down'));
+
+    await expect(runFibonacci({ iterations: 10 })).rejects.toThrow('db down');
+    expect(outboxRelay.poke).not.toHaveBeenCalled();
+  });
+
+  it(`rejects more than ${MAX_JOB_ITEMS} items`, async () => {
+    const response = await rejection(
+      runLoadProducts(Array.from({ length: MAX_JOB_ITEMS + 1 }, () => product)),
+    );
+
+    expect(response.message).toBe(
+      `A job can have at most ${MAX_JOB_ITEMS} items; got ${MAX_JOB_ITEMS + 1}.`,
+    );
+    expectNothingCreated();
   });
 
   it('sends every array item tagged with the job id', async () => {

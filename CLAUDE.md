@@ -182,14 +182,14 @@ npm run cache-clean                # reset Nx cache and npm cache
 
 ## Architecture
 
-Nx monorepo with four NestJS microservices, an Angular frontend, and five shared libraries.
+Nx monorepo with four NestJS microservices, an Angular frontend, and six shared libraries.
 
 ### Services
 
 | Service    | Port | Role                                                        |
 | ---------- | ---- | ----------------------------------------------------------- |
 | `auth`     | 3000 | User auth (GraphQL + PostgreSQL/Prisma + gRPC server)       |
-| `jobs`     | 3001 | Job management (GraphQL + Pulsar producer + gRPC client)    |
+| `jobs`     | 3001 | Job management (GraphQL + outbox to Pulsar + gRPC client)   |
 | `executor` | 3002 | Job execution (Pulsar consumer + gRPC client to `products`) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
 | `ui`       | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
@@ -206,7 +206,7 @@ Nx monorepo with four NestJS microservices, an Angular frontend, and five shared
 
 - Decorate a class with `@Job()` to register a new job type
 - `JobsService` uses `@golevelup/nestjs-discovery` to auto-discover all `@Job()` decorated classes
-- The discovered job class receives the job payload and publishes it to a Pulsar topic named after the job type
+- The discovered job class validates the payload (at most `MAX_JOB_ITEMS`, 10,000 items), then in one transaction creates the `Job` row and writes one outbox record per item; the outbox relay publishes them to a Pulsar topic named after the job type. A crash can therefore never leave a job whose messages weren't sent.
 - `executor` defines a corresponding `PulsarConsumer<T>` subclass that processes messages from that topic
 
 See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/app/jobs/fibonacci/fibonacci.consumer.ts` for the reference implementation.
@@ -246,6 +246,7 @@ It deliberately uses the newest Angular APIs; keep new code on them:
 - **`@jobber/nestjs`** (`libs/nestjs`) — `init()` bootstrap helper used by all apps, `Jobs` enum
 - **`@jobber/grpc`** (`libs/grpc`) — gRPC proto files and generated TypeScript types for `AuthService` and `ProductsService`, plus the `Packages` enum
 - **`@jobber/prisma`** (`libs/prisma`) — Prisma client used by `auth`
+- **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. Delivery is at-least-once.
 - **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, a `send()` helper (key, properties, `sequenceId`), and job message DTOs (`FibonacciMessage`, `LoadProductsMessage`)
   - Consumers take `ConsumerOptions`: subscription (default `jobber`, which job consumers keep), type (default `Shared`), redelivery delay (5 s) and max redeliveries (5) before Pulsar moves the message to `<topic>-<subscription>-DLQ`. Give each service that consumes the same topic its own subscription, or they split the messages instead of each getting all of them.
   - `onMessage(data, meta)` gets the message id, partition key, properties and redelivery count. Throwing `NonRetryableError` (or sending unparseable JSON) dead-letters the message at once; any other error nacks it for redelivery. Only a failed handler nacks, never a failed ack, so handlers must tolerate the occasional repeat.

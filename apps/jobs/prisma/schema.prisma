@@ -17,3 +17,19 @@ model Job {
   started   DateTime  @default(now())
   ended     DateTime?
 }
+
+/// The `outbox` table `@jobber/outbox` reads and writes with raw SQL; keep it matching the
+/// contract in `libs/outbox/src/lib/outbox.types.ts`.
+model OutboxMessage {
+  id          BigInt    @id @default(autoincrement())
+  transport   String
+  destination String
+  key         String?
+  payload     Json
+  headers     Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  publishedAt DateTime? @map("published_at") @db.Timestamptz
+
+  @@index([publishedAt, id])
+  @@map("outbox")
+}

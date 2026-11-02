@@ -39,7 +39,8 @@
     "@jobber/graphql": "dist/libs/graphql/main",
     "@jobber/pulsar": "dist/libs/pulsar/main",
     "@jobber/nestjs": "dist/libs/nestjs/main",
-    "@jobber/prisma": "dist/libs/prisma/main"
+    "@jobber/prisma": "dist/libs/prisma/main",
+    "@jobber/outbox": "dist/libs/outbox/main"
   },
   "overrides": {
     "@apollo/server": "^5.5.1"

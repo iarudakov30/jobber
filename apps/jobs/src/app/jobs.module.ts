@@ -7,13 +7,19 @@ import { DiscoveryModule } from '@golevelup/nestjs-discovery';
 import { join } from 'path';
 
 import { Packages } from '@jobber/grpc';
-import { PulsarModule } from '@jobber/pulsar';
+import { PulsarClient, PulsarModule } from '@jobber/pulsar';
+import {
+  OutboxRelay,
+  PrismaOutboxStore,
+  PulsarOutboxPublisher,
+} from '@jobber/outbox';
 
 import { FibonacciJob } from './jobs/fibonacci/fibonacci.job';
 import { JobsService } from './jobs.service';
 import { JobsResolver } from './jobs.resolver';
 import { LoadProductsJob } from './jobs/products/load-products.job';
 import { PrismaModule } from './prisma/prisma.module';
+import { PrismaService } from './prisma/prisma.service';
 import { JobsController } from './jobs.controller';
 
 @Module({
@@ -37,6 +43,25 @@ import { JobsController } from './jobs.controller';
     ]),
   ],
   controllers: [JobsController],
-  providers: [FibonacciJob, JobsService, JobsResolver, LoadProductsJob],
+  providers: [
+    FibonacciJob,
+    JobsService,
+    JobsResolver,
+    LoadProductsJob,
+    {
+      provide: PrismaOutboxStore,
+      useFactory: (prisma: PrismaService) => new PrismaOutboxStore(prisma),
+      inject: [PrismaService],
+    },
+    {
+      // Starts polling on application bootstrap and stops before shutdown.
+      provide: OutboxRelay,
+      useFactory: (store: PrismaOutboxStore, pulsarClient: PulsarClient) =>
+        new OutboxRelay(store, [
+          new PulsarOutboxPublisher(pulsarClient, 'jobs'),
+        ]),
+      inject: [PrismaOutboxStore, PulsarClient],
+    },
+  ],
 })
 export class JobsModule {}

@@ -1,0 +1,9 @@
+{
+  "name": "outbox",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "outbox/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project outbox --web",
+  "targets": {}
+}
