@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Start all services
 
 ```bash
-npm start                          # serves auth, jobs, executor, products and ui concurrently
+npm start                          # serves auth, jobs, executor, products, ui and nexus concurrently
 ```
 
 ### Individual app commands
@@ -19,13 +19,14 @@ npx nx test <app>                  # run tests
 npx nx lint <app>                  # lint
 ```
 
-Apps: `auth`, `jobs`, `executor`, `products`, `ui`
+Apps: `auth`, `jobs`, `executor`, `products`, `ui`, `nexus`
 
 ### Run a single test file
 
 ```bash
 npx nx test auth --testFile=apps/auth/src/app/auth/auth.service.spec.ts
 npx nx test ui --include=apps/ui/src/app/auth/session.spec.ts   # ui uses Vitest, not Jest
+npx nx test nexus -- src/lib/session.spec.ts                    # nexus runs plain Vitest from apps/nexus
 ```
 
 ### Run all affected tasks (CI pattern)
@@ -176,13 +177,14 @@ npx nx run grpc:generate-ts-proto  # regenerate TypeScript from libs/grpc/src/li
 ### Utilities
 
 ```bash
-npm stop                           # kill services on ports 3000, 3001, 3002
+npm stop                           # kill services on ports 3000-3003, 4200 and 4300
 npm run cache-clean                # reset Nx cache and npm cache
 ```
 
 ## Architecture
 
-Nx monorepo with four NestJS microservices, an Angular frontend, and five shared libraries.
+Nx monorepo with four NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
+NexusPay pet project), and five shared libraries.
 
 ### Services
 
@@ -193,6 +195,7 @@ Nx monorepo with four NestJS microservices, an Angular frontend, and five shared
 | `executor` | 3002 | Job execution (Pulsar consumer + gRPC client to `products`) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
 | `ui`       | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
+| `nexus`    | 4300 | React 19 + Vite frontend for NexusPay (`graphql-request`)   |
 
 ### Communication Patterns
 
@@ -239,6 +242,25 @@ It deliberately uses the newest Angular APIs; keep new code on them:
 - The JWT cookie is unreadable from JS and `auth` has no "current user" query, so `Session`
   (`apps/ui/src/app/auth/session.ts`) remembers the user returned by `login` in `localStorage`.
 - `job(id)` takes `Float!`, not `Int!` (the resolver arg is an untyped TS `number`).
+
+### Frontend (`nexus`)
+
+React 19 + Vite app for NexusPay (`apps/nexus`), generated with `@nx/react`. Its targets are
+inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.json` scopes to
+`apps/nexus/**` so they don't add targets to the other projects.
+
+- **Stack:** TanStack Router (code-based routes in `src/router.tsx`), TanStack Query,
+  `graphql-request`, React Hook Form + Zod, Tailwind CSS v4 (`@tailwindcss/vite`).
+- **Session:** `src/lib/session.ts` mirrors the Angular `Session` (user from `login` kept in
+  `localStorage`), exposed to components through `useSyncExternalStore` (`useSession()`).
+  Protected routes redirect in `beforeLoad`; `safeReturnUrl()` only allows same-app paths.
+- **Server errors:** `applyServerErrors()` (`src/lib/errors.ts`) is the React counterpart of
+  `serverErrors()`: class-validator messages go on the field they name, the rest on `root.server`.
+- **API:** relative `/api/<service>` URLs; `vite.config.mts` proxies them with `/api` stripped
+  (only `/api/auth` so far), keeping the HttpOnly cookie same-origin.
+- **ESLint:** `eslint-plugin-react` 7 crashes on ESLint 10 while auto-detecting the React
+  version (`context.getFilename` was removed), so `apps/nexus/eslint.config.mjs` pins
+  `settings.react.version`.
 
 ### Shared Libraries
 
