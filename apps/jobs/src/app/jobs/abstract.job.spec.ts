@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import {
   FibonacciMessage,
   LoadProductsMessage,
+  MAX_FIBONACCI_ITERATIONS,
   PulsarClient,
   deserialize,
 } from '@jobber/pulsar';
@@ -93,8 +94,19 @@ describe('AbstractJob', () => {
   it('rejects invalid data before creating a job', async () => {
     const response = await rejection(runFibonacci({ iterations: 'ten' }));
 
+    expect(response.message).toEqual(
+      expect.arrayContaining(['iterations must be an integer number']),
+    );
+    expectNothingCreated();
+  });
+
+  it('caps Fibonacci iterations so one job cannot block the executor', async () => {
+    const response = await rejection(
+      runFibonacci({ iterations: MAX_FIBONACCI_ITERATIONS + 1 }),
+    );
+
     expect(response.message).toEqual([
-      'iterations must be a number conforming to the specified constraints',
+      `iterations must not be greater than ${MAX_FIBONACCI_ITERATIONS}`,
     ]);
     expectNothingCreated();
   });

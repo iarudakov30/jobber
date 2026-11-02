@@ -3,7 +3,7 @@ import {
   JOBS_SERVICE_NAME,
   JobsServiceClient,
 } from '@jobber/grpc';
-import { PulsarClient, PulsarConsumer } from '@jobber/pulsar';
+import { MessageMeta, PulsarClient, PulsarConsumer } from '@jobber/pulsar';
 import { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
@@ -26,10 +26,10 @@ export abstract class JobsConsumer<
     await super.onModuleInit();
   }
 
-  protected async onMessage(data: T): Promise<void> {
-    await this.execute(data);
+  protected async onMessage(data: T, meta: MessageMeta): Promise<void> {
+    await this.execute(data, meta);
     await firstValueFrom(this.jobsService.acknowledge(data));
   }
 
-  protected abstract execute(data: T): Promise<void>;
+  protected abstract execute(data: T, meta: MessageMeta): Promise<void>;
 }

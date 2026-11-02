@@ -246,7 +246,10 @@ It deliberately uses the newest Angular APIs; keep new code on them:
 - **`@jobber/nestjs`** (`libs/nestjs`) — `init()` bootstrap helper used by all apps, `Jobs` enum
 - **`@jobber/grpc`** (`libs/grpc`) — gRPC proto files and generated TypeScript types for `AuthService` and `ProductsService`, plus the `Packages` enum
 - **`@jobber/prisma`** (`libs/prisma`) — Prisma client used by `auth`
-- **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, and job message DTOs (`FibonacciMessage`, `LoadProductsMessage`)
+- **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, a `send()` helper (key, properties, `sequenceId`), and job message DTOs (`FibonacciMessage`, `LoadProductsMessage`)
+  - Consumers take `ConsumerOptions`: subscription (default `jobber`, which job consumers keep), type (default `Shared`), redelivery delay (5 s) and max redeliveries (5) before Pulsar moves the message to `<topic>-<subscription>-DLQ`. Give each service that consumes the same topic its own subscription, or they split the messages instead of each getting all of them.
+  - `onMessage(data, meta)` gets the message id, partition key, properties and redelivery count. Throwing `NonRetryableError` (or sending unparseable JSON) dead-letters the message at once; any other error nacks it for redelivery. Only a failed handler nacks, never a failed ack, so handlers must tolerate the occasional repeat.
+  - Consumers run in the executor's single event loop, so CPU-heavy work stalls every other consumer: `FibonacciMessage` caps `iterations` at `MAX_FIBONACCI_ITERATIONS` (1,000) for that reason.
 
 `products` uses Drizzle ORM (not Prisma) for its own PostgreSQL access — schema in `apps/products/src/app/products/schema.ts`, migrations managed via `nx run products:generate-drizzle` / `migrate-drizzle`.
 
