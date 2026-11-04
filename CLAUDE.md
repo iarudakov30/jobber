@@ -189,7 +189,7 @@ npx nx run grpc:generate-ts-proto  # regenerate TypeScript from libs/grpc/src/li
 ### Utilities
 
 ```bash
-npm stop                           # kill services on ports 3000, 3001, 3002
+npm stop                           # kill whatever listens on the app ports (3000-3003, gRPC 5000-5002, 4200, 4300)
 npm run cache-clean                # reset Nx cache and npm cache
 ```
 
