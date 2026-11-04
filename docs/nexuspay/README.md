@@ -35,24 +35,34 @@ actually built, and the spec describes the plan.
 
 ## Branches (phase 1)
 
-Nothing from phase 1 is merged into `main` yet. The backend work is a stack of branches, each
-built on the previous one, so they must be merged in this order:
+All of phase 1 was merged into `main` on 2026-11-05 (merge commit `ea669df`). The backend work
+was a stack of branches, each built on the previous one, so `main` fast-forwarded through them;
+the React app was branched separately and came in with a merge commit:
 
 ```mermaid
 flowchart LR
-  M((main)) --> R["feature/nexus-react-app<br/>d57b258 React app + login"]
-  M --> P["feature/pulsar-consumer-options<br/>e5561ad Pulsar options + DLQ"]
+  M((main d05d4b6)) --> P["feature/pulsar-consumer-options<br/>e5561ad Pulsar options + DLQ"]
   P --> O["feature/jobs-outbox<br/>bf1262c Outbox"]
   O --> A["feature/idempotent-job-acks<br/>a59cac2 Idempotent acks"]
   A --> T["feature/tracing-infra<br/>548599d Tracing + infra"]
-  T --> D["docs/nexuspay<br/>these docs"]
+  T --> D["docs/nexuspay<br/>70874aa these docs<br/>37a61dc npm stop"]
+  M --> R["feature/nexus-react-app<br/>d57b258 React app + login"]
+  D --> X((main ea669df))
+  R --> X
 ```
 
 | Order | Branch | Commit | Step |
 | ----- | ------ | ------ | ---- |
-| — | `feature/nexus-react-app` | `d57b258` | [React app with login](phase-1/00-react-app.md) (independent, from `main`) |
 | 1 | `feature/pulsar-consumer-options` | `e5561ad` | [Step 1 — Pulsar consumer options and dead-lettering](phase-1/01-pulsar-consumer.md) |
 | 2 | `feature/jobs-outbox` | `bf1262c` | [Step 2 — Transactional outbox](phase-1/02-outbox.md) |
 | 3 | `feature/idempotent-job-acks` | `a59cac2` | [Step 3 — Count each job item once](phase-1/03-idempotent-acks.md) |
 | 4 | `feature/tracing-infra` | `548599d` | [Step 4 — Tracing and infrastructure](phase-1/04-tracing-infra.md) |
-| 5 | `docs/nexuspay` | — | These documents |
+| 5 | `docs/nexuspay` | `70874aa`, `37a61dc` | These documents; `npm stop` rewritten as `scripts/stop.mjs` |
+| 6 | `feature/nexus-react-app` | `d57b258` → merge `ea669df` | [React app with login](phase-1/00-react-app.md) |
+
+The merge had three conflicts: `package.json` (kept `nexus` in `npm start` and the new
+`npm stop`), `CLAUDE.md` (combined the intros) and `package-lock.json` (took the React branch's
+lock, then ran `npm install --package-lock-only --legacy-peer-deps` to add the backend packages).
+Lint, test and build passed for all 13 projects on the merge result.
+
+Phase 2 should start from a fresh branch off `main`.
