@@ -1,0 +1,112 @@
+.pipeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.pipeline-header h2 {
+  margin: 0;
+}
+
+.canvas {
+  overflow-x: auto;
+}
+
+svg {
+  display: block;
+  width: 100%;
+  min-width: 40rem;
+  height: auto;
+}
+
+.edge {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  opacity: 0.45;
+  transition:
+    stroke 0.2s,
+    opacity 0.2s;
+}
+
+.edge.active {
+  stroke: var(--accent);
+  opacity: 1;
+}
+
+.arrowhead {
+  fill: var(--text-muted);
+}
+
+.edge-label {
+  font-size: 11px;
+  fill: var(--text-muted);
+}
+
+.node rect {
+  fill: var(--surface);
+  stroke: var(--border);
+  stroke-width: 1.5;
+  transition: stroke 0.2s;
+}
+
+.node.active rect {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.node.dim {
+  opacity: 0.4;
+}
+
+.node-title {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--text);
+  text-anchor: middle;
+}
+
+.node-subtitle {
+  font-size: 11px;
+  fill: var(--text-muted);
+  text-anchor: middle;
+}
+
+.counter {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--text);
+  text-anchor: middle;
+}
+
+.dot {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.log {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.log li:first-child:not(.muted) {
+  font-weight: 600;
+}
+
+.log li + li {
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edge,
+  .node rect {
+    transition: none;
+  }
+}

@@ -261,6 +261,9 @@ It deliberately uses the newest Angular APIs; keep new code on them:
 - The JWT cookie is unreadable from JS and `auth` has no "current user" query, so `Session`
   (`apps/ui-admin/src/app/auth/session.ts`) remembers the user returned by `login` in `localStorage`.
 - `job(id)` takes `Float!`, not `Int!` (the resolver arg is an untyped TS `number`).
+- The job detail page draws the services a job passes through as an animated SVG
+  (`apps/ui-admin/src/app/jobs/job-pipeline/`): the layout and routes are plain data in
+  `pipeline.ts`, and the dots are illustrative, sent whenever the polled `completed` count rises.
 
 ### Frontend (`nexus`)
 

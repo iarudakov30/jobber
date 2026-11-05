@@ -1,4 +1,4 @@
-<div class="narrow">
+<div class="job-page">
   <p><a routerLink="/jobs">← All jobs</a></p>
 
   <section class="card">
@@ -31,4 +31,8 @@
       <p class="muted">Loading job #{{ id() }}…</p>
     }
   </section>
+
+  @if (job.hasValue()) {
+    <app-job-pipeline [job]="job.value()" />
+  }
 </div>

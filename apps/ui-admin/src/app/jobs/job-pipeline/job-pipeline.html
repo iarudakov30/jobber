@@ -1,0 +1,103 @@
+<section class="card">
+  <header class="pipeline-header">
+    <h2>How this job runs</h2>
+    <button class="btn" type="button" (click)="replay()">Replay</button>
+  </header>
+
+  <div class="canvas">
+    <svg
+      [attr.viewBox]="viewBox"
+      role="img"
+      aria-label="The services a job passes through, with a dot for each message in flight"
+    >
+      <defs>
+        <marker
+          id="pipeline-arrow"
+          viewBox="0 0 8 8"
+          refX="8"
+          refY="4"
+          markerUnits="userSpaceOnUse"
+          markerWidth="8"
+          markerHeight="8"
+          orient="auto"
+        >
+          <path class="arrowhead" d="M0 0L8 4L0 8z" />
+        </marker>
+      </defs>
+
+      @for (edge of edges; track edge.id) {
+        <path
+          class="edge"
+          [class.active]="activeEdges().has(edge.id)"
+          [attr.d]="edge.d"
+          marker-end="url(#pipeline-arrow)"
+        />
+        @if (edge.label && edge.labelAt) {
+          <text
+            class="edge-label"
+            [attr.x]="edge.labelAt.x"
+            [attr.y]="edge.labelAt.y"
+            [attr.text-anchor]="edge.labelAnchor ?? 'middle'"
+          >
+            {{ edge.label }}
+          </text>
+        }
+      }
+
+      @for (node of nodes; track node.id) {
+        <g
+          class="node"
+          [class.active]="activeNodes().has(node.id)"
+          [class.dim]="node.id === 'products' && !usesProducts()"
+        >
+          <rect
+            [attr.x]="node.x"
+            [attr.y]="node.y"
+            [attr.width]="nodeWidth"
+            [attr.height]="nodeHeight"
+            rx="8"
+          />
+          <text
+            class="node-title"
+            [attr.x]="node.x + nodeWidth / 2"
+            [attr.y]="node.y + 24"
+          >
+            {{ node.title }}
+          </text>
+          <text
+            class="node-subtitle"
+            [attr.x]="node.x + nodeWidth / 2"
+            [attr.y]="node.y + 42"
+          >
+            {{ subtitles()[node.id] }}
+          </text>
+        </g>
+      }
+
+      @let j = job();
+      <text class="counter" [attr.x]="dbCenter" [attr.y]="counterY">
+        done {{ j.completed }} / {{ j.size }}
+      </text>
+      <text class="counter" [attr.x]="pulsarCenter" [attr.y]="counterY">
+        still to process: {{ j.size - j.completed }}
+      </text>
+
+      @for (dot of dots(); track dot.id) {
+        <circle class="dot" r="6" [attr.cx]="dot.x" [attr.cy]="dot.y" />
+      }
+    </svg>
+  </div>
+
+  <ol class="log" role="log" aria-label="What is happening">
+    @for (entry of log(); track entry.id) {
+      <li>{{ entry.text }}</li>
+    } @empty {
+      <li class="muted">Press Replay to watch how this job ran.</li>
+    }
+  </ol>
+
+  <p class="hint">
+    Dots show the path each item takes. The counters, and when new dots appear,
+    come from the job's real progress, which this page polls every 2 seconds.
+  </p>
+</section>
