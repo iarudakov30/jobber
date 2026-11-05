@@ -11,6 +11,7 @@ const JOB_FIELDS = gql`
     status
     started
     ended
+    traceId
   }
 `;
 

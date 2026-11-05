@@ -1,8 +1,30 @@
 <section class="card">
   <header class="pipeline-header">
     <h2>How this job runs</h2>
-    <button class="btn" type="button" (click)="replay()">Replay</button>
+    <div class="actions">
+      <button class="btn" type="button" (click)="replay()">Replay</button>
+      <button
+        class="btn"
+        type="button"
+        [disabled]="!job().traceId || trace.isLoading()"
+        [title]="
+          job().traceId
+            ? 'Replay the spans Jaeger recorded for this job'
+            : 'This job has no trace id: it was created before trace ids were stored, or with tracing off'
+        "
+        (click)="replayTrace()"
+      >
+        Replay real trace
+      </button>
+      @if (jaegerLink(); as link) {
+        <a [href]="link" target="_blank" rel="noopener">Open in Jaeger</a>
+      }
+    </div>
   </header>
+
+  @if (traceStatus(); as status) {
+    <p class="notice-muted" role="status">{{ status }}</p>
+  }
 
   <div class="canvas">
     <svg
@@ -83,7 +105,12 @@
       </text>
 
       @for (dot of dots(); track dot.id) {
-        <circle class="dot" r="6" [attr.cx]="dot.x" [attr.cy]="dot.y" />
+        <circle
+          class="dot"
+          r="6"
+          [attr.cx]="dot.point.x"
+          [attr.cy]="dot.point.y"
+        />
       }
     </svg>
   </div>
@@ -96,8 +123,45 @@
     }
   </ol>
 
-  <p class="hint">
-    Dots show the path each item takes. The counters, and when new dots appear,
-    come from the job's real progress, which this page polls every 2 seconds.
-  </p>
+  @if (mode() === 'trace' && summary(); as s) {
+    <dl class="details trace-summary">
+      <dt>Request</dt>
+      <dd>{{ ms(s.request) }}</dd>
+      @if (s.authenticate !== undefined) {
+        <dt>Authenticate</dt>
+        <dd>{{ ms(s.authenticate) }}</dd>
+      }
+      @if (s.transaction !== undefined) {
+        <dt>Transaction</dt>
+        <dd>{{ ms(s.transaction) }}</dd>
+      }
+      @if (s.relayLag !== undefined) {
+        <dt>Outbox relay lag</dt>
+        <dd>{{ ms(s.relayLag) }}</dd>
+      }
+      @if (s.publishAverage !== undefined) {
+        <dt>Publish (average)</dt>
+        <dd>{{ ms(s.publishAverage) }}</dd>
+      }
+      @if (s.processAverage !== undefined) {
+        <dt>Processing (average)</dt>
+        <dd>{{ ms(s.processAverage) }}</dd>
+      }
+      <dt>Failed deliveries</dt>
+      <dd>{{ s.retries }}</dd>
+      <dt>Whole job</dt>
+      <dd>{{ ms(s.total) }}</dd>
+    </dl>
+    <p class="hint">
+      Replaying the real trace: the order of events and the gaps between them
+      come from Jaeger, slowed down so you can follow them, with long waits
+      shortened. The log and the numbers above are the real times.
+    </p>
+  } @else {
+    <p class="hint">
+      Dots show the path each item takes. The counters, and when new dots
+      appear, come from the job's real progress, which this page polls every 2
+      seconds. Replay real trace shows what actually happened.
+    </p>
+  }
 </section>

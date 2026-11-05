@@ -10,6 +10,24 @@
   margin: 0;
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.notice-muted {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.trace-summary {
+  font-size: 0.875rem;
+}
+
 .canvas {
   overflow-x: auto;
 }

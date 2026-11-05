@@ -256,14 +256,19 @@ It deliberately uses the newest Angular APIs; keep new code on them:
   named `auth` client (`AUTH_CLIENT`). An error link clears the session and redirects to `/login`
   on a `FORBIDDEN` response from `GqlAuthGuard`.
 - Endpoints are relative (`/api/auth`, `/api/jobs`); `apps/ui-admin/proxy.conf.json` strips `/api` and
-  forwards to ports 3000/3001 during `nx serve ui-admin`, so the HttpOnly cookie is same-origin. The
+  forwards to ports 3000/3001 during `nx serve ui-admin`, so the HttpOnly cookie is same-origin
+  (`/api/jaeger` likewise maps to Jaeger's query API on 16686). The
   `/api` prefix keeps the proxy from capturing the UI's own `/jobs` routes on a page refresh.
 - The JWT cookie is unreadable from JS and `auth` has no "current user" query, so `Session`
   (`apps/ui-admin/src/app/auth/session.ts`) remembers the user returned by `login` in `localStorage`.
 - `job(id)` takes `Float!`, not `Int!` (the resolver arg is an untyped TS `number`).
 - The job detail page draws the services a job passes through as an animated SVG
-  (`apps/ui-admin/src/app/jobs/job-pipeline/`): the layout and routes are plain data in
-  `pipeline.ts`, and the dots are illustrative, sent whenever the polled `completed` count rises.
+  (`apps/ui-admin/src/app/jobs/job-pipeline/`; layout and routes are plain data in `pipeline.ts`).
+  By default the dots are illustrative, sent whenever the polled `completed` count rises.
+  "Replay real trace" loads the job's trace (`Job.traceId`, stored by `jobs` when the job is
+  created) from Jaeger through the dev proxy's `/api/jaeger` and replays the real spans
+  (`trace.ts`): real order and gaps, slowed down, with real durations in the log. Its tests use
+  real traces trimmed into `job-pipeline/testing/trace-fixtures.ts`.
 
 ### Frontend (`nexus`)
 

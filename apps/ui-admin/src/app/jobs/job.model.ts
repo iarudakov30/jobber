@@ -8,6 +8,8 @@ export interface Job {
   status: JobStatus;
   started: string;
   ended: string | null;
+  /** The job's OpenTelemetry trace in Jaeger; null when tracing was off. */
+  traceId: string | null;
 }
 
 export interface JobMetadata {

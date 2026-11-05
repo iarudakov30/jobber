@@ -31,6 +31,7 @@ export type EdgeId =
   | 'claim'
   | 'publish'
   | 'deliver'
+  | 'nack'
   | 'create-product'
   | 'product-saved'
   | 'acknowledge';
@@ -167,6 +168,18 @@ export const EDGES: readonly PipelineEdge[] = [
     ],
     label: 'deliver',
     labelAt: { x: 747, y: 182 },
+  },
+  {
+    // A failed handler hands the message back for redelivery; only real traces travel it.
+    id: 'nack',
+    from: 'executor',
+    to: 'pulsar',
+    points: [
+      { x: 775, y: 204 },
+      { x: 720, y: 204 },
+    ],
+    label: 'nack',
+    labelAt: { x: 747, y: 218 },
   },
   {
     id: 'create-product',

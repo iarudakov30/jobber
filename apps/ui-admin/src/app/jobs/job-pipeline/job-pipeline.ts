@@ -1,3 +1,4 @@
+import { HttpErrorResponse, httpResource } from '@angular/common/http';
 import {
   Component,
   DestroyRef,
@@ -12,7 +13,6 @@ import {
 import { Job } from '../job.model';
 import {
   EDGES,
-  EDGE_BY_ID,
   Hop,
   NODES,
   NODE_HEIGHT,
@@ -22,12 +22,20 @@ import {
   creationRoute,
   itemRoute,
   pathData,
-  pointAlong,
   pollRoute,
   usesProducts,
 } from './pipeline';
+import { Playback, dotAt, playbackDuration, routesPlayback } from './playback';
+import {
+  OtlpTraceResponse,
+  analyseJobTrace,
+  ms,
+  parseTrace,
+  summarise,
+  tracePlayback,
+} from './trace';
 
-/** How long a dot takes to travel one arrow. */
+/** How long a dot takes to travel one arrow in the illustration. */
 const HOP_MS = 600;
 /** Gap between dots sent together, so they read as separate items. */
 const STAGGER_MS = 350;
@@ -36,13 +44,19 @@ const MAX_DOTS = 6;
 /** A job opened this soon after it started replays its run on its own. */
 const AUTOPLAY_WINDOW_MS = 60_000;
 const LOG_SIZE = 8;
+/** Jaeger's query API, proxied by the dev server (`proxy.conf.json`). */
+const JAEGER_API = '/api/jaeger/v3/traces';
+/** Jaeger's own UI. */
+const JAEGER_UI = 'http://localhost:16686/trace';
 
-/** A dot travelling a route; `hop` is the arrow it was last seen on (-1 before it starts). */
-interface Token {
+/** A playback in progress; `origin` is its time 0 on the `performance.now()` clock. */
+interface Run {
   id: number;
-  route: Hop[];
-  start: number;
-  hop: number;
+  origin: number;
+  playback: Playback;
+  duration: number;
+  /** How many of the playback's events are already in the log. */
+  logged: number;
 }
 
 interface LogEntry {
@@ -54,11 +68,12 @@ const centerOf = (id: NodeId) =>
   (NODES.find((node) => node.id === id)?.x ?? 0) + NODE_WIDTH / 2;
 
 /**
- * Animated diagram of the services a job passes through.
+ * Animated diagram of the services a job passes through, in one of two modes:
  *
- * The browser only sees the job's polled progress, so the dots are an illustration of the path
- * each item takes; what is real is the counters and when new dots appear: every rise in
- * `completed` sends that many dots (up to `MAX_DOTS`) through the item route.
+ * - **Illustration** (default): the browser only sees the job's polled progress, so the dots
+ *   show the path each item takes; the counters, and when new dots appear, are real.
+ * - **Trace**: replays the job's real OpenTelemetry trace from Jaeger, so the order of events and
+ *   the gaps between them are real (slowed down for the screen), as are the times in the log.
  */
 @Component({
   selector: 'app-job-pipeline',
@@ -79,6 +94,7 @@ export class JobPipeline {
     ...edge,
     d: pathData(edge.points),
   }));
+  protected readonly ms = ms;
 
   protected readonly usesProducts = computed(() =>
     usesProducts(this.job().name),
@@ -95,33 +111,73 @@ export class JobPipeline {
     return subtitles;
   });
 
-  private readonly tokens = signal<Token[]>([]);
+  protected readonly mode = signal<'illustration' | 'trace'>('illustration');
+  private readonly runs = signal<Run[]>([]);
   private readonly now = signal(0);
   protected readonly log = signal<LogEntry[]>([]);
 
   protected readonly dots = computed(() => {
     const now = this.now();
-    return this.tokens().flatMap((token) => {
-      const elapsed = now - token.start;
-      const hop = token.route[Math.floor(elapsed / HOP_MS)];
-      if (elapsed < 0 || !hop) {
-        return [];
-      }
-      const point = pointAlong(
-        EDGE_BY_ID[hop.edge].points,
-        (elapsed % HOP_MS) / HOP_MS,
-      );
-      return [{ id: token.id, edge: hop.edge, ...point }];
-    });
+    return this.runs().flatMap((run) =>
+      run.playback.tokens.flatMap((hops, i) => {
+        const dot = dotAt(hops, now - run.origin);
+        return dot ? [{ id: `${run.id}.${i}`, ...dot }] : [];
+      }),
+    );
   });
 
   protected readonly activeEdges = computed(
-    () => new Set(this.dots().map((dot) => dot.edge)),
+    () => new Set(this.dots().flatMap((dot) => (dot.edge ? [dot.edge] : []))),
   );
 
   protected readonly activeNodes = computed(
-    () => new Set(this.dots().map((dot) => EDGE_BY_ID[dot.edge].to)),
+    () => new Set(this.dots().map((dot) => dot.node)),
   );
+
+  /** The trace being replayed; set by "Replay real trace". */
+  private readonly traceId = signal<string | undefined>(undefined);
+
+  protected readonly trace = httpResource<OtlpTraceResponse>(() => {
+    const id = this.traceId();
+    return id ? `${JAEGER_API}/${id}` : undefined;
+  });
+
+  private readonly jobTrace = computed(() =>
+    this.trace.hasValue()
+      ? analyseJobTrace(parseTrace(this.trace.value()))
+      : null,
+  );
+
+  protected readonly summary = computed(() => {
+    const jobTrace = this.jobTrace();
+    return jobTrace ? summarise(jobTrace) : null;
+  });
+
+  protected readonly jaegerLink = computed(() => {
+    const id = this.job().traceId;
+    return id ? `${JAEGER_UI}/${id}` : undefined;
+  });
+
+  protected readonly traceStatus = computed((): string | undefined => {
+    if (this.trace.isLoading()) {
+      return 'Loading the trace from Jaeger…';
+    }
+    const error = this.trace.error();
+    if (error) {
+      return error instanceof HttpErrorResponse && error.status === 404
+        ? "Jaeger doesn't have this trace (yet). Spans reach it every few seconds, and it forgets everything when it restarts."
+        : 'Could not reach Jaeger. Is it running (docker compose up -d jaeger)?';
+    }
+    if (this.trace.hasValue() && !this.jobTrace()) {
+      return "The trace is incomplete: jobs hasn't exported the request yet. Try again in a few seconds.";
+    }
+    const summary = this.summary();
+    const size = this.job().size;
+    if (summary && summary.acknowledged < size) {
+      return `The trace shows ${summary.acknowledged} of ${size} messages acknowledged so far; the rest may still be on their way to Jaeger.`;
+    }
+    return undefined;
+  });
 
   private readonly reducedMotion =
     typeof matchMedia === 'function' &&
@@ -137,17 +193,41 @@ export class JobPipeline {
       const job = this.job();
       untracked(() => this.onProgress(job));
     });
+    // Every (re)load of the trace replays it.
+    effect(() => {
+      const jobTrace = this.jobTrace();
+      if (jobTrace) {
+        untracked(() => {
+          this.mode.set('trace');
+          this.start(tracePlayback(jobTrace, MAX_DOTS));
+        });
+      }
+    });
     inject(DestroyRef).onDestroy(() => cancelAnimationFrame(this.frame));
   }
 
-  /** Plays the whole run from the start: the job's creation, then its items. */
+  /** Plays the illustrated run from the start: the job's creation, then its items. */
   protected replay(): void {
     const job = this.job();
-    this.tokens.set([]);
-    this.log.set([]);
     const creation = creationRoute(job);
-    this.send([creation], 0);
-    this.sendItems(job, job.completed, creation.length * HOP_MS);
+    this.mode.set('illustration');
+    this.start(
+      this.itemsPlayback(job, job.completed, creation.length * HOP_MS, [
+        { route: creation, delay: 0 },
+      ]),
+    );
+  }
+
+  protected replayTrace(): void {
+    const id = this.job().traceId;
+    if (!id) {
+      return;
+    }
+    if (this.traceId() === id) {
+      this.trace.reload();
+    } else {
+      this.traceId.set(id);
+    }
   }
 
   private onProgress(job: Job): void {
@@ -160,45 +240,66 @@ export class JobPipeline {
     }
     const added = job.completed - this.seenCompleted;
     this.seenCompleted = job.completed;
-    this.sendItems(job, added, 0);
+    if (added > 0) {
+      this.play(this.itemsPlayback(job, added, 0));
+    }
   }
 
-  /** Sends `count` item dots (at most `MAX_DOTS`), then the poll that reports them. */
-  private sendItems(job: Job, count: number, delay: number): void {
-    if (count <= 0) {
-      return;
-    }
+  /** `count` item dots (at most `MAX_DOTS`) after `delay`, then the poll that reports them. */
+  private itemsPlayback(
+    job: Job,
+    count: number,
+    delay: number,
+    before: { route: Hop[]; delay: number }[] = [],
+  ): Playback {
     const drawn = Math.min(count, MAX_DOTS);
     const route = itemRoute(job);
-    this.send(
-      Array.from({ length: drawn }, () => route),
-      delay,
-    );
-    if (count > drawn) {
-      this.addLog([`…and ${count - drawn} more items the same way`]);
+    const routes = [
+      ...before,
+      ...Array.from({ length: drawn }, (_, i) => ({
+        route,
+        delay: delay + i * STAGGER_MS,
+      })),
+    ];
+    if (drawn > 0) {
+      routes.push({
+        route: pollRoute(job),
+        delay: delay + (drawn - 1) * STAGGER_MS + route.length * HOP_MS,
+      });
     }
-    this.send(
-      [pollRoute(job)],
-      delay + (drawn - 1) * STAGGER_MS + route.length * HOP_MS,
-    );
+    const playback = routesPlayback(routes, HOP_MS);
+    if (count > drawn) {
+      playback.events.push({
+        at: delay,
+        text: `…and ${count - drawn} more items the same way`,
+      });
+    }
+    return playback;
   }
 
-  private send(routes: Hop[][], delay: number): void {
+  /** Replaces whatever is playing. */
+  private start(playback: Playback): void {
+    this.runs.set([]);
+    this.log.set([]);
+    this.play(playback);
+  }
+
+  /** Plays alongside whatever is already playing. */
+  private play(playback: Playback): void {
+    const events = [...playback.events].sort((a, b) => a.at - b.at);
     if (this.reducedMotion) {
-      // No movement: describe each distinct route once instead.
-      this.addLog([...new Set(routes)].flatMap((r) => r.map((h) => h.text)));
+      // No movement: describe the run instead, each step once.
+      this.addLog([...new Set(events.map((event) => event.text))]);
       return;
     }
-    const start = performance.now() + delay;
-    this.tokens.update((tokens) => [
-      ...tokens,
-      ...routes.map((route, i) => ({
-        id: this.nextId++,
-        route,
-        start: start + i * STAGGER_MS,
-        hop: -1,
-      })),
-    ]);
+    const run: Run = {
+      id: this.nextId++,
+      origin: performance.now(),
+      playback: { ...playback, events },
+      duration: playbackDuration(playback),
+      logged: 0,
+    };
+    this.runs.update((runs) => [...runs, run]);
     if (!this.frame) {
       this.frame = requestAnimationFrame(this.tick);
     }
@@ -207,21 +308,22 @@ export class JobPipeline {
   private readonly tick = (): void => {
     const now = performance.now();
     const texts: string[] = [];
-    const tokens = this.tokens().flatMap((token) => {
-      const hop = Math.floor((now - token.start) / HOP_MS);
-      if (hop >= token.route.length) {
+    const runs = this.runs().flatMap((run) => {
+      const t = now - run.origin;
+      const { events } = run.playback;
+      let logged = run.logged;
+      while (logged < events.length && events[logged].at <= t) {
+        texts.push(events[logged++].text);
+      }
+      if (t > run.duration) {
         return [];
       }
-      if (hop >= 0 && hop !== token.hop) {
-        texts.push(token.route[hop].text);
-        return [{ ...token, hop }];
-      }
-      return [token];
+      return [logged === run.logged ? run : { ...run, logged }];
     });
-    this.tokens.set(tokens);
+    this.runs.set(runs);
     this.now.set(now);
     this.addLog(texts);
-    this.frame = tokens.length ? requestAnimationFrame(this.tick) : 0;
+    this.frame = runs.length ? requestAnimationFrame(this.tick) : 0;
   };
 
   /** Newest entry first. */
