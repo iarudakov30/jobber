@@ -41,7 +41,7 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 | jobs | 3001 (`/jobs` GraphQL) | 5002 | `jobber` (Prisma) | Tables `Job`, `JobItem`, `outbox` |
 | executor | 3002 | — | — | Consumes job topics, subscription `jobber` |
 | products | 3003 | 5001 | `products` (Drizzle) | `products.source_ref` is unique |
-| ui | 4200 | — | — | Angular; proxies `/api/*` to 3000/3001 |
+| ui-admin | 4200 | — | — | Angular; proxies `/api/*` to 3000/3001 |
 | nexus | 4300 | — | — | React; Vite proxies `/api/auth` to 3000 |
 
 | Infrastructure (docker compose) | Port(s) | UI |

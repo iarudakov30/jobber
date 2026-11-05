@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { nxReadySignal } from '@nx/vite/plugins/nx-ready-signal.plugin';
 
 // Relative `/api/*` calls are proxied to the backends with the `/api` prefix stripped (as
-// `apps/ui/proxy.conf.json` does for Angular), so the browser sees one origin and the HttpOnly
+// `apps/ui-admin/proxy.conf.json` does for Angular), so the browser sees one origin and the HttpOnly
 // `Authentication` cookie set by `auth` is sent with every request.
 const api = (target: string) => ({
   target,

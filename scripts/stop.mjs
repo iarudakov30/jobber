@@ -10,7 +10,7 @@ const PORTS = {
   5000: 'auth gRPC',
   5001: 'products gRPC',
   5002: 'jobs gRPC',
-  4200: 'ui',
+  4200: 'ui-admin',
   4300: 'nexus',
 };
 

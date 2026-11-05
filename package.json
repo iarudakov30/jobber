@@ -4,9 +4,9 @@
   "license": "MIT",
   "scripts": {
     "cache-clean": "nx reset && npm cache clean --force",
-    "build": "npx nx run-many -t build -p auth jobs executor products ui nexus",
+    "build": "npx nx run-many -t build -p auth jobs executor products ui-admin nexus",
     "test": "npx nx affected -t lint test build",
-    "start": "nx run-many -t serve -p auth jobs executor products ui nexus --parallel 6 --output-style=stream",
+    "start": "nx run-many -t serve -p auth jobs executor products ui-admin nexus --parallel 6 --output-style=stream",
     "stop": "node scripts/stop.mjs",
     "migrate-db": "docker exec jobber-postgres-1 psql -U postgres -c \"SELECT 'ok' FROM pg_database WHERE datname='jobber-auth'\" | grep -q ok || docker exec jobber-postgres-1 psql -U postgres -c 'CREATE DATABASE \"jobber-auth\";' && cd apps/auth && npx prisma migrate deploy"
   },

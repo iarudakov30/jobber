@@ -8,7 +8,7 @@ export interface User {
 const STORAGE_KEY = 'nexus.user';
 
 /**
- * Client-side record of the logged-in user, mirroring the Angular `Session` in `apps/ui`.
+ * Client-side record of the logged-in user, mirroring the Angular `Session` in `apps/ui-admin`.
  *
  * The JWT lives in an HttpOnly cookie that scripts cannot read, and `auth` exposes no
  * "current user" query, so the app remembers the user returned by `login` instead. The backend

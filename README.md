@@ -23,9 +23,9 @@
 | **executor** | Calls `products` over gRPC to persist enriched product data   |
 | **products** | gRPC service for product creation                             |
 | **products** | Drizzle ORM + PostgreSQL persistence                          |
-| **ui**       | Register / sign in against `auth` (HttpOnly cookie session)   |
-| **ui**       | Run jobs with a JSON payload, prefilled per job type          |
-| **ui**       | Live job list and job detail pages with progress polling      |
+| **ui-admin** | Register / sign in against `auth` (HttpOnly cookie session)   |
+| **ui-admin** | Run jobs with a JSON payload, prefilled per job type          |
+| **ui-admin** | Live job list and job detail pages with progress polling      |
 
 ---
 
@@ -138,7 +138,7 @@ Client → jobs (GraphQL mutation) → JobsService discovers @Job() class
 
 ## Web UI
 
-The `ui` app is an Angular 22 frontend for the `auth` and `jobs` GraphQL APIs.
+The `ui-admin` app is an Angular 22 frontend for the `auth` and `jobs` GraphQL APIs.
 
 | Route       | Page                                                                  |
 | ----------- | --------------------------------------------------------------------- |
@@ -160,18 +160,18 @@ Then open <http://localhost:4200>, create an account and run a **Fibonacci** or 
 
 ### How it talks to the backend
 
-- During `nx serve ui`, the dev server proxies `/api/auth` → `localhost:3000/auth` and `/api/jobs` → `localhost:3001/jobs` (`apps/ui/proxy.conf.json`). The browser sees a single origin, so the HttpOnly cookie works without CORS. The `/api` prefix keeps the proxy from capturing the UI's own `/jobs` routes on a page refresh.
-- Two Apollo clients are configured in `apps/ui/src/app/graphql.provider.ts`: the default one for `jobs` and a named `auth` client.
+- During `nx serve ui-admin`, the dev server proxies `/api/auth` → `localhost:3000/auth` and `/api/jobs` → `localhost:3001/jobs` (`apps/ui-admin/proxy.conf.json`). The browser sees a single origin, so the HttpOnly cookie works without CORS. The `/api` prefix keeps the proxy from capturing the UI's own `/jobs` routes on a page refresh.
+- Two Apollo clients are configured in `apps/ui-admin/src/app/graphql.provider.ts`: the default one for `jobs` and a named `auth` client.
 - The cookie can't be read from JavaScript, so the UI remembers the signed-in user locally. If `jobs` answers `FORBIDDEN` (expired or missing cookie), the session is cleared and you are sent back to the login page.
 - Server validation messages (e.g. "password is not strong enough") are shown under the field they refer to.
 
 ### Commands
 
 ```sh
-npx nx serve ui    # dev server on http://localhost:4200 (needs the backend running)
-npx nx build ui    # production build to dist/apps/ui
-npx nx test ui     # unit tests (Vitest)
-npx nx lint ui
+npx nx serve ui-admin    # dev server on http://localhost:4200 (needs the backend running)
+npx nx build ui-admin    # production build to dist/apps/ui-admin
+npx nx test ui-admin     # unit tests (Vitest)
+npx nx lint ui-admin
 ```
 
 The UI isn't containerized or part of the Helm chart yet.
@@ -221,7 +221,7 @@ The UI isn't containerized or part of the Helm chart yet.
 
 ## Summary
 
-A **NestJS microservices backend** demonstrating GraphQL-first APIs, JWT cookie authentication, gRPC for internal service calls, and Apache Pulsar for async job processing — spanning four independently deployable services (`auth`, `jobs`, `executor`, `products`) in an Nx monorepo, with an **Angular** web UI (`ui`) on top.
+A **NestJS microservices backend** demonstrating GraphQL-first APIs, JWT cookie authentication, gRPC for internal service calls, and Apache Pulsar for async job processing — spanning four independently deployable services (`auth`, `jobs`, `executor`, `products`) in an Nx monorepo, with an **Angular** web UI (`ui-admin`) on top.
 
 [Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/nest?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
 
@@ -250,7 +250,7 @@ docker compose down
 ### Serve
 
 ```sh
-npx nx serve auth                 # Serve a single app (auth, jobs, executor, products, ui)
+npx nx serve auth                 # Serve a single app (auth, jobs, executor, products, ui-admin, nexus)
 npx nx run-many -t serve          # Serve all apps in parallel
 
 --skip-nx-cache                   # Run without cache

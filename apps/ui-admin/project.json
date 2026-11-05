@@ -1,9 +1,9 @@
 {
-  "name": "ui",
+  "name": "ui-admin",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "prefix": "app",
-  "sourceRoot": "apps/ui/src",
+  "sourceRoot": "apps/ui-admin/src",
   "tags": [],
   "targets": {
     "build": {
@@ -11,16 +11,16 @@
       "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
-        "outputPath": "dist/apps/ui",
-        "browser": "apps/ui/src/main.ts",
-        "tsConfig": "apps/ui/tsconfig.app.json",
+        "outputPath": "dist/apps/ui-admin",
+        "browser": "apps/ui-admin/src/main.ts",
+        "tsConfig": "apps/ui-admin/tsconfig.app.json",
         "assets": [
           {
             "glob": "**/*",
-            "input": "apps/ui/public"
+            "input": "apps/ui-admin/public"
           }
         ],
-        "styles": ["apps/ui/src/styles.css"]
+        "styles": ["apps/ui-admin/src/styles.css"]
       },
       "configurations": {
         "production": {
@@ -53,15 +53,15 @@
       "executor": "@angular/build:dev-server",
       "options": {
         "port": 4200,
-        "proxyConfig": "apps/ui/proxy.conf.json"
+        "proxyConfig": "apps/ui-admin/proxy.conf.json"
       },
       "defaultConfiguration": "development",
       "configurations": {
         "production": {
-          "buildTarget": "ui:build:production"
+          "buildTarget": "ui-admin:build:production"
         },
         "development": {
-          "buildTarget": "ui:build:development"
+          "buildTarget": "ui-admin:build:development"
         }
       }
     },
@@ -79,8 +79,8 @@
       "dependsOn": ["build"],
       "executor": "@nx/web:file-server",
       "options": {
-        "buildTarget": "ui:build",
-        "staticFilePath": "dist/apps/ui/browser",
+        "buildTarget": "ui-admin:build",
+        "staticFilePath": "dist/apps/ui-admin/browser",
         "spa": true
       }
     }

@@ -6,7 +6,7 @@
 
 ## Why
 
-NexusPay needs its own frontend, and learning React was one of the goals. The Angular `ui` app
+NexusPay needs its own frontend, and learning React was one of the goals. The Angular `ui` app (renamed `ui-admin` after phase 1)
 stays the jobber jobs console; NexusPay screens are React only. Starting with login means the app
 talks to a real backend (the existing `auth` service) from day one.
 
@@ -33,7 +33,7 @@ Files worth reading:
 ## How it works
 
 - **Same-origin cookie.** The browser calls `/api/auth`; Vite proxies it to `auth` with `/api`
-  stripped (exactly like `apps/ui/proxy.conf.json`). `auth` sets the HttpOnly `Authentication`
+  stripped (exactly like `apps/ui-admin/proxy.conf.json`). `auth` sets the HttpOnly `Authentication`
   cookie, which the browser then sends automatically.
 - **Session.** JavaScript can't read the HttpOnly cookie, and `auth` has no "current user" query,
   so the app remembers the user that `login` returned (a copy of the Angular `Session`). The backend

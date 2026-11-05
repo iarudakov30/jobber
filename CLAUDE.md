@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Start all services
 
 ```bash
-npm start                          # serves auth, jobs, executor, products, ui and nexus concurrently
+npm start                          # serves auth, jobs, executor, products, ui-admin and nexus concurrently
 ```
 
 ### Individual app commands
@@ -19,13 +19,13 @@ npx nx test <app>                  # run tests
 npx nx lint <app>                  # lint
 ```
 
-Apps: `auth`, `jobs`, `executor`, `products`, `ui`, `nexus`
+Apps: `auth`, `jobs`, `executor`, `products`, `ui-admin`, `nexus`
 
 ### Run a single test file
 
 ```bash
 npx nx test auth --testFile=apps/auth/src/app/auth/auth.service.spec.ts
-npx nx test ui --include=apps/ui/src/app/auth/session.spec.ts   # ui uses Vitest, not Jest
+npx nx test ui-admin --include=apps/ui-admin/src/app/auth/session.spec.ts   # ui-admin uses Vitest, not Jest
 npx nx test nexus -- src/lib/session.spec.ts                    # nexus runs plain Vitest from apps/nexus
 ```
 
@@ -211,7 +211,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 | `jobs`     | 3001 | Job management (GraphQL + outbox to Pulsar + gRPC client)   |
 | `executor` | 3002 | Job execution (Pulsar consumer + gRPC client to `products`) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
-| `ui`       | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
+| `ui-admin` | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
 | `nexus`    | 4300 | React 19 + Vite frontend for NexusPay (`graphql-request`)   |
 
 ### Communication Patterns
@@ -235,14 +235,14 @@ See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/a
 
 The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) follows the same pattern but its consumer (`apps/executor/src/app/jobs/products/load-products.consumer.ts`) additionally calls the `products` service over gRPC to persist the enriched product data via Drizzle.
 
-### Frontend (`ui`)
+### Frontend (`ui-admin`)
 
 Zoneless, standalone Angular 22 app (signals, lazy routes, Vitest via `@angular/build:unit-test`).
 It deliberately uses the newest Angular APIs; keep new code on them:
 
 - **Signal forms** (`@angular/forms/signals`: `form()`, `[formField]`, `[formRoot]`, submission
   `action`), not reactive forms. Server errors go through `serverErrors()`
-  (`apps/ui/src/app/shared/error-message.ts`), which attaches class-validator messages to the
+  (`apps/ui-admin/src/app/shared/error-message.ts`), which attaches class-validator messages to the
   field they name. `signalFormsConfig` is provided per form component (not in `app.config.ts`)
   to keep signal forms out of the initial bundle.
 - **Resource API** — Apollo queries are exposed as plain data streams by `JobsService` and
@@ -252,14 +252,14 @@ It deliberately uses the newest Angular APIs; keep new code on them:
   `linkedSignal` for derived-but-editable state, `@let` in templates.
 - GraphQL stays on Apollo for now; new direct (non-GraphQL) HTTP calls should use `httpResource`.
 
-- `apps/ui/src/app/graphql.provider.ts` — two Apollo clients: the default one for `jobs` and a
+- `apps/ui-admin/src/app/graphql.provider.ts` — two Apollo clients: the default one for `jobs` and a
   named `auth` client (`AUTH_CLIENT`). An error link clears the session and redirects to `/login`
   on a `FORBIDDEN` response from `GqlAuthGuard`.
-- Endpoints are relative (`/api/auth`, `/api/jobs`); `apps/ui/proxy.conf.json` strips `/api` and
-  forwards to ports 3000/3001 during `nx serve ui`, so the HttpOnly cookie is same-origin. The
+- Endpoints are relative (`/api/auth`, `/api/jobs`); `apps/ui-admin/proxy.conf.json` strips `/api` and
+  forwards to ports 3000/3001 during `nx serve ui-admin`, so the HttpOnly cookie is same-origin. The
   `/api` prefix keeps the proxy from capturing the UI's own `/jobs` routes on a page refresh.
 - The JWT cookie is unreadable from JS and `auth` has no "current user" query, so `Session`
-  (`apps/ui/src/app/auth/session.ts`) remembers the user returned by `login` in `localStorage`.
+  (`apps/ui-admin/src/app/auth/session.ts`) remembers the user returned by `login` in `localStorage`.
 - `job(id)` takes `Float!`, not `Int!` (the resolver arg is an untyped TS `number`).
 
 ### Frontend (`nexus`)

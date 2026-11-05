@@ -202,7 +202,7 @@ matching engine is needed.
 | Ops (admin) | Outbox lag, DLQ depth, recon issues, chaos buttons | The interview demo |
 
 The React app is `apps/nexus` (React 19, Vite, TanStack Router + Query, `graphql-request`, React
-Hook Form + Zod, Tailwind). The Angular `ui` app stays the jobber jobs console.
+Hook Form + Zod, Tailwind). The Angular `ui-admin` app stays the jobber jobs console.
 
 ## Skipped on purpose
 

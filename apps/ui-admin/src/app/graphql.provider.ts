@@ -14,7 +14,7 @@ import { Session } from './auth/session';
 /** Named Apollo client for the `auth` service; the default client talks to `jobs`. */
 export const AUTH_CLIENT = 'auth';
 
-// Relative URIs are proxied to the backend by `proxy.conf.json` during `nx serve ui`,
+// Relative URIs are proxied to the backend by `proxy.conf.json` during `nx serve ui-admin`,
 // so the browser sees a single origin and the HttpOnly `Authentication` cookie is sent as-is.
 const AUTH_URI = '/api/auth';
 const JOBS_URI = '/api/jobs';

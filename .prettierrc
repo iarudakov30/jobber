@@ -2,7 +2,7 @@
   "singleQuote": true,
   "overrides": [
     {
-      "files": "apps/ui/src/**/*.html",
+      "files": "apps/ui-admin/src/**/*.html",
       "options": { "parser": "angular" }
     }
   ]
