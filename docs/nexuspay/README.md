@@ -16,6 +16,7 @@ These documents let anyone (including future you) pick the project up cold and u
 | 2 | [Repo guide](02-repo-guide.md) | How the monorepo is laid out, how to run, test and debug it, known gotchas |
 | 3 | [Roadmap](03-roadmap.md) | The five phases, what each delivers, the decisions already taken |
 | 4 | [Phase 1 — step by step](phase-1/README.md) | What was actually built in phase 1, step by step, and how each step was verified |
+| 5 | [React app guide](react-app-guide.md) | How `apps/nexus` is structured and why, layer by layer, with Angular parallels — for learning React |
 
 The full design spec, with detailed per-phase specs (scope, design, tasks, acceptance tests,
 risks), lives in Claude Docs:
