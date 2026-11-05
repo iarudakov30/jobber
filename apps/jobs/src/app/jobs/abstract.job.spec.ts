@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { TraceFlags, trace } from '@opentelemetry/api';
 import {
   FibonacciMessage,
   LoadProductsMessage,
@@ -45,6 +46,8 @@ describe('AbstractJob', () => {
     outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
     outboxRelay = { poke: jest.fn() };
   });
+
+  afterEach(() => jest.restoreAllMocks());
 
   const deps = () =>
     [
@@ -107,6 +110,27 @@ describe('AbstractJob', () => {
     await runFibonacci({ iterations: 10 });
 
     expect(outboxRelay.poke).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the trace of the request that created the job', async () => {
+    const traceId = '43e9d06ab4f91608107331c0ff33be67';
+    jest.spyOn(trace, 'getActiveSpan').mockReturnValue(
+      trace.wrapSpanContext({
+        traceId,
+        spanId: '0123456789abcdef',
+        traceFlags: TraceFlags.SAMPLED,
+      }),
+    );
+
+    await runFibonacci({ iterations: 10 });
+
+    expect(tx.job.create.mock.calls[0][0].data.traceId).toBe(traceId);
+  });
+
+  it('records no trace when tracing is off', async () => {
+    await runFibonacci({ iterations: 10 });
+
+    expect(tx.job.create.mock.calls[0][0].data.traceId).toBeNull();
   });
 
   it('enqueues nothing when the transaction fails', async () => {

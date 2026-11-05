@@ -1,4 +1,5 @@
 import { plainToInstance } from 'class-transformer';
+import { isSpanContextValid, trace } from '@opentelemetry/api';
 import { OutboxRelay, PrismaOutboxStore } from '@jobber/outbox';
 import { ValidationError, validate } from 'class-validator';
 import { BadRequestException } from '@nestjs/common';
@@ -33,6 +34,7 @@ export abstract class AbstractJob<T extends object> {
             size: items.length,
             completed: 0,
             status: JobStatus.IN_PROGRESS,
+            traceId: currentTraceId(),
           },
         });
         await this.outbox.enqueue(
@@ -79,6 +81,14 @@ export abstract class AbstractJob<T extends object> {
       throw new BadRequestException(messages);
     }
   }
+}
+
+/** The trace of the current request; every span of the job (outbox, executor, acks) joins it. */
+function currentTraceId(): string | null {
+  const spanContext = trace.getActiveSpan()?.spanContext();
+  return spanContext && isSpanContextValid(spanContext)
+    ? spanContext.traceId
+    : null;
 }
 
 function constraintMessages(errors: ValidationError[]): string[] {

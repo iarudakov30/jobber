@@ -16,6 +16,9 @@ model Job {
   status    String
   started   DateTime  @default(now())
   ended     DateTime?
+  /// The OpenTelemetry trace of the request that created the job (null when tracing is off), so
+  /// the UI can load the job's spans from Jaeger.
+  traceId   String?
   items     JobItem[]
 }
 
