@@ -12,13 +12,14 @@ it is visible like any other job: a `Job` row, a trace in Jaeger and an `executo
 
 ## What changed
 
-| Area          | Change                                                                                                                                                                                        |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `libs/nestjs` | `Jobs.LEDGER_AUDIT = 'LedgerAudit'`                                                                                                                                                           |
-| `libs/pulsar` | `LedgerAuditMessage` (`trigger?: 'schedule' \| 'manual'`)                                                                                                                                     |
-| `jobs`        | `LedgerAuditJob` (`@Job`); `LedgerAuditScheduler` (cron `0 3 * * *` UTC, `LEDGER_AUDIT_CRON` to change it or `off`); `ScheduleModule.forRoot()`; dependencies `@nestjs/schedule` 12, `cron` 4 |
-| `executor`    | `LedgerAuditConsumer` (topic `LedgerAudit`) calling `WalletService.RunAudit`; wallet gRPC client (`WALLET_GRPC_SERVICE_URL` in `apps/executor/.env`)                                          |
-| Tests         | 8 in `jobs` (job validation, schedule, failure handling), 3 in `executor` (no issues, issues, wallet down)                                                                                    |
+| Area             | Change                                                                                                                                                                                        |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/nestjs`    | `Jobs.LEDGER_AUDIT = 'LedgerAudit'`                                                                                                                                                           |
+| `libs/pulsar`    | `LedgerAuditMessage` (`trigger?: 'schedule' \| 'manual'`)                                                                                                                                     |
+| `jobs`           | `LedgerAuditJob` (`@Job`); `LedgerAuditScheduler` (cron `0 3 * * *` UTC, `LEDGER_AUDIT_CRON` to change it or `off`); `ScheduleModule.forRoot()`; dependencies `@nestjs/schedule` 12, `cron` 4 |
+| `executor`       | `LedgerAuditConsumer` (topic `LedgerAudit`) calling `WalletService.RunAudit`; wallet gRPC client (`WALLET_GRPC_SERVICE_URL` in `apps/executor/.env`)                                          |
+| Container setups | `docker-compose.apps.yaml` and the Helm chart deploy no wallet yet: `jobs` gets `LEDGER_AUDIT_CRON=off`, and the executor starts without `WALLET_GRPC_SERVICE_URL`                            |
+| Tests            | 8 in `jobs` (job validation, schedule, failure handling), 3 in `executor` (no issues, issues, wallet down)                                                                                    |
 
 ## How it works
 
@@ -74,6 +75,11 @@ it is visible like any other job: a `Job` row, a trace in Jaeger and an `executo
 
 ## Lessons
 
+- **Every `getOrThrow` in a module factory is a new required variable for every deployment.**
+  `docker-compose.apps.yaml` and the Helm chart set the executor's environment explicitly, so a
+  required `WALLET_GRPC_SERVICE_URL` would have stopped the executor from starting there. It is
+  optional now (checked by starting the built executor without it), and `jobs` gets
+  `LEDGER_AUDIT_CRON=off` in both, since neither deploys the wallet yet.
 - **`@Cron()` takes a fixed string, so it can't come from config.** To make the schedule
   configurable (and testable with a per-minute cron), the scheduler builds a `CronJob` itself at
   bootstrap and registers it with `SchedulerRegistry`. `ScheduleModule` still stops it on
