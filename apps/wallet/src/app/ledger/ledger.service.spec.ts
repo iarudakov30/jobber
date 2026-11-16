@@ -260,14 +260,12 @@ describe('ledger invariants enforced by the database', () => {
           .update(accounts)
           .set({ balance: sql`${accounts.balance} + 100` })
           .where(eq(accounts.id, alice));
-        await tx
-          .insert(entries)
-          .values({
-            transactionId: t.id,
-            accountId: alice,
-            asset: USD,
-            amount: 100n,
-          });
+        await tx.insert(entries).values({
+          transactionId: t.id,
+          accountId: alice,
+          asset: USD,
+          amount: 100n,
+        });
       }),
     );
 
@@ -302,6 +300,83 @@ describe('ledger invariants enforced by the database', () => {
     );
 
     expect(await wrongAsset).toMatch(/entries_account_asset_fk/);
+  });
+});
+
+describe('outbox events', () => {
+  const announce = (transactionId: string) => [
+    {
+      transport: 'pulsar' as const,
+      destination: 'transfer-completed',
+      key: transactionId,
+      payload: { transactionId },
+    },
+  ];
+
+  function transferAnnounced(
+    from: bigint,
+    to: bigint,
+    cents: bigint,
+    ref: string,
+  ) {
+    return ledger.post({
+      type: 'transfer',
+      externalRef: ref,
+      legs: [
+        { accountId: from, asset: USD, amount: -cents },
+        { accountId: to, asset: USD, amount: cents },
+      ],
+      outbox: announce,
+    });
+  }
+
+  async function eventsFor(key: string) {
+    const { rows } = await pool.query(
+      'SELECT destination, payload FROM outbox WHERE key = $1',
+      [key],
+    );
+    return rows;
+  }
+
+  it('writes the events with the posting, carrying its transaction id', async () => {
+    const alice = await newUser(1_000n);
+    const bob = await newUser();
+
+    const { transactionId } = await transferAnnounced(
+      alice,
+      bob,
+      100n,
+      nextId(),
+    );
+
+    expect(await eventsFor(transactionId)).toEqual([
+      { destination: 'transfer-completed', payload: { transactionId } },
+    ]);
+  });
+
+  it('writes no second event for a duplicate posting', async () => {
+    const alice = await newUser(1_000n);
+    const bob = await newUser();
+    const ref = nextId();
+
+    const first = await transferAnnounced(alice, bob, 100n, ref);
+    const again = await transferAnnounced(alice, bob, 100n, ref);
+
+    expect(again.duplicate).toBe(true);
+    expect(await eventsFor(first.transactionId)).toHaveLength(1);
+  });
+
+  it('writes no event when the posting is refused', async () => {
+    const alice = await newUser(100n);
+    const bob = await newUser();
+    const before = await pool.query('SELECT count(*)::int AS n FROM outbox');
+
+    await expect(transferAnnounced(alice, bob, 101n, nextId())).rejects.toThrow(
+      InsufficientFundsError,
+    );
+
+    const after = await pool.query('SELECT count(*)::int AS n FROM outbox');
+    expect(after.rows[0].n).toBe(before.rows[0].n);
   });
 });
 

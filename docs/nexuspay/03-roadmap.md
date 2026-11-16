@@ -10,13 +10,13 @@ task checklists, acceptance tests, risks) are in the
 
 Make jobber's messaging and jobs framework safe enough to build money on, and start the React app.
 
-| Step | Delivered | Details |
-| ---- | --------- | ------- |
-| React app | `apps/nexus` with Login and Register | [00-react-app](phase-1/00-react-app.md) |
-| 1 | Pulsar consumer options, dead-letter topics, message metadata | [01-pulsar-consumer](phase-1/01-pulsar-consumer.md) |
-| 2 | Transactional outbox; jobs and their messages created atomically | [02-outbox](phase-1/02-outbox.md) |
-| 3 | Each job item counted once; `LoadProducts` safe to redeliver | [03-idempotent-acks](phase-1/03-idempotent-acks.md) |
-| 4 | Tracing end to end; Redis, Mailpit, Jaeger; Pulsar broker dedup | [04-tracing-infra](phase-1/04-tracing-infra.md) |
+| Step      | Delivered                                                        | Details                                             |
+| --------- | ---------------------------------------------------------------- | --------------------------------------------------- |
+| React app | `apps/nexus` with Login and Register                             | [00-react-app](phase-1/00-react-app.md)             |
+| 1         | Pulsar consumer options, dead-letter topics, message metadata    | [01-pulsar-consumer](phase-1/01-pulsar-consumer.md) |
+| 2         | Transactional outbox; jobs and their messages created atomically | [02-outbox](phase-1/02-outbox.md)                   |
+| 3         | Each job item counted once; `LoadProducts` safe to redeliver     | [03-idempotent-acks](phase-1/03-idempotent-acks.md) |
+| 4         | Tracing end to end; Redis, Mailpit, Jaeger; Pulsar broker dedup  | [04-tracing-infra](phase-1/04-tracing-infra.md)     |
 
 **Done when:** a Pulsar stop/start and a forced `LoadProducts` redelivery both leave the job
 `COMPLETED` with no duplicate products. Both were verified, along with the end-to-end trace.
@@ -24,7 +24,8 @@ Make jobber's messaging and jobs framework safe enough to build money on, and st
 ## Phase 2 — Ledger core + React screens (~2.5 weeks, in progress)
 
 Progress, step by step: [phase-2/README.md](phase-2/README.md). Step 1 (`apps/wallet`, ledger
-schema and triggers, `LedgerService.post`) is done.
+schema and triggers, `LedgerService.post`) and step 2 (`libs/money`, `wallet.proto`,
+`FindUserByEmail`, `DrizzleOutboxStore`) are done.
 
 - `apps/wallet` (3004): Drizzle ledger schema (`assets`, `accounts`, `transactions`, `entries`), a
   deferred trigger that rejects unbalanced transactions, an append-only trigger on entries,

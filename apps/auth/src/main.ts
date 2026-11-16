@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { join } from 'path';
 
-import { Packages } from '@jobber/grpc';
+import { Packages, GRPC_LOADER_OPTIONS } from '@jobber/grpc';
 import { init } from '@jobber/nestjs';
 
 import { AppModule } from './app/app.module';
@@ -24,6 +24,7 @@ async function bootstrap() {
       url: app.get(ConfigService).getOrThrow('AUTH_GRPC_SERVICE_URL'),
       package: Packages.AUTH,
       protoPath: join(__dirname, '../../libs/grpc/proto/auth.proto'),
+      loader: GRPC_LOADER_OPTIONS,
     },
   });
   await app.startAllMicroservices();

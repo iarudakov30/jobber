@@ -18,6 +18,14 @@ export class UsersService {
     return this.prismaService.user.findUniqueOrThrow({ where: args });
   }
 
+  /** Exact match, like login; null when nobody has that email. */
+  async findByEmail(email: string): Promise<User | null> {
+    return this.prismaService.user.findUnique({
+      where: { email },
+      omit: { password: true },
+    });
+  }
+
   async createUser(data: Prisma.UserCreateInput): Promise<User> {
     return this.prismaService.user.create({
       data: {

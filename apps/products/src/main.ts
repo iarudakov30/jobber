@@ -11,7 +11,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { init } from '@jobber/nestjs';
 import { GrpcOptions, Transport } from '@nestjs/microservices';
-import { Packages } from '@jobber/grpc';
+import { Packages, GRPC_LOADER_OPTIONS } from '@jobber/grpc';
 import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 
@@ -24,6 +24,7 @@ async function bootstrap() {
       url: app.get(ConfigService).getOrThrow('PRODUCTS_GRPC_SERVICE_URL'),
       package: Packages.PRODUCTS,
       protoPath: join(__dirname, '../../libs/grpc/proto/products.proto'),
+      loader: GRPC_LOADER_OPTIONS,
     },
   });
   await app.startAllMicroservices();

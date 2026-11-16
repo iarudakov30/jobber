@@ -9,20 +9,23 @@ person.
 
 ```
 apps/
-  auth/        NestJS — users, login, JWT cookie; GraphQL + gRPC server (Authenticate)
+  auth/        NestJS — users, login, JWT cookie; GraphQL + gRPC server (Authenticate, FindUserByEmail)
   jobs/        NestJS — @Job framework; GraphQL; outbox → Pulsar; gRPC server (Acknowledge)
   executor/    NestJS — Pulsar consumers for job topics; gRPC clients to jobs and products
   products/    NestJS — product persistence (Drizzle); gRPC server (CreateProduct)
-  wallet/      NestJS — NexusPay double-entry ledger (Drizzle)
+  wallet/      NestJS — NexusPay double-entry ledger (Drizzle); outbox (Drizzle store)
   ui-admin/    Angular 22 — the jobber jobs console
   nexus/       React 19 + Vite — the NexusPay app
 libs/
   graphql/     AbstractModel, GqlContext, GqlAuthGuard
-  grpc/        .proto contracts + generated TypeScript types, Packages enum
+  grpc/        .proto contracts (auth, jobs, products, wallet) + generated TypeScript types,
+               Packages enum, GRPC_LOADER_OPTIONS, GrpcStatus
   nestjs/      init() bootstrap helper, Jobs enum
   prisma/      Prisma client used by auth
   pulsar/      PulsarClient, PulsarConsumer<T>, send(), job message DTOs
-  outbox/      Transactional outbox: PrismaOutboxStore, OutboxRelay, PulsarOutboxPublisher
+  outbox/      Transactional outbox: PrismaOutboxStore, DrizzleOutboxStore, OutboxRelay,
+               PulsarOutboxPublisher
+  money/       bigint minor units: ASSETS, parseAmount, formatAmount, toWire/fromWire
   tracing/     startTracing() — OpenTelemetry bootstrap
 charts/jobber  Helm chart (minikube / EKS)
 docs/          These documents and other guides
@@ -36,23 +39,23 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 
 ## Services and ports
 
-| Service | HTTP | gRPC | Database | Notes |
-| ------- | ---- | ---- | -------- | ----- |
-| auth | 3000 (`/auth` GraphQL) | 5000 | `jobber-auth` (Prisma) | Sets the HttpOnly `Authentication` cookie |
-| jobs | 3001 (`/jobs` GraphQL) | 5002 | `jobber` (Prisma) | Tables `Job`, `JobItem`, `outbox` |
-| executor | 3002 | — | — | Consumes job topics, subscription `jobber` |
-| products | 3003 | 5001 | `products` (Drizzle) | `products.source_ref` is unique |
-| wallet | 3004 | — | `wallet` (Drizzle) | Ledger; triggers keep postings balanced and entries append-only |
-| ui-admin | 4200 | — | — | Angular; proxies `/api/*` to 3000/3001 |
-| nexus | 4300 | — | — | React; Vite proxies `/api/auth` to 3000 |
+| Service  | HTTP                   | gRPC | Database               | Notes                                                                           |
+| -------- | ---------------------- | ---- | ---------------------- | ------------------------------------------------------------------------------- |
+| auth     | 3000 (`/auth` GraphQL) | 5000 | `jobber-auth` (Prisma) | Sets the HttpOnly `Authentication` cookie                                       |
+| jobs     | 3001 (`/jobs` GraphQL) | 5002 | `jobber` (Prisma)      | Tables `Job`, `JobItem`, `outbox`                                               |
+| executor | 3002                   | —    | —                      | Consumes job topics, subscription `jobber`                                      |
+| products | 3003                   | 5001 | `products` (Drizzle)   | `products.source_ref` is unique                                                 |
+| wallet   | 3004                   | —    | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox` table |
+| ui-admin | 4200                   | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                          |
+| nexus    | 4300                   | —    | —                      | React; Vite proxies `/api/auth` to 3000                                         |
 
-| Infrastructure (docker compose) | Port(s) | UI |
-| ------------------------------- | ------- | -- |
-| PostgreSQL | 5432 | — |
-| Pulsar (standalone, broker dedup on) | 6650 | — |
-| Redis | 6379 | — |
-| Mailpit | 1025 (SMTP) | http://localhost:8025 |
-| Jaeger | 4318 (OTLP/HTTP) | http://localhost:16686 |
+| Infrastructure (docker compose)      | Port(s)          | UI                     |
+| ------------------------------------ | ---------------- | ---------------------- |
+| PostgreSQL                           | 5432             | —                      |
+| Pulsar (standalone, broker dedup on) | 6650             | —                      |
+| Redis                                | 6379             | —                      |
+| Mailpit                              | 1025 (SMTP)      | http://localhost:8025  |
+| Jaeger                               | 4318 (OTLP/HTTP) | http://localhost:16686 |
 
 ## Running it
 
@@ -96,6 +99,8 @@ npx nx affected -t lint test build                 # what CI runs
 npx nx run-many -t lint test build --parallel=2    # everything, gentler on memory
 npx nx test pulsar                                 # one project (Jest)
 npx nx test wallet                                 # real PostgreSQL via Testcontainers: needs Docker
+npx nx test outbox                                 # also Testcontainers (DrizzleOutboxStore)
+npx nx test money                                  # amount parsing and formatting
 npx nx test nexus -- src/lib/session.spec.ts       # one file (nexus uses Vitest)
 ```
 
@@ -123,25 +128,25 @@ exactly once. The variable is ignored when `NODE_ENV=production`.
 
 ## Gotchas (learned the hard way)
 
-| Symptom | Cause and fix |
-| ------- | ------------- |
-| `npm install` fails with `ERESOLVE` (`webpack-merge`, `eslint-plugin-import`) | The repo installs with `npm install --legacy-peer-deps`. That skips peer dependencies, so add any peer a new plugin needs (e.g. `vite`) explicitly. |
-| An Nx build "succeeds" but `dist/` is stale | A missing peer (e.g. `webpack`) makes the build a silent no-op. Check for `webpack compiled successfully` or that `dist/` changed. |
-| `npx nx run grpc:generate-ts-proto` fails with exit code `0xC0000135` | grpc-tools' `protoc.exe` can't load a DLL on this Windows machine. Generate in a Linux container instead (mount at `/work`, **not** `/lib`, which would hide the container's system libraries):<br>`docker run --rm --entrypoint /bin/sh -v "<repo>/libs/grpc/src/lib:/work" -w /work node:24-slim -c 'npm i -g ts-proto@2.11.4 grpc-tools@1.13.1 && grpc_tools_node_protoc --plugin=$(npm root -g)/ts-proto/protoc-gen-ts_proto --ts_proto_out=./types ./proto/*.proto --ts_proto_opt=nestJs=true --ts_proto_opt=exportCommonSymbols=false'`<br>then `npx prettier --write libs/grpc/src/lib/types`. |
-| `Failed to bind to address …:5000` (or another app port): `address already in use` | An old service is still running, often a built one started with `node dist/apps/<app>/main.js`, which outlives the terminal. `npm stop` kills the **Node** processes on 3000–3003, 5000–5002, 4200 and 4300 and leaves anything else alone. Port 5000 (auth gRPC) also clashes with other local apps such as .NET services: run only one of them at a time. |
-| `npm stop` printed "Ports cleared" but nothing stopped | The old script used `fuser`, which doesn't exist on Windows, and hid the error. It is now `scripts/stop.mjs` (`netstat` on Windows, `lsof` elsewhere). |
-| After switching branches or merging, `nx` fails with `Cannot find module '@nx/vite/plugin'` | `node_modules` still matches the other branch's lock. Run `npm install --legacy-peer-deps`. |
-| Tests or the machine die with "out of memory" | Too many dev servers plus parallel test workers. Stop servers (`npm stop`), use `--parallel=2`. |
-| `nexus` lint crashes in `eslint-plugin-react` (`getFilename is not a function`) | eslint-plugin-react 7 vs ESLint 10. `apps/nexus/eslint.config.mjs` pins `settings.react.version` to avoid the crashing code path. |
-| A job sits `IN_PROGRESS` and the executor's HTTP port stops answering | A CPU-heavy message is blocking the executor's single event loop (it happened with a 1,000,000-iteration Fibonacci job). Iterations are now capped at 1,000. |
-| `pulsar-client produce -m '{"a":1,"b":2}'` sends two broken messages | The CLI splits `-m` on commas; pass `--separator '#'`. |
-| A Vitest test fails with an error from a mock after the test finished | `beforeEach(() => mock.mockReset())` returns the mock, and Vitest treats a returned function as teardown and calls it. Use a braced body. |
-| `prettier --write CLAUDE.md` reformats the GraphQL examples | Run Prettier only on files you changed; the pre-commit hook already formats staged files. |
+| Symptom                                                                                     | Cause and fix                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm install` fails with `ERESOLVE` (`webpack-merge`, `eslint-plugin-import`)               | The repo installs with `npm install --legacy-peer-deps`. That skips peer dependencies, so add any peer a new plugin needs (e.g. `vite`) explicitly.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| An Nx build "succeeds" but `dist/` is stale                                                 | A missing peer (e.g. `webpack`) makes the build a silent no-op. Check for `webpack compiled successfully` or that `dist/` changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `npx nx run grpc:generate-ts-proto` fails with exit code `0xC0000135`                       | grpc-tools' `protoc.exe` can't load a DLL on this Windows machine. Generate in a Linux container instead (mount at `/work`, **not** `/lib`, which would hide the container's system libraries):<br>`docker run --rm --entrypoint /bin/sh -v "<repo>/libs/grpc/src/lib:/work" -w /work node:24-slim -c 'npm i -g ts-proto@2.11.4 grpc-tools@1.13.1 && grpc_tools_node_protoc --plugin=$(npm root -g)/ts-proto/protoc-gen-ts_proto --ts_proto_out=./types ./proto/*.proto --ts_proto_opt=nestJs=true --ts_proto_opt=exportCommonSymbols=false --ts_proto_opt=forceLong=string'`<br>then `npx prettier --write libs/grpc/src/lib/types`. Run it from PowerShell: Git Bash rewrites `-w /work` into `C:/Program Files/Git/work` (or prefix the command with `MSYS_NO_PATHCONV=1`). |
+| `Failed to bind to address …:5000` (or another app port): `address already in use`          | An old service is still running, often a built one started with `node dist/apps/<app>/main.js`, which outlives the terminal. `npm stop` kills the **Node** processes on 3000–3003, 5000–5002, 4200 and 4300 and leaves anything else alone. Port 5000 (auth gRPC) also clashes with other local apps such as .NET services: run only one of them at a time.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `npm stop` printed "Ports cleared" but nothing stopped                                      | The old script used `fuser`, which doesn't exist on Windows, and hid the error. It is now `scripts/stop.mjs` (`netstat` on Windows, `lsof` elsewhere).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| After switching branches or merging, `nx` fails with `Cannot find module '@nx/vite/plugin'` | `node_modules` still matches the other branch's lock. Run `npm install --legacy-peer-deps`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Tests or the machine die with "out of memory"                                               | Too many dev servers plus parallel test workers. Stop servers (`npm stop`), use `--parallel=2`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `nexus` lint crashes in `eslint-plugin-react` (`getFilename is not a function`)             | eslint-plugin-react 7 vs ESLint 10. `apps/nexus/eslint.config.mjs` pins `settings.react.version` to avoid the crashing code path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| A job sits `IN_PROGRESS` and the executor's HTTP port stops answering                       | A CPU-heavy message is blocking the executor's single event loop (it happened with a 1,000,000-iteration Fibonacci job). Iterations are now capped at 1,000.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `pulsar-client produce -m '{"a":1,"b":2}'` sends two broken messages                        | The CLI splits `-m` on commas; pass `--separator '#'`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| A Vitest test fails with an error from a mock after the test finished                       | `beforeEach(() => mock.mockReset())` returns the mock, and Vitest treats a returned function as teardown and calls it. Use a braced body.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `prettier --write CLAUDE.md` reformats the GraphQL examples                                 | Run Prettier only on files you changed; the pre-commit hook already formats staged files.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## Environment variables added by NexusPay
 
-| Variable | Where | Purpose |
-| -------- | ----- | ------- |
+| Variable                      | Where                       | Purpose                                                                |
+| ----------------------------- | --------------------------- | ---------------------------------------------------------------------- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | every backend `apps/*/.env` | Where traces go (Jaeger, `http://localhost:4318`); unset = tracing off |
-| `OTEL_SDK_DISABLED` | optional | `true` turns tracing off |
-| `FAULT_ACK_FAILURES` | executor, tests only | Fail the first n messages after `execute` |
+| `OTEL_SDK_DISABLED`           | optional                    | `true` turns tracing off                                               |
+| `FAULT_ACK_FAILURES`          | executor, tests only        | Fail the first n messages after `execute`                              |

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { Packages } from '@jobber/grpc';
+import { Packages, GRPC_LOADER_OPTIONS } from '@jobber/grpc';
 import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
 
@@ -15,6 +15,7 @@ import { join } from 'path';
             url: configService.getOrThrow('JOBS_GRPC_SERVICE_URL'),
             package: Packages.JOBS,
             protoPath: join(__dirname, '../../libs/grpc/proto/jobs.proto'),
+            loader: GRPC_LOADER_OPTIONS,
           },
         }),
         inject: [ConfigService],

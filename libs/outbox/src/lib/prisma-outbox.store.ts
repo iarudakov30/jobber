@@ -1,11 +1,10 @@
-import { context, propagation } from '@opentelemetry/api';
-
 import {
   BatchResult,
   NewOutboxRecord,
   OutboxRecord,
   OutboxStore,
 } from './outbox.types';
+import { withTraceHeaders } from './trace-headers';
 
 /**
  * The parts of a Prisma client (or interactive-transaction client) the store needs. Typed
@@ -55,12 +54,7 @@ export class PrismaOutboxStore implements OutboxStore {
     tx: PrismaRawClient,
     records: NewOutboxRecord[],
   ): Promise<void> {
-    const trace: Record<string, string> = {};
-    propagation.inject(context.active(), trace);
-    records = records.map((r) => ({
-      ...r,
-      headers: { ...trace, ...r.headers },
-    }));
+    records = withTraceHeaders(records);
     for (let i = 0; i < records.length; i += INSERT_CHUNK) {
       const chunk = records.slice(i, i + INSERT_CHUNK);
       await tx.$executeRaw`

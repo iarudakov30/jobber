@@ -28,6 +28,7 @@ npx nx test auth --testFile=apps/auth/src/app/auth/auth.service.spec.ts
 npx nx test ui-admin --include=apps/ui-admin/src/app/auth/session.spec.ts   # ui-admin uses Vitest, not Jest
 npx nx test nexus -- src/lib/session.spec.ts                    # nexus runs plain Vitest from apps/nexus
 npx nx test wallet                 # real PostgreSQL via Testcontainers: Docker must be running
+npx nx test outbox                 # likewise (DrizzleOutboxStore spec)
 ```
 
 Node 25+ has a built-in global `localStorage` that is `undefined` without `--localstorage-file` and
@@ -198,8 +199,13 @@ successful even when drizzle-kit crashes, so check that a new `.sql` file appear
 ### Proto generation
 
 ```bash
-npx nx run grpc:generate-ts-proto  # regenerate TypeScript from libs/grpc/src/lib/proto/auth.proto
+npx nx run grpc:generate-ts-proto  # regenerate TypeScript from libs/grpc/src/lib/proto/*.proto
 ```
+
+`protoc.exe` fails on Windows; generate in a Linux container instead (command in
+`docs/nexuspay/02-repo-guide.md`, "Gotchas"; run it from PowerShell). ts-proto runs with
+`forceLong=string`, so `int64` fields are decimal strings in TypeScript, and every gRPC client and
+server passes `loader: GRPC_LOADER_OPTIONS` (`{ longs: String }`) so they arrive that way.
 
 ### Utilities
 
@@ -211,7 +217,7 @@ npm run cache-clean                # reset Nx cache and npm cache
 ## Architecture
 
 Nx monorepo with five NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
-NexusPay pet project), and seven shared libraries.
+NexusPay pet project), and eight shared libraries.
 
 NexusPay (the wallet/payments learning project being built in this repo) is documented in
 `docs/nexuspay/`: purpose and architecture, repo guide, roadmap, and a step-by-step log of what
@@ -232,7 +238,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 ### Communication Patterns
 
 1. **GraphQL (external)** — clients talk to `auth` and `jobs` via Apollo GraphQL APIs
-2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request; `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
+2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email); `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
 3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them
 
 ### Job Framework
@@ -253,7 +259,8 @@ The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) 
 ### Wallet ledger (`wallet`)
 
 NexusPay's money service (phase 2, in progress): the only service that changes balances. So far
-it has the ledger itself; GraphQL, gRPC `WalletService` and the outbox come next.
+it has the ledger itself and its outbox table; GraphQL, gRPC `WalletService` (contract in
+`libs/grpc/src/lib/proto/wallet.proto`) and the outbox relay come next.
 
 - **Schema** (`apps/wallet/src/app/ledger/schema.ts`): `assets` (USD, scale 2), `accounts`
   (owner + asset + kind, cached `balance`), `transactions` (`UNIQUE (type, external_ref)`),
@@ -267,8 +274,11 @@ it has the ledger itself; GraphQL, gRPC `WalletService` and the outbox come next
   by `(type, externalRef)` (returns `duplicate: true`, writes nothing), locks the touched accounts
   in ascending id order with `FOR UPDATE` (no deadlocks), maps the balance check to
   `InsufficientFundsError` and malformed postings to `InvalidPostingError`; on either, nothing is
-  written. `ensureAccounts(userId, asset)` / `ensureSystemAccount(name, asset)` create accounts
+  written. `outbox: (transactionId) => records` writes events in the same transaction through
+  `DrizzleOutboxStore` (none for a duplicate or a refused posting). `ensureAccounts(userId, asset)` / `ensureSystemAccount(name, asset)` create accounts
   lazily.
+- Amounts cross boundaries through `@jobber/money` (`parseAmount`, `formatAmount`, `toWire`,
+  `fromWire`): `bigint` in code, a decimal string of minor units on the wire.
 - Tests (`ledger.service.spec.ts`) run against a Testcontainers PostgreSQL 18 and check after
   every test that each asset sums to zero and each cached balance equals its entries.
 
@@ -330,10 +340,11 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 
 - **`@jobber/graphql`** (`libs/graphql`) — `AbstractModel` (GraphQL base type), `GqlContext`, `GqlAuthGuard`
 - **`@jobber/nestjs`** (`libs/nestjs`) — `init()` bootstrap helper used by all apps, `Jobs` enum
-- **`@jobber/grpc`** (`libs/grpc`) — gRPC proto files and generated TypeScript types for `AuthService` and `ProductsService`, plus the `Packages` enum
+- **`@jobber/grpc`** (`libs/grpc`) — gRPC proto files and generated TypeScript types for `AuthService`, `ProductsService`, `JobsService` and `WalletService`, plus the `Packages` enum, `GRPC_LOADER_OPTIONS` and `GrpcStatus` (status codes for `RpcException`)
 - **`@jobber/prisma`** (`libs/prisma`) — Prisma client used by `auth`
 - **`@jobber/tracing`** (`libs/tracing`) — `startTracing(serviceName)`: OpenTelemetry SDK with http, express, Nest, GraphQL, gRPC and pg (only inside a traced request) instrumentation, exporting over OTLP/HTTP. Call it on the line right after `require('module-alias/register')` in `main.ts`, before anything loads NestJS: instrumentations patch modules when they are first required. Pulsar isn't instrumented; `send()` and the outbox write `traceparent` into message properties and `PulsarConsumer` continues the trace from them.
-- **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. Delivery is at-least-once.
+- **`@jobber/money`** (`libs/money`) — amounts as `bigint` minor units: `ASSETS` (USD, scale 2), `parseAmount` ("12.34" → `1234n`, never rounds), `formatAmount` (exact, via `Intl.NumberFormat` on a decimal string), `toWire`/`fromWire` (canonical decimal strings). No framework imports, so `nexus` can use it too.
+- **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`, or `DrizzleOutboxStore.enqueue(tx, records)` for Drizzle apps), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. Delivery is at-least-once.
 - **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, a `send()` helper (key, properties, `sequenceId`), and job message DTOs (`FibonacciMessage`, `LoadProductsMessage`)
   - Consumers take `ConsumerOptions`: subscription (default `jobber`, which job consumers keep), type (default `Shared`), redelivery delay (5 s) and max redeliveries (5) before Pulsar moves the message to `<topic>-<subscription>-DLQ`. Give each service that consumes the same topic its own subscription, or they split the messages instead of each getting all of them.
   - `onMessage(data, meta)` gets the message id, partition key, properties and redelivery count. Throwing `NonRetryableError` (or sending unparseable JSON) dead-letters the message at once; any other error nacks it for redelivery. Only a failed handler nacks, never a failed ack, so handlers must tolerate the occasional repeat.

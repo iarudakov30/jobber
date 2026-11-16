@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
 import { PulsarModule } from '@jobber/pulsar';
-import { Packages } from '@jobber/grpc';
+import { Packages, GRPC_LOADER_OPTIONS } from '@jobber/grpc';
 
 import { join } from 'path';
 
@@ -23,6 +23,7 @@ import { JobClientsModule } from '../job-clients.module';
             url: configService.getOrThrow('PRODUCTS_GRPC_SERVICE_URL'),
             package: Packages.PRODUCTS,
             protoPath: join(__dirname, '../../libs/grpc/proto/products.proto'),
+            loader: GRPC_LOADER_OPTIONS,
           },
         }),
         inject: [ConfigService],

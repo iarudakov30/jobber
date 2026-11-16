@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { DrizzleOutboxStore, NewOutboxRecord } from '@jobber/outbox';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import {
   InsufficientFundsError,
@@ -26,6 +27,11 @@ export interface PostingInput {
   externalRef: string;
   legs: PostingLeg[];
   metadata?: Record<string, unknown>;
+  /**
+   * Events announcing this posting, built from its transaction id and written in the same
+   * database transaction: they exist exactly when the posting does (none on a duplicate).
+   */
+  outbox?: (transactionId: string) => NewOutboxRecord[];
 }
 
 export interface PostingResult {
@@ -41,9 +47,13 @@ export interface UserAccounts {
 
 @Injectable()
 export class LedgerService {
+  private readonly outbox: DrizzleOutboxStore;
+
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly db: LedgerDatabase,
-  ) {}
+  ) {
+    this.outbox = new DrizzleOutboxStore(db);
+  }
 
   /**
    * Posts one balanced journal transaction, exactly once per (type, externalRef).
@@ -137,6 +147,11 @@ export class LedgerService {
           amount: leg.amount,
         })),
       );
+
+      const events = input.outbox?.(created.id) ?? [];
+      if (events.length) {
+        await this.outbox.enqueue(tx, events);
+      }
 
       // The deferred entries_balanced trigger re-checks the sums at COMMIT.
       return { transactionId: created.id, duplicate: false };

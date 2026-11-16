@@ -4,10 +4,16 @@ package auth;
 
 service AuthService {
   rpc Authenticate(AuthenticateRequest) returns (User);
+  // For other services (wallet transfers by email). NOT_FOUND when no user has that email.
+  rpc FindUserByEmail(FindUserByEmailRequest) returns (User);
 }
 
 message AuthenticateRequest {
   string token = 1;
+}
+
+message FindUserByEmailRequest {
+  string email = 1;
 }
 
 message User {

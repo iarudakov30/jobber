@@ -6,7 +6,7 @@ import { DiscoveryModule } from '@golevelup/nestjs-discovery';
 
 import { join } from 'path';
 
-import { Packages } from '@jobber/grpc';
+import { Packages, GRPC_LOADER_OPTIONS } from '@jobber/grpc';
 import { PulsarClient, PulsarModule } from '@jobber/pulsar';
 import {
   OutboxRelay,
@@ -36,6 +36,7 @@ import { JobsController } from './jobs.controller';
             url: configService.getOrThrow('AUTH_GRPC_SERVICE_URL'),
             package: Packages.AUTH,
             protoPath: join(__dirname, '../../libs/grpc/proto/auth.proto'),
+            loader: GRPC_LOADER_OPTIONS,
           },
         }),
         inject: [ConfigService],

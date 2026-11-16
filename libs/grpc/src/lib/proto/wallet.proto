@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package wallet;
+
+// NexusPay's ledger. Amounts are int64 minor units (cents for USD); TypeScript sees them as
+// decimal strings (ts-proto forceLong=string, proto-loader longs: String).
+service WalletService {
+  // Moves money from a system account (seed, stripe_clearing, ...) to a user's available
+  // balance. Idempotent by (type, externalRef).
+  rpc Credit(CreditRequest) returns (PostingResult);
+  rpc GetBalances(GetBalancesRequest) returns (Balances);
+  // Recomputes every balance from the entries and reports what doesn't match.
+  rpc RunAudit(RunAuditRequest) returns (AuditResult);
+}
+
+message CreditRequest {
+  int32 userId = 1;
+  string asset = 2;
+  int64 amount = 3;
+  string fromSystemAccount = 4;
+  string type = 5;
+  string externalRef = 6;
+}
+
+message PostingResult {
+  string transactionId = 1;
+  bool duplicate = 2;
+}
+
+message GetBalancesRequest {
+  int32 userId = 1;
+}
+
+message Balance {
+  string asset = 1;
+  int64 available = 2;
+  int64 held = 3;
+}
+
+message Balances {
+  repeated Balance balances = 1;
+}
+
+message RunAuditRequest {}
+
+message AuditIssue {
+  string kind = 1;
+  string detail = 2;
+}
+
+message AuditResult {
+  repeated AuditIssue issues = 1;
+}

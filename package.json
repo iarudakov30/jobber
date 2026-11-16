@@ -41,7 +41,8 @@
     "@jobber/nestjs": "dist/libs/nestjs/main",
     "@jobber/prisma": "dist/libs/prisma/main",
     "@jobber/outbox": "dist/libs/outbox/main",
-    "@jobber/tracing": "dist/libs/tracing/main"
+    "@jobber/tracing": "dist/libs/tracing/main",
+    "@jobber/money": "dist/libs/money/main"
   },
   "overrides": {
     "@apollo/server": "^5.5.1"
