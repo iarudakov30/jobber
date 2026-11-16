@@ -86,6 +86,12 @@
       "options": {
         "cwd": "{projectRoot}"
       }
+    },
+    "load-test": {
+      "command": "node ../../scripts/k6.mjs",
+      "options": {
+        "cwd": "{projectRoot}"
+      }
     }
   },
   "tags": []

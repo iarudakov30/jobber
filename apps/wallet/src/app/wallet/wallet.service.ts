@@ -11,6 +11,7 @@ import {
   User,
 } from '@jobber/grpc';
 import { ASSETS, AssetCode, isAssetCode, toWire } from '@jobber/money';
+import { canonicalJson as canonical } from '@jobber/idempotency';
 import { OutboxRelay } from '@jobber/outbox';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import {
@@ -172,12 +173,16 @@ export class WalletService implements OnModuleInit {
 
   /**
    * Moves `amount` from `from`'s available balance to the user with `toEmail`, and announces it
-   * on `transfer-completed`. Each call is a new transfer; retries are deduplicated in step 4
-   * (`@Idempotent()`).
+   * on `transfer-completed`.
+   *
+   * The ledger `externalRef` is `transfer:<userId>:<idempotencyKey>`, so running the same keyed
+   * request twice (a retry that took over an expired claim after a crash) posts once and returns
+   * the first transfer. Reusing a key for a different transfer is refused.
    */
   async transfer(
     from: User,
     input: { toEmail: string; asset: string; amount: bigint },
+    idempotencyKey?: string,
   ): Promise<{ transactionId: string; asset: string; amount: bigint }> {
     const { asset, amount } = input;
     if (!isAssetCode(asset)) {
@@ -198,14 +203,20 @@ export class WalletService implements OnModuleInit {
       this.ledger.ensureAccounts(from.id, asset),
       this.ledger.ensureAccounts(recipient.id, asset),
     ]);
-    const { transactionId } = await this.ledger.post({
+    const terms = {
+      fromUserId: from.id,
+      toUserId: recipient.id,
+      asset,
+      amount: toWire(amount),
+    };
+    const { transactionId, duplicate } = await this.ledger.post({
       type: 'transfer',
-      externalRef: `transfer:${randomUUID()}`,
+      externalRef: `transfer:${from.id}:${idempotencyKey ?? randomUUID()}`,
       legs: [
         { accountId: source.available, asset, amount: -amount },
         { accountId: target.available, asset, amount },
       ],
-      metadata: { fromUserId: from.id, toUserId: recipient.id },
+      metadata: terms,
       outbox: (transactionId) => [
         {
           transport: 'pulsar',
@@ -221,7 +232,19 @@ export class WalletService implements OnModuleInit {
         },
       ],
     });
-    this.relay.poke();
+    if (duplicate) {
+      const [original] = await this.db
+        .select({ metadata: transactions.metadata })
+        .from(transactions)
+        .where(eq(transactions.id, transactionId));
+      if (canonical(original?.metadata) !== canonical(terms)) {
+        throw new WalletInputError(
+          'Idempotency-Key was already used for a different transfer',
+        );
+      }
+    } else {
+      this.relay.poke();
+    }
     return { transactionId, asset, amount };
   }
 

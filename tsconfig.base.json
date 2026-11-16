@@ -25,7 +25,11 @@
       "@jobber/prisma": ["libs/prisma/src/index.ts"],
       "@jobber/outbox": ["libs/outbox/src/index.ts"],
       "@jobber/tracing": ["libs/tracing/src/index.ts"],
-      "@jobber/money": ["libs/money/src/index.ts"]
+      "@jobber/money": ["libs/money/src/index.ts"],
+      "@jobber/idempotency": ["libs/idempotency/src/index.ts"],
+      "@jobber/idempotency/table": [
+        "libs/idempotency/src/lib/idempotency-keys.table.ts"
+      ]
     }
   },
   "exclude": ["node_modules", "tmp"]

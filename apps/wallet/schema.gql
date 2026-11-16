@@ -45,7 +45,9 @@ An amount in minor units of its asset, as a decimal string: "1250" is $12.50.
 scalar MinorUnits
 
 type Mutation {
-  """Sends money to another user by email, from your available balance."""
+  """
+  Sends money to another user by email, from your available balance. Requires an Idempotency-Key header: a retry with the same key and input returns the first result.
+  """
   transfer(input: TransferInput!): Transfer!
 }
 

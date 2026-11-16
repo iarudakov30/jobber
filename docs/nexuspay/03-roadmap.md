@@ -25,8 +25,8 @@ Make jobber's messaging and jobs framework safe enough to build money on, and st
 
 Progress, step by step: [phase-2/README.md](phase-2/README.md). Step 1 (`apps/wallet`, ledger
 schema and triggers, `LedgerService.post`) step 2 (`libs/money`, `wallet.proto`,
-`FindUserByEmail`, `DrizzleOutboxStore`) and step 3 (GraphQL and gRPC API, outbox relay,
-`wallet:seed`) are done.
+`FindUserByEmail`, `DrizzleOutboxStore`) step 3 (GraphQL and gRPC API, outbox relay,
+`wallet:seed`) and step 4 (`libs/idempotency`, k6 load tests) are done.
 
 - `apps/wallet` (3004): Drizzle ledger schema (`assets`, `accounts`, `transactions`, `entries`), a
   deferred trigger that rejects unbalanced transactions, an append-only trigger on entries,

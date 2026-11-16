@@ -219,7 +219,7 @@ npm run cache-clean                # reset Nx cache and npm cache
 ## Architecture
 
 Nx monorepo with five NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
-NexusPay pet project), and eight shared libraries.
+NexusPay pet project), and nine shared libraries.
 
 NexusPay (the wallet/payments learning project being built in this repo) is documented in
 `docs/nexuspay/`: purpose and architecture, repo guide, roadmap, and a step-by-step log of what
@@ -289,7 +289,15 @@ NexusPay's money service (phase 2, in progress): the only service that changes b
   balances vs entries, unbalanced transactions, in one REPEATABLE READ snapshot).
 - **Outbox:** each transfer writes `transfer-completed` (`{ transactionId, fromUserId, toUserId,
   asset, amount }`) in its transaction; `OutboxRelay` publishes it to Pulsar (no consumer yet).
-  `transfer` isn't idempotent yet: `@Idempotent()` is phase 2 step 4.
+- **Idempotency:** `transfer` is `@Idempotent()` and requires an `Idempotency-Key` header: a retry
+  with the same key and input gets the stored response (`Idempotent-Replayed: true`), the same
+  key with another input gets `UNPROCESSABLE_ENTITY`, a concurrent duplicate gets `CONFLICT`. The
+  ledger `externalRef` is `transfer:<userId>:<key>`, so even a retry that takes over a claim
+  after a crash posts once. Redis (`REDIS_URL`) is only the fast path; PostgreSQL
+  (`idempotency_keys`) decides.
+- **Load tests** (k6 in Docker, against running `auth` + `wallet`): `npx nx run wallet:load-test
+  overdraft` (200 concurrent $1 transfers from $100: exactly 100 succeed), `deadlock` (100 each
+  way), `same-key` (50 parallel requests, one key: one transfer). Scripts in `apps/wallet/load/`.
 - Amounts cross boundaries through `@jobber/money` (`parseAmount`, `formatAmount`, `toWire`,
   `fromWire`): `bigint` in code, a decimal string of minor units on the wire.
 - Tests run against a Testcontainers PostgreSQL 18 (`src/testing/test-database.ts`) and check
@@ -358,6 +366,7 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 - **`@jobber/prisma`** (`libs/prisma`) — Prisma client used by `auth`
 - **`@jobber/tracing`** (`libs/tracing`) — `startTracing(serviceName)`: OpenTelemetry SDK with http, express, Nest, GraphQL, gRPC and pg (only inside a traced request) instrumentation, exporting over OTLP/HTTP. Call it on the line right after `require('module-alias/register')` in `main.ts`, before anything loads NestJS: instrumentations patch modules when they are first required. Pulsar isn't instrumented; `send()` and the outbox write `traceparent` into message properties and `PulsarConsumer` continues the trace from them.
 - **`@jobber/money`** (`libs/money`) — amounts as `bigint` minor units: `ASSETS` (USD, scale 2), `parseAmount` ("12.34" → `1234n`, never rounds), `formatAmount` (exact, via `Intl.NumberFormat` on a decimal string), `toWire`/`fromWire` (canonical decimal strings). No framework imports, so `nexus` can use it too.
+- **`@jobber/idempotency`** (`libs/idempotency`) — `@Idempotent({ operation })` for GraphQL resolvers and HTTP handlers (`IdempotencyInterceptor`), `@IdempotencyKey()` to read the key in the handler, `DrizzleIdempotencyStore` + `idempotencyKeysTable()` (import the table from `@jobber/idempotency/table` in Drizzle schema files: drizzle-kit can't load the decorators), `RedisIdempotencyLock` (no offline queue: fails fast when Redis is down), `IdempotencyCleanup` (hourly expiry). The module provides `IDEMPOTENCY_STORE` and optionally `IDEMPOTENCY_LOCK`; see `apps/wallet/src/app/wallet/wallet.module.ts`.
 - **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`, or `DrizzleOutboxStore.enqueue(tx, records)` for Drizzle apps), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. Delivery is at-least-once.
 - **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, a `send()` helper (key, properties, `sequenceId`), and job message DTOs (`FibonacciMessage`, `LoadProductsMessage`)
   - Consumers take `ConsumerOptions`: subscription (default `jobber`, which job consumers keep), type (default `Shared`), redelivery delay (5 s) and max redeliveries (5) before Pulsar moves the message to `<topic>-<subscription>-DLQ`. Give each service that consumes the same topic its own subscription, or they split the messages instead of each getting all of them.
@@ -383,7 +392,8 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
   request → outbox `<topic> publish` → executor `<topic> process` → `Acknowledge` gRPC back into
   `jobs`. Known gap: `auth`'s gRPC server records no spans yet, though the `jobs` side of that
   call does.
-- Redis and Mailpit run in compose but no app uses them until NexusPay phases 2–3.
+- Redis backs the wallet's idempotency fast path (`REDIS_URL`); the wallet keeps working without
+  it. Mailpit runs in compose but no app uses it until NexusPay phase 3.
 
 ### Git Hooks
 
@@ -546,7 +556,9 @@ query {
 **Endpoint:** `http://localhost:3004/wallet` (requires the auth cookie: log in at `auth` first)
 
 Run `npx nx run wallet:seed` first to get `alice@example.com` and `bob@example.com` (password
-`Test@1234`) with $100 each. Amounts are strings of minor units: `"1250"` is $12.50.
+`Test@1234`) with $100 each. Amounts are strings of minor units: `"1250"` is $12.50. `transfer`
+needs an `Idempotency-Key` request header (any unique string per transfer, reused on retries); in
+GraphiQL, add it under "Headers": `{ "Idempotency-Key": "my-first-transfer" }`.
 
 ```graphql
 query {

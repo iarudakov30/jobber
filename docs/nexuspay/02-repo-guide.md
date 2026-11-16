@@ -27,6 +27,7 @@ libs/
   outbox/      Transactional outbox: PrismaOutboxStore, DrizzleOutboxStore, OutboxRelay,
                PulsarOutboxPublisher
   money/       bigint minor units: ASSETS, parseAmount, formatAmount, toWire/fromWire
+  idempotency/ @Idempotent() (Idempotency-Key): PostgreSQL store, Redis fast path, cleanup
   tracing/     startTracing() — OpenTelemetry bootstrap
 charts/jobber  Helm chart (minikube / EKS)
 docs/          These documents and other guides
@@ -40,15 +41,15 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 
 ## Services and ports
 
-| Service  | HTTP                     | gRPC | Database               | Notes                                                                                                                                           |
-| -------- | ------------------------ | ---- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| auth     | 3000 (`/auth` GraphQL)   | 5000 | `jobber-auth` (Prisma) | Sets the HttpOnly `Authentication` cookie                                                                                                       |
-| jobs     | 3001 (`/jobs` GraphQL)   | 5002 | `jobber` (Prisma)      | Tables `Job`, `JobItem`, `outbox`                                                                                                               |
-| executor | 3002                     | —    | —                      | Consumes job topics, subscription `jobber`                                                                                                      |
-| products | 3003                     | 5001 | `products` (Drizzle)   | `products.source_ref` is unique                                                                                                                 |
-| wallet   | 3004 (`/wallet` GraphQL) | 5003 | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox` table; `npx nx run wallet:seed` gives alice@ and bob@example.com $100 |
-| ui-admin | 4200                     | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                                                                                          |
-| nexus    | 4300                     | —    | —                      | React; Vite proxies `/api/auth` to 3000                                                                                                         |
+| Service  | HTTP                     | gRPC | Database               | Notes                                                                                                                                                        |
+| -------- | ------------------------ | ---- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| auth     | 3000 (`/auth` GraphQL)   | 5000 | `jobber-auth` (Prisma) | Sets the HttpOnly `Authentication` cookie                                                                                                                    |
+| jobs     | 3001 (`/jobs` GraphQL)   | 5002 | `jobber` (Prisma)      | Tables `Job`, `JobItem`, `outbox`                                                                                                                            |
+| executor | 3002                     | —    | —                      | Consumes job topics, subscription `jobber`                                                                                                                   |
+| products | 3003                     | 5001 | `products` (Drizzle)   | `products.source_ref` is unique                                                                                                                              |
+| wallet   | 3004 (`/wallet` GraphQL) | 5003 | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox`, `idempotency_keys`; Redis for the idempotency fast path; `npx nx run wallet:seed` |
+| ui-admin | 4200                     | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                                                                                                       |
+| nexus    | 4300                     | —    | —                      | React; Vite proxies `/api/auth` to 3000                                                                                                                      |
 
 | Infrastructure (docker compose)      | Port(s)          | UI                     |
 | ------------------------------------ | ---------------- | ---------------------- |
@@ -103,6 +104,9 @@ npx nx test pulsar                                 # one project (Jest)
 npx nx test wallet                                 # real PostgreSQL via Testcontainers: needs Docker
 npx nx test outbox                                 # also Testcontainers (DrizzleOutboxStore)
 npx nx test money                                  # amount parsing and formatting
+npx nx test idempotency                            # Testcontainers PostgreSQL + Redis
+npx nx run wallet:load-test overdraft              # k6 in Docker against running auth + wallet
+                                                   # (also: deadlock, same-key)
 npx nx test nexus -- src/lib/session.spec.ts       # one file (nexus uses Vitest)
 ```
 

@@ -4,6 +4,13 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { join } from 'path';
 import { GRPC_LOADER_OPTIONS, Packages } from '@jobber/grpc';
 import {
+  DrizzleIdempotencyStore,
+  IDEMPOTENCY_LOCK,
+  IDEMPOTENCY_STORE,
+  IdempotencyCleanup,
+  RedisIdempotencyLock,
+} from '@jobber/idempotency';
+import {
   DrizzleOutboxStore,
   OutboxRelay,
   PulsarOutboxPublisher,
@@ -54,6 +61,25 @@ import { WalletService } from './wallet.service';
           new PulsarOutboxPublisher(pulsarClient, 'wallet'),
         ]),
       inject: [DrizzleOutboxStore, PulsarClient],
+    },
+    // @Idempotent() on transfer: PostgreSQL is the guarantee, Redis the fast path.
+    {
+      provide: IDEMPOTENCY_STORE,
+      useFactory: (db: LedgerDatabase) => new DrizzleIdempotencyStore(db),
+      inject: [DATABASE_CONNECTION],
+    },
+    {
+      provide: IDEMPOTENCY_LOCK,
+      useFactory: (configService: ConfigService) =>
+        RedisIdempotencyLock.connect(configService.getOrThrow('REDIS_URL')),
+      inject: [ConfigService],
+    },
+    {
+      // Deletes expired keys hourly.
+      provide: IdempotencyCleanup,
+      useFactory: (store: DrizzleIdempotencyStore) =>
+        new IdempotencyCleanup(store),
+      inject: [IDEMPOTENCY_STORE],
     },
   ],
 })

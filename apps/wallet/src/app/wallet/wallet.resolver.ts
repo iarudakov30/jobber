@@ -1,6 +1,7 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard } from '@jobber/graphql';
+import { Idempotent, IdempotencyKey } from '@jobber/idempotency';
 import { User } from '@jobber/grpc';
 import { CurrentUser } from './current-user.decorator';
 import { TransferInput } from './dto/transfer.input';
@@ -34,12 +35,15 @@ export class WalletResolver {
 
   @Mutation(() => Transfer, {
     description:
-      'Sends money to another user by email, from your available balance.',
+      'Sends money to another user by email, from your available balance. Requires an ' +
+      'Idempotency-Key header: a retry with the same key and input returns the first result.',
   })
+  @Idempotent({ operation: 'transfer' })
   transfer(
     @CurrentUser() user: User,
     @Args('input') input: TransferInput,
+    @IdempotencyKey() idempotencyKey: string,
   ): Promise<Transfer> {
-    return asGraphQL(() => this.wallet.transfer(user, input));
+    return asGraphQL(() => this.wallet.transfer(user, input, idempotencyKey));
   }
 }

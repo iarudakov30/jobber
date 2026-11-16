@@ -5,12 +5,15 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { RpcException } from '@nestjs/microservices';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
-import { readFileSync } from 'fs';
+import { readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Pool } from 'pg';
 import { Observable, of, throwError } from 'rxjs';
+import { GenericContainer, StartedTestContainer } from 'testcontainers';
+import { randomUUID } from 'crypto';
 import { GrpcStatus, Packages, User } from '@jobber/grpc';
+import { IDEMPOTENCY_LOCK, RedisIdempotencyLock } from '@jobber/idempotency';
 import { OutboxRelay } from '@jobber/outbox';
 import { PulsarClient } from '@jobber/pulsar';
 import {
@@ -24,12 +27,14 @@ import { WalletController } from './wallet.controller';
 import { WalletModule } from './wallet.module';
 
 // The wallet API end to end over HTTP: Apollo, GqlAuthGuard, ValidationPipe, the MinorUnits
-// scalar and the ledger, against a Testcontainers PostgreSQL. Only `auth` (gRPC) and Pulsar
-// are faked.
+// scalar, @Idempotent() and the ledger, against Testcontainers PostgreSQL and Redis. Only `auth`
+// (gRPC) and Pulsar are faked.
 
 const schemaFile = join(tmpdir(), `wallet-schema-${process.pid}.gql`);
 
 let testDb: TestDatabase;
+let redisContainer: StartedTestContainer;
+let redisLock: RedisIdempotencyLock;
 let pool: Pool;
 let app: INestApplication;
 let url: string;
@@ -58,8 +63,15 @@ const fakeAuth = {
 };
 
 beforeAll(async () => {
-  testDb = await startTestDatabase();
+  [testDb, redisContainer] = await Promise.all([
+    startTestDatabase(),
+    new GenericContainer('redis:7-alpine').withExposedPorts(6379).start(),
+  ]);
   pool = testDb.pool;
+  redisLock = RedisIdempotencyLock.connect(
+    `redis://${redisContainer.getHost()}:${redisContainer.getMappedPort(6379)}`,
+  );
+  await redisLock.whenReady();
 
   const moduleRef = await Test.createTestingModule({
     imports: [
@@ -77,6 +89,8 @@ beforeAll(async () => {
     .useValue(relay)
     .overrideProvider(PulsarClient)
     .useValue({})
+    .overrideProvider(IDEMPOTENCY_LOCK)
+    .useValue(redisLock)
     .compile();
 
   app = moduleRef.createNestApplication({ logger: false });
@@ -91,6 +105,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.close(); // ends the pool (DatabaseModule)
   await testDb?.container.stop();
+  await redisContainer?.stop();
+  rmSync(schemaFile, { force: true });
 });
 
 afterEach(() => expectBooksBalanced(pool));
@@ -125,12 +141,14 @@ async function gql<T = Record<string, unknown>>(
   token: string | null,
   query: string,
   variables?: Record<string, unknown>,
+  headers: Record<string, string> = {},
 ): Promise<GqlResponse<T>> {
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       ...(token ? { cookie: `Authentication=${token}` } : {}),
+      ...headers,
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -151,12 +169,28 @@ async function usd(token: string) {
   return data?.balances[0].available;
 }
 
-function send(token: string, toEmail: string, amount: unknown) {
+/** A transfer with its own Idempotency-Key unless `key` is given (`null`: no header). */
+function send(
+  token: string,
+  toEmail: string,
+  amount: unknown,
+  key: string | null = randomUUID(),
+) {
   return gql<{ transfer: { transactionId: string; amount: string } }>(
     token,
     TRANSFER,
     { input: { toEmail, asset: 'USD', amount } },
+    key === null ? {} : { 'idempotency-key': key },
   );
+}
+
+async function transferCount(fromUserId: number) {
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS n FROM transactions
+     WHERE type = 'transfer' AND metadata->>'fromUserId' = $1`,
+    [String(fromUserId)],
+  );
+  return rows[0].n as number;
 }
 
 describe('GraphQL', () => {
@@ -344,6 +378,163 @@ describe('GraphQL', () => {
     );
 
     expect(readFileSync(schemaFile, 'utf8')).toBe(committed);
+  });
+});
+
+describe('idempotent transfer', () => {
+  const scopeOf = (userId: number, key: string) => `${userId}:transfer:${key}`;
+
+  it('requires an Idempotency-Key and moves nothing without one', async () => {
+    const alice = await signUp(100);
+    const bob = await signUp();
+
+    const { data, errors } = await send(alice.token, bob.email, '100', null);
+
+    expect(data).toBeNull();
+    expect(errors?.[0].extensions).toMatchObject({
+      code: 'BAD_REQUEST',
+      status: 400,
+    });
+    expect(await transferCount(alice.id)).toBe(0);
+  });
+
+  it('replays the first result for a retry with the same key', async () => {
+    const alice = await signUp(100);
+    const bob = await signUp();
+    const key = randomUUID();
+
+    const first = await send(alice.token, bob.email, '700', key);
+    const retry = await send(alice.token, bob.email, '700', key);
+
+    expect(first.errors).toBeUndefined();
+    expect(retry).toEqual(first);
+    expect(await usd(alice.token)).toBe('9300');
+    expect(await transferCount(alice.id)).toBe(1);
+  });
+
+  it('makes one transfer from 50 parallel requests with one key (spec test 4)', async () => {
+    const alice = await signUp(100);
+    const bob = await signUp();
+    const key = randomUUID();
+
+    const results = await Promise.all(
+      Array.from({ length: 50 }, () =>
+        send(alice.token, bob.email, '100', key),
+      ),
+    );
+
+    const ok = results.filter((r) => r.data?.transfer);
+    expect(ok.length).toBeGreaterThanOrEqual(1);
+    expect(new Set(ok.map((r) => r.data?.transfer.transactionId)).size).toBe(1);
+    for (const r of results.filter((r) => r.errors)) {
+      expect(r.errors?.[0].extensions?.code).toBe('CONFLICT');
+    }
+    expect(await transferCount(alice.id)).toBe(1);
+    expect(await usd(bob.token)).toBe('100');
+  });
+
+  it('refuses the key with a different amount and moves nothing (spec test 5)', async () => {
+    const alice = await signUp(100);
+    const bob = await signUp();
+    const key = randomUUID();
+    await send(alice.token, bob.email, '100', key);
+
+    const reused = await send(alice.token, bob.email, '200', key);
+
+    expect(reused.data).toBeNull();
+    expect(reused.errors?.[0]).toMatchObject({
+      message: 'Idempotency-Key was already used with a different request',
+      extensions: { code: 'UNPROCESSABLE_ENTITY', status: 422 },
+    });
+    expect(await transferCount(alice.id)).toBe(1);
+    expect(await usd(alice.token)).toBe('9900');
+  });
+
+  it('still makes one transfer with Redis unavailable (spec test 6)', async () => {
+    const alice = await signUp(100);
+    const bob = await signUp();
+    const key = randomUUID();
+    const acquire = jest
+      .spyOn(redisLock, 'acquire')
+      .mockResolvedValue({ status: 'unavailable' });
+
+    try {
+      const results = await Promise.all(
+        Array.from({ length: 50 }, () =>
+          send(alice.token, bob.email, '100', key),
+        ),
+      );
+
+      expect(results.some((r) => r.data?.transfer)).toBe(true);
+      expect(await transferCount(alice.id)).toBe(1);
+    } finally {
+      acquire.mockRestore();
+    }
+  });
+
+  it('lets the same key be retried after a refused transfer', async () => {
+    const alice = await signUp(1);
+    const bob = await signUp();
+    const key = randomUUID();
+
+    const refused = await send(alice.token, bob.email, '500', key);
+    await controller.credit({
+      userId: alice.id,
+      asset: 'USD',
+      amount: '400',
+      fromSystemAccount: 'seed',
+      type: 'seed',
+      externalRef: `top-up:${alice.id}`,
+    });
+    const retried = await send(alice.token, bob.email, '500', key);
+
+    expect(refused.errors?.[0].message).toBe(
+      'amount exceeds your available balance',
+    );
+    expect(retried.errors).toBeUndefined();
+    expect(await usd(bob.token)).toBe('500');
+  });
+
+  it('posts once when a retry takes over a claim whose response was never stored', async () => {
+    const alice = await signUp(100);
+    const bob = await signUp();
+    const key = randomUUID();
+    const first = await send(alice.token, bob.email, '300', key);
+    // As if the server crashed after the ledger commit, before storing the response.
+    await pool.query(
+      `UPDATE idempotency_keys
+       SET status = 'in_progress', response = NULL, expires_at = NULL,
+           locked_until = now() - interval '1 second'
+       WHERE scope = $1`,
+      [scopeOf(alice.id, key)],
+    );
+
+    const retry = await send(alice.token, bob.email, '300', key);
+
+    expect(retry).toEqual(first);
+    expect(await transferCount(alice.id)).toBe(1);
+    expect(await usd(bob.token)).toBe('300');
+  });
+
+  it('refuses a key reused for a different transfer after its response expired', async () => {
+    const alice = await signUp(100);
+    const bob = await signUp();
+    const key = randomUUID();
+    await send(alice.token, bob.email, '300', key);
+    await pool.query(
+      `UPDATE idempotency_keys SET expires_at = now() - interval '1 second'
+       WHERE scope = $1`,
+      [scopeOf(alice.id, key)],
+    );
+
+    const reused = await send(alice.token, bob.email, '999', key);
+
+    expect(reused.errors?.[0]).toMatchObject({
+      message: 'Idempotency-Key was already used for a different transfer',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    expect(await transferCount(alice.id)).toBe(1);
+    expect(await usd(alice.token)).toBe('9700');
   });
 });
 
