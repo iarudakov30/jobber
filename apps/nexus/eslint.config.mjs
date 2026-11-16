@@ -2,6 +2,8 @@ import nx from '@nx/eslint-plugin';
 import baseConfig from '../../eslint.config.mjs';
 
 export default [
+  // GraphQL Codegen output (nx run nexus:codegen).
+  { ignores: ['src/gql/**'] },
   ...nx.configs['flat/react'],
   ...baseConfig,
   {

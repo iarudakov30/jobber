@@ -63,3 +63,7 @@ __screenshots__/
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
 .vitest
+
+# Playwright (nexus-e2e) run output
+/apps/nexus-e2e/test-results
+/apps/nexus-e2e/playwright-report

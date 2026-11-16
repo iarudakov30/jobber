@@ -1,4 +1,4 @@
-import { GraphQLClient } from 'graphql-request';
+import { ClientError, GraphQLClient } from 'graphql-request';
 
 /**
  * A client for one backend's GraphQL endpoint. Paths are relative (`/api/auth`) and proxied by
@@ -11,3 +11,13 @@ export function graphqlClient(path: string): GraphQLClient {
 }
 
 export const authClient = graphqlClient('/api/auth');
+export const walletClient = graphqlClient('/api/wallet');
+
+/** The `extensions.code` of a GraphQL error response (`FORBIDDEN`, `CONFLICT`, ...). */
+export function graphqlErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof ClientError)) {
+    return undefined;
+  }
+  const code = error.response.errors?.[0]?.extensions?.['code'];
+  return typeof code === 'string' ? code : undefined;
+}

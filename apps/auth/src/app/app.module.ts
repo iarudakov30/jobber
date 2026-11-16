@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { join } from 'path';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ConfigModule } from '@nestjs/config';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
@@ -22,7 +23,10 @@ import { AuthModule } from './auth/auth.module';
       path: 'auth',
       playground: false,
       context: ({ req, res }) => ({ req, res }),
-      autoSchemaFile: true,
+      // Printed on startup (Nx runs the app from the workspace root) and committed: the React app's
+      // GraphQL Codegen reads it. src/app/schema.spec.ts fails when it's stale.
+      autoSchemaFile: join(process.cwd(), 'apps/auth/schema.gql'),
+      sortSchema: true,
     }),
     UsersModule,
     AuthModule,

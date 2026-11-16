@@ -21,12 +21,11 @@ Make jobber's messaging and jobs framework safe enough to build money on, and st
 **Done when:** a Pulsar stop/start and a forced `LoadProducts` redelivery both leave the job
 `COMPLETED` with no duplicate products. Both were verified, along with the end-to-end trace.
 
-## Phase 2 — Ledger core + React screens (~2.5 weeks, in progress)
+## Phase 2 — Ledger core + React screens (~2.5 weeks, done)
 
-Progress, step by step: [phase-2/README.md](phase-2/README.md). Step 1 (`apps/wallet`, ledger
-schema and triggers, `LedgerService.post`) step 2 (`libs/money`, `wallet.proto`,
-`FindUserByEmail`, `DrizzleOutboxStore`) step 3 (GraphQL and gRPC API, outbox relay,
-`wallet:seed`) step 4 (`libs/idempotency`, k6 load tests) and step 5 (nightly `LedgerAudit` job) are done.
+Done in six steps, each logged in [phase-2/README.md](phase-2/README.md): ledger core, contracts
+and libs, wallet API, idempotency (with the k6 runs), nightly audit, React screens. All spec
+acceptance tests pass.
 
 - `apps/wallet` (3004): Drizzle ledger schema (`assets`, `accounts`, `transactions`, `entries`), a
   deferred trigger that rejects unbalanced transactions, an append-only trigger on entries,

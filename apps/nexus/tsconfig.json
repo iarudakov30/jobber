@@ -4,7 +4,9 @@
     "allowJs": false,
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "types": ["vite/client", "vitest"]
+    "types": ["vite/client", "vitest"],
+    "target": "es2022",
+    "lib": ["es2023", "dom", "dom.iterable"]
   },
   "files": [],
   "include": [],

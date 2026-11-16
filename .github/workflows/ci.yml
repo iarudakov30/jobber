@@ -32,3 +32,12 @@ jobs:
 
       # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
       - run: npx nx affected -t lint test build
+
+      # The React app's generated GraphQL types must match the committed schema files
+      # (apps/auth/schema.gql, apps/wallet/schema.gql) and its documents: regenerate, then fail
+      # on any change or new file.
+      - name: GraphQL Codegen is up to date
+        run: |
+          npx nx run nexus:codegen --skip-nx-cache
+          git status --porcelain -- apps/nexus/src/gql
+          test -z "$(git status --porcelain -- apps/nexus/src/gql)"

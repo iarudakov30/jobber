@@ -21,9 +21,29 @@ export function AppShell() {
       </p>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link to="/" className="text-lg font-semibold tracking-tight">
-            NexusPay
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link to="/wallet" className="text-lg font-semibold tracking-tight">
+              NexusPay
+            </Link>
+            {user && (
+              <nav className="flex gap-4 text-sm">
+                <Link
+                  to="/wallet"
+                  className="text-slate-600 hover:text-slate-900"
+                  activeProps={{ className: 'font-medium text-slate-900' }}
+                >
+                  Wallet
+                </Link>
+                <Link
+                  to="/send"
+                  className="text-slate-600 hover:text-slate-900"
+                  activeProps={{ className: 'font-medium text-slate-900' }}
+                >
+                  Send
+                </Link>
+              </nav>
+            )}
+          </div>
           {user && (
             <div className="flex items-center gap-3 text-sm">
               <span className="text-slate-600">{user.email}</span>

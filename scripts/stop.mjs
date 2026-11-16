@@ -19,12 +19,16 @@ const PORTS = {
 function listeningPids(port) {
   try {
     if (process.platform === 'win32') {
-      return execSync('netstat -ano -p tcp', { encoding: 'utf8' })
+      // Not `-p tcp`: that lists IPv4 sockets only, and Vite's dev server (nexus) listens on
+      // [::1] alone.
+      return execSync('netstat -ano', { encoding: 'utf8' })
         .split('\n')
         .map((line) => line.trim().split(/\s+/))
         .filter(
-          ([, local, , state]) =>
-            state === 'LISTENING' && local?.endsWith(`:${port}`),
+          ([proto, local, , state]) =>
+            proto === 'TCP' &&
+            state === 'LISTENING' &&
+            local?.endsWith(`:${port}`),
         )
         .map((cols) => Number(cols[4]));
     }

@@ -11,7 +11,8 @@ import { AppShell } from './components/app-shell';
 import { AuthCard } from './features/auth/auth-card';
 import { LoginForm } from './features/auth/login-form';
 import { RegisterForm } from './features/auth/register-form';
-import { HomePage } from './features/home/home-page';
+import { SendPage } from './features/wallet/send-page';
+import { WalletPage } from './features/wallet/wallet-page';
 import { session } from './lib/session';
 
 interface LoginSearch {
@@ -27,15 +28,33 @@ export function safeReturnUrl(returnUrl: string | undefined): string {
 
 const rootRoute = createRootRoute({ component: AppShell });
 
+/** Pages that need a signed-in user send everyone else to the login page, and back after. */
+function requireSession({ location }: { location: { href: string } }) {
+  if (!session.get()) {
+    throw redirect({ to: '/login', search: { returnUrl: location.href } });
+  }
+}
+
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: ({ location }) => {
-    if (!session.get()) {
-      throw redirect({ to: '/login', search: { returnUrl: location.href } });
-    }
+  beforeLoad: () => {
+    throw redirect({ to: '/wallet' });
   },
-  component: HomePage,
+});
+
+const walletRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/wallet',
+  beforeLoad: requireSession,
+  component: WalletPage,
+});
+
+const sendRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/send',
+  beforeLoad: requireSession,
+  component: SendPage,
 });
 
 const loginRoute = createRoute({
@@ -102,14 +121,20 @@ const registerRoute = createRoute({
           </>
         }
       >
-        <RegisterForm onSuccess={() => router.navigate({ to: '/' })} />
+        <RegisterForm onSuccess={() => router.navigate({ to: '/wallet' })} />
       </AuthCard>
     );
   },
 });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([homeRoute, loginRoute, registerRoute]),
+  routeTree: rootRoute.addChildren([
+    homeRoute,
+    walletRoute,
+    sendRoute,
+    loginRoute,
+    registerRoute,
+  ]),
 });
 
 declare module '@tanstack/react-router' {
