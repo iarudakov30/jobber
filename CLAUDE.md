@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Start all services
 
 ```bash
-npm start                          # serves auth, jobs, executor, products, ui-admin and nexus concurrently
+npm start                          # serves auth, jobs, executor, products, wallet, ui-admin and nexus concurrently
 ```
 
 ### Individual app commands
@@ -19,7 +19,7 @@ npx nx test <app>                  # run tests
 npx nx lint <app>                  # lint
 ```
 
-Apps: `auth`, `jobs`, `executor`, `products`, `ui-admin`, `nexus`
+Apps: `auth`, `jobs`, `executor`, `products`, `wallet`, `ui-admin`, `nexus`
 
 ### Run a single test file
 
@@ -27,6 +27,7 @@ Apps: `auth`, `jobs`, `executor`, `products`, `ui-admin`, `nexus`
 npx nx test auth --testFile=apps/auth/src/app/auth/auth.service.spec.ts
 npx nx test ui-admin --include=apps/ui-admin/src/app/auth/session.spec.ts   # ui-admin uses Vitest, not Jest
 npx nx test nexus -- src/lib/session.spec.ts                    # nexus runs plain Vitest from apps/nexus
+npx nx test wallet                 # real PostgreSQL via Testcontainers: Docker must be running
 ```
 
 Node 25+ has a built-in global `localStorage` that is `undefined` without `--localstorage-file` and
@@ -184,7 +185,15 @@ npx nx run auth:generate    # regenerate Prisma client
 
 npx nx run products:generate-drizzle  # generate Drizzle migrations from schema
 npx nx run products:migrate-drizzle   # run Drizzle migrations
+
+npx nx run wallet:migrate-drizzle     # creates the `wallet` database if missing, then migrates
+npx nx run wallet:generate-drizzle --name=<name>            # migration from schema changes
+npx nx run wallet:generate-drizzle --custom --name=<name>   # empty SQL migration (triggers, seeds)
 ```
+
+`wallet:create-db` (`scripts/create-db.mjs`, run before `migrate-drizzle`) creates the database
+named in the project's `DATABASE_URL`; drizzle-kit won't. Nx reports `generate-drizzle` as
+successful even when drizzle-kit crashes, so check that a new `.sql` file appeared.
 
 ### Proto generation
 
@@ -195,13 +204,13 @@ npx nx run grpc:generate-ts-proto  # regenerate TypeScript from libs/grpc/src/li
 ### Utilities
 
 ```bash
-npm stop                           # kill Node processes on the app ports (3000-3003, gRPC 5000-5002, 4200, 4300)
+npm stop                           # kill Node processes on the app ports (3000-3004, gRPC 5000-5002, 4200, 4300)
 npm run cache-clean                # reset Nx cache and npm cache
 ```
 
 ## Architecture
 
-Nx monorepo with four NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
+Nx monorepo with five NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
 NexusPay pet project), and seven shared libraries.
 
 NexusPay (the wallet/payments learning project being built in this repo) is documented in
@@ -216,6 +225,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 | `jobs`     | 3001 | Job management (GraphQL + outbox to Pulsar + gRPC client)   |
 | `executor` | 3002 | Job execution (Pulsar consumer + gRPC client to `products`) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
+| `wallet`   | 3004 | NexusPay double-entry ledger (PostgreSQL/Drizzle)           |
 | `ui-admin` | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
 | `nexus`    | 4300 | React 19 + Vite frontend for NexusPay (`graphql-request`)   |
 
@@ -239,6 +249,28 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/app/jobs/fibonacci/fibonacci.consumer.ts` for the reference implementation.
 
 The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) follows the same pattern but its consumer (`apps/executor/src/app/jobs/products/load-products.consumer.ts`) additionally calls the `products` service over gRPC to persist the enriched product data via Drizzle.
+
+### Wallet ledger (`wallet`)
+
+NexusPay's money service (phase 2, in progress): the only service that changes balances. So far
+it has the ledger itself; GraphQL, gRPC `WalletService` and the outbox come next.
+
+- **Schema** (`apps/wallet/src/app/ledger/schema.ts`): `assets` (USD, scale 2), `accounts`
+  (owner + asset + kind, cached `balance`), `transactions` (`UNIQUE (type, external_ref)`),
+  `entries` (signed amounts). Amounts are `bigint` minor units everywhere; never JS numbers.
+- **Database guarantees** (custom migration `drizzle/0001_ledger_triggers.sql` plus constraints):
+  a deferred trigger rejects at COMMIT any transaction whose entries don't sum to zero per
+  asset; entries are append-only (UPDATE, DELETE, TRUNCATE raise); user accounts can't go
+  negative (`user_balance_non_negative`; system accounts like `seed` may); an entry's asset must
+  be its account's (`(account_id, asset)` foreign key).
+- **`LedgerService.post({ type, externalRef, legs })`** is the only way to move money: idempotent
+  by `(type, externalRef)` (returns `duplicate: true`, writes nothing), locks the touched accounts
+  in ascending id order with `FOR UPDATE` (no deadlocks), maps the balance check to
+  `InsufficientFundsError` and malformed postings to `InvalidPostingError`; on either, nothing is
+  written. `ensureAccounts(userId, asset)` / `ensureSystemAccount(name, asset)` create accounts
+  lazily.
+- Tests (`ledger.service.spec.ts`) run against a Testcontainers PostgreSQL 18 and check after
+  every test that each asset sums to zero and each cached balance equals its entries.
 
 ### Frontend (`ui-admin`)
 

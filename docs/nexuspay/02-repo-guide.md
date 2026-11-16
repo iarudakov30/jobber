@@ -13,8 +13,9 @@ apps/
   jobs/        NestJS — @Job framework; GraphQL; outbox → Pulsar; gRPC server (Acknowledge)
   executor/    NestJS — Pulsar consumers for job topics; gRPC clients to jobs and products
   products/    NestJS — product persistence (Drizzle); gRPC server (CreateProduct)
-  ui/          Angular 22 — the jobber jobs console
-  nexus/       React 19 + Vite — the NexusPay app (on feature/nexus-react-app for now)
+  wallet/      NestJS — NexusPay double-entry ledger (Drizzle)
+  ui-admin/    Angular 22 — the jobber jobs console
+  nexus/       React 19 + Vite — the NexusPay app
 libs/
   graphql/     AbstractModel, GqlContext, GqlAuthGuard
   grpc/        .proto contracts + generated TypeScript types, Packages enum
@@ -41,6 +42,7 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 | jobs | 3001 (`/jobs` GraphQL) | 5002 | `jobber` (Prisma) | Tables `Job`, `JobItem`, `outbox` |
 | executor | 3002 | — | — | Consumes job topics, subscription `jobber` |
 | products | 3003 | 5001 | `products` (Drizzle) | `products.source_ref` is unique |
+| wallet | 3004 | — | `wallet` (Drizzle) | Ledger; triggers keep postings balanced and entries append-only |
 | ui-admin | 4200 | — | — | Angular; proxies `/api/*` to 3000/3001 |
 | nexus | 4300 | — | — | React; Vite proxies `/api/auth` to 3000 |
 
@@ -69,6 +71,7 @@ Migrations:
 npx nx run auth:migrate-prisma            # auth (Prisma)
 cd apps/jobs && npx prisma migrate dev    # jobs (Prisma): Job, JobItem, outbox
 npx nx run products:migrate-drizzle       # products (Drizzle)
+npx nx run wallet:migrate-drizzle         # wallet (Drizzle); creates the database first
 ```
 
 **Low-memory alternative.** `npm start` runs a webpack watcher per app. On a machine with little
@@ -92,6 +95,7 @@ http://localhost:4300 for the React app.
 npx nx affected -t lint test build                 # what CI runs
 npx nx run-many -t lint test build --parallel=2    # everything, gentler on memory
 npx nx test pulsar                                 # one project (Jest)
+npx nx test wallet                                 # real PostgreSQL via Testcontainers: needs Docker
 npx nx test nexus -- src/lib/session.spec.ts       # one file (nexus uses Vitest)
 ```
 
