@@ -1,0 +1,10 @@
+.job-page {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+.job-page > p {
+  margin: 0;
+}

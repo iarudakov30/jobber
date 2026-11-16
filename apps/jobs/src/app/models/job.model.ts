@@ -22,4 +22,8 @@ export class Job {
 
   @Field({ nullable: true })
   ended?: Date;
+
+  /** The job's OpenTelemetry trace id; null when tracing was off. */
+  @Field(() => String, { nullable: true })
+  traceId?: string | null;
 }

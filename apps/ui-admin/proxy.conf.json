@@ -8,5 +8,10 @@
     "target": "http://localhost:3001",
     "pathRewrite": { "^/api": "" },
     "secure": false
+  },
+  "/api/jaeger": {
+    "target": "http://localhost:16686",
+    "pathRewrite": { "^/api/jaeger": "/api" },
+    "secure": false
   }
 }
