@@ -190,6 +190,8 @@ npx nx run products:migrate-drizzle   # run Drizzle migrations
 npx nx run wallet:migrate-drizzle     # creates the `wallet` database if missing, then migrates
 npx nx run wallet:generate-drizzle --name=<name>            # migration from schema changes
 npx nx run wallet:generate-drizzle --custom --name=<name>   # empty SQL migration (triggers, seeds)
+npx nx run wallet:seed                # with auth + wallet running: creates alice@/bob@example.com
+                                      # (password Test@1234) if missing, credits $100 each, once
 ```
 
 `wallet:create-db` (`scripts/create-db.mjs`, run before `migrate-drizzle`) creates the database
@@ -210,7 +212,7 @@ server passes `loader: GRPC_LOADER_OPTIONS` (`{ longs: String }`) so they arrive
 ### Utilities
 
 ```bash
-npm stop                           # kill Node processes on the app ports (3000-3004, gRPC 5000-5002, 4200, 4300)
+npm stop                           # kill Node processes on the app ports (3000-3004, gRPC 5000-5003, 4200, 4300)
 npm run cache-clean                # reset Nx cache and npm cache
 ```
 
@@ -231,14 +233,14 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 | `jobs`     | 3001 | Job management (GraphQL + outbox to Pulsar + gRPC client)   |
 | `executor` | 3002 | Job execution (Pulsar consumer + gRPC client to `products`) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
-| `wallet`   | 3004 | NexusPay double-entry ledger (PostgreSQL/Drizzle)           |
+| `wallet`   | 3004 | NexusPay ledger (GraphQL + gRPC server 5003 + PostgreSQL/Drizzle + outbox to Pulsar) |
 | `ui-admin` | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
 | `nexus`    | 4300 | React 19 + Vite frontend for NexusPay (`graphql-request`)   |
 
 ### Communication Patterns
 
 1. **GraphQL (external)** — clients talk to `auth` and `jobs` via Apollo GraphQL APIs
-2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email); `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
+2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email); other services call `wallet`'s `WalletService` (`Credit`, `GetBalances`, `RunAudit`); `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
 3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them
 
 ### Job Framework
@@ -258,9 +260,7 @@ The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) 
 
 ### Wallet ledger (`wallet`)
 
-NexusPay's money service (phase 2, in progress): the only service that changes balances. So far
-it has the ledger itself and its outbox table; GraphQL, gRPC `WalletService` (contract in
-`libs/grpc/src/lib/proto/wallet.proto`) and the outbox relay come next.
+NexusPay's money service (phase 2, in progress): the only service that changes balances.
 
 - **Schema** (`apps/wallet/src/app/ledger/schema.ts`): `assets` (USD, scale 2), `accounts`
   (owner + asset + kind, cached `balance`), `transactions` (`UNIQUE (type, external_ref)`),
@@ -277,10 +277,24 @@ it has the ledger itself and its outbox table; GraphQL, gRPC `WalletService` (co
   written. `outbox: (transactionId) => records` writes events in the same transaction through
   `DrizzleOutboxStore` (none for a duplicate or a refused posting). `ensureAccounts(userId, asset)` / `ensureSystemAccount(name, asset)` create accounts
   lazily.
+- **GraphQL** (`/wallet`, code-first, `apps/wallet/src/app/wallet/`): `balances`, `entries(asset, after,
+  first)` (newest first, cursor = last entry id), `transfer(input: { toEmail, asset, amount })`, all
+  behind `GqlAuthGuard`. Money is the `MinorUnits` scalar: a decimal string of minor units, never a
+  JSON number. Caller mistakes are `BAD_USER_INPUT` (or `BAD_REQUEST` from `ValidationPipe`) with
+  messages that start with the field name. The app prints its schema to `apps/wallet/schema.gql`
+  on startup (in `.prettierignore`); a test fails when the committed file is stale, so commit it
+  after changing the API.
+- **gRPC `WalletService`** (5003, `wallet.proto`): `Credit` (from `seed` or `stripe_clearing`;
+  `seed` is refused in production), `GetBalances`, `RunAudit` (`LedgerService.audit()`: cached
+  balances vs entries, unbalanced transactions, in one REPEATABLE READ snapshot).
+- **Outbox:** each transfer writes `transfer-completed` (`{ transactionId, fromUserId, toUserId,
+  asset, amount }`) in its transaction; `OutboxRelay` publishes it to Pulsar (no consumer yet).
+  `transfer` isn't idempotent yet: `@Idempotent()` is phase 2 step 4.
 - Amounts cross boundaries through `@jobber/money` (`parseAmount`, `formatAmount`, `toWire`,
   `fromWire`): `bigint` in code, a decimal string of minor units on the wire.
-- Tests (`ledger.service.spec.ts`) run against a Testcontainers PostgreSQL 18 and check after
-  every test that each asset sums to zero and each cached balance equals its entries.
+- Tests run against a Testcontainers PostgreSQL 18 (`src/testing/test-database.ts`) and check
+  after every test that each asset sums to zero and each cached balance equals its entries.
+  `wallet.api.spec.ts` drives the GraphQL API over HTTP with only `auth` and Pulsar faked.
 
 ### Frontend (`ui-admin`)
 
@@ -523,6 +537,30 @@ query {
     status
     started
     ended
+  }
+}
+```
+
+### 9. Wallet: balances, history and transfer
+
+**Endpoint:** `http://localhost:3004/wallet` (requires the auth cookie: log in at `auth` first)
+
+Run `npx nx run wallet:seed` first to get `alice@example.com` and `bob@example.com` (password
+`Test@1234`) with $100 each. Amounts are strings of minor units: `"1250"` is $12.50.
+
+```graphql
+query {
+  balances { asset available held }
+  entries(first: 20) { items { id type asset amount createdAt } nextCursor }
+}
+```
+
+```graphql
+mutation {
+  transfer(input: { toEmail: "bob@example.com", asset: "USD", amount: "1250" }) {
+    transactionId
+    amount
+    asset
   }
 }
 ```

@@ -27,13 +27,13 @@ actually built, and the spec describes the plan.
 
 ## Status
 
-| Phase                | Content                                                                                                         | State                                                             |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done**                                                          |
-| 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **In progress** (steps 1–2 done: ledger core, contracts and libs) |
-| 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | Planned                                                           |
-| 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | Planned                                                           |
-| 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned                                                           |
+| Phase                | Content                                                                                                         | State                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done**                                                                      |
+| 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **In progress** (steps 1–3 done: ledger core, contracts and libs, wallet API) |
+| 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | Planned                                                                       |
+| 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | Planned                                                                       |
+| 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned                                                                       |
 
 ## Branches (phase 1)
 

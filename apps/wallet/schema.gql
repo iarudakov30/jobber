@@ -1,0 +1,70 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+"""One asset's balances for the signed-in user."""
+type Balance {
+  asset: String!
+
+  """Spendable now."""
+  available: MinorUnits!
+
+  """Reserved, e.g. by open orders."""
+  held: MinorUnits!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type EntryPage {
+  """Newest first."""
+  items: [LedgerEntry!]!
+
+  """Pass as `after` for the next page; null on the last page."""
+  nextCursor: ID
+}
+
+"""A line of the user's history: one ledger entry."""
+type LedgerEntry {
+  """Negative when money left."""
+  amount: MinorUnits!
+  asset: String!
+  createdAt: DateTime!
+  id: ID!
+  transactionId: ID!
+
+  """The posting's kind: 'seed', 'transfer', ..."""
+  type: String!
+}
+
+"""
+An amount in minor units of its asset, as a decimal string: "1250" is $12.50.
+"""
+scalar MinorUnits
+
+type Mutation {
+  """Sends money to another user by email, from your available balance."""
+  transfer(input: TransferInput!): Transfer!
+}
+
+type Query {
+  """The signed-in user's balances."""
+  balances: [Balance!]!
+
+  """The signed-in user's ledger entries, newest first."""
+  entries(after: ID, asset: String, first: Int! = 50): EntryPage!
+}
+
+type Transfer {
+  amount: MinorUnits!
+  asset: String!
+  transactionId: ID!
+}
+
+input TransferInput {
+  amount: MinorUnits!
+  asset: String!
+  toEmail: String!
+}

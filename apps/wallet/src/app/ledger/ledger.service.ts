@@ -40,6 +40,13 @@ export interface PostingResult {
   duplicate: boolean;
 }
 
+export interface AuditIssue {
+  /** `balance_drift`: an account's cached balance differs from the sum of its entries.
+   *  `transaction_unbalanced`: a transaction's entries don't sum to zero in some asset. */
+  kind: 'balance_drift' | 'transaction_unbalanced';
+  detail: string;
+}
+
 export interface UserAccounts {
   available: bigint;
   held: bigint;
@@ -156,6 +163,59 @@ export class LedgerService {
       // The deferred entries_balanced trigger re-checks the sums at COMMIT.
       return { transactionId: created.id, duplicate: false };
     });
+  }
+
+  /**
+   * Recomputes the books from the entries and lists what doesn't match. Both checks read one
+   * REPEATABLE READ snapshot, so postings committing meanwhile can't show up as false drift.
+   * System accounts may be negative by design; that is not an issue.
+   */
+  async audit(): Promise<AuditIssue[]> {
+    return this.db.transaction(
+      async (tx) => {
+        const drifted = await tx.execute<{
+          id: string;
+          owner_type: string;
+          owner_id: string;
+          asset: string;
+          kind: string;
+          balance: string;
+          entries_total: string;
+        }>(sql`
+          SELECT a.id, a.owner_type, a.owner_id, a.asset, a.kind,
+                 a.balance::text, coalesce(e.total, 0)::text AS entries_total
+          FROM accounts a
+          LEFT JOIN (
+            SELECT account_id, sum(amount) AS total FROM entries GROUP BY account_id
+          ) e ON e.account_id = a.id
+          WHERE a.balance <> coalesce(e.total, 0)
+          ORDER BY a.id`);
+        const unbalanced = await tx.execute<{
+          transaction_id: string;
+          asset: string;
+          total: string;
+        }>(sql`
+          SELECT transaction_id, asset, sum(amount)::text AS total
+          FROM entries
+          GROUP BY transaction_id, asset
+          HAVING sum(amount) <> 0
+          ORDER BY transaction_id, asset`);
+
+        return [
+          ...drifted.rows.map((r) => ({
+            kind: 'balance_drift' as const,
+            detail:
+              `account ${r.id} (${r.owner_type} ${r.owner_id} ${r.asset} ${r.kind}): ` +
+              `balance ${r.balance}, entries sum to ${r.entries_total}`,
+          })),
+          ...unbalanced.rows.map((r) => ({
+            kind: 'transaction_unbalanced' as const,
+            detail: `transaction ${r.transaction_id}: ${r.asset} entries sum to ${r.total}`,
+          })),
+        ];
+      },
+      { isolationLevel: 'repeatable read', accessMode: 'read only' },
+    );
   }
 
   /** The user's `available` and `held` accounts for `asset`, created on first use. */

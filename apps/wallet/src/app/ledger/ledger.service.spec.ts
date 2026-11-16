@@ -1,12 +1,10 @@
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
 import { eq, sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { join } from 'path';
 import { Pool } from 'pg';
+import {
+  TestDatabase,
+  expectBooksBalanced,
+  startTestDatabase,
+} from '../../testing/test-database';
 import { InsufficientFundsError, InvalidPostingError } from './ledger.errors';
 import { LedgerDatabase, LedgerService } from './ledger.service';
 import * as schema from './schema';
@@ -17,16 +15,14 @@ import { accounts, entries, transactions } from './schema';
 
 const USD = 'USD';
 
-let container: StartedPostgreSqlContainer;
+let testDb: TestDatabase;
 let pool: Pool;
 let db: LedgerDatabase;
 let ledger: LedgerService;
 
 beforeAll(async () => {
-  container = await new PostgreSqlContainer('postgres:18-alpine').start();
-  pool = new Pool({ connectionString: container.getConnectionUri(), max: 20 });
-  db = drizzle(pool, { schema });
-  await migrate(db, { migrationsFolder: join(__dirname, '../../../drizzle') });
+  testDb = await startTestDatabase();
+  ({ pool, db } = testDb);
   // A second asset, to check that an entry can't land on an account of another asset.
   await db.insert(schema.assets).values({ code: 'XTS', scale: 2 });
   ledger = new LedgerService(db);
@@ -34,24 +30,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await pool?.end();
-  await container?.stop();
+  await testDb?.container.stop();
 });
 
-// Whatever a test did, the books must still balance.
-afterEach(async () => {
-  const { rows: assetSums } = await pool.query(
-    'SELECT asset, sum(balance)::text AS total FROM accounts GROUP BY asset',
-  );
-  for (const row of assetSums) {
-    expect(row).toEqual({ asset: row.asset, total: '0' });
-  }
-  const { rows: drifted } = await pool.query(`
-    SELECT a.id FROM accounts a
-    LEFT JOIN entries e ON e.account_id = a.id
-    GROUP BY a.id, a.balance
-    HAVING a.balance <> coalesce(sum(e.amount), 0)`);
-  expect(drifted).toEqual([]);
-});
+afterEach(() => expectBooksBalanced(pool));
 
 let lastId = 0;
 const nextId = () => `${Date.now()}-${++lastId}`;
@@ -437,5 +419,39 @@ describe('concurrency', () => {
     expect(new Set(results.map((r) => r.available)).size).toBe(1);
     expect(new Set(results.map((r) => r.held)).size).toBe(1);
     expect(results[0].available).not.toBe(results[0].held);
+  });
+});
+
+describe('LedgerService.audit', () => {
+  it('finds nothing wrong in sound books, negative system accounts included', async () => {
+    await newUser(500n);
+
+    expect(await ledger.audit()).toEqual([]);
+  });
+
+  it('names exactly the account whose cached balance was corrupted', async () => {
+    const alice = await newUser(500n);
+    await pool.query(
+      'UPDATE accounts SET balance = balance + 1 WHERE id = $1',
+      [String(alice)],
+    );
+    try {
+      expect(await ledger.audit()).toEqual([
+        {
+          kind: 'balance_drift',
+          detail: expect.stringMatching(
+            new RegExp(
+              String.raw`^account ${alice} \(user \S+ USD available\): ` +
+                'balance 501, entries sum to 500$',
+            ),
+          ),
+        },
+      ]);
+    } finally {
+      await pool.query(
+        'UPDATE accounts SET balance = balance - 1 WHERE id = $1',
+        [String(alice)],
+      );
+    }
   });
 });

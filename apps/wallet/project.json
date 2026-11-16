@@ -80,6 +80,12 @@
       "options": {
         "cwd": "{projectRoot}"
       }
+    },
+    "seed": {
+      "command": "node ../../scripts/wallet-seed.mjs",
+      "options": {
+        "cwd": "{projectRoot}"
+      }
     }
   },
   "tags": []
