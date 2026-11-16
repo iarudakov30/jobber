@@ -44,6 +44,9 @@ export default defineConfig(() => ({
     watch: false,
     globals: true,
     environment: 'jsdom',
+    // Node 25+ defines its own global `localStorage`, which is `undefined` without
+    // `--localstorage-file` and hides jsdom's. Turn it off in the test workers.
+    execArgv: ['--no-webstorage'],
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {

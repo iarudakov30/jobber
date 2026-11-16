@@ -29,6 +29,11 @@ npx nx test ui-admin --include=apps/ui-admin/src/app/auth/session.spec.ts   # ui
 npx nx test nexus -- src/lib/session.spec.ts                    # nexus runs plain Vitest from apps/nexus
 ```
 
+Node 25+ has a built-in global `localStorage` that is `undefined` without `--localstorage-file` and
+hides jsdom's, so both frontends start their Vitest workers with `--no-webstorage`
+(`apps/nexus/vite.config.mts`; `apps/ui-admin/vitest-base.config.mts`, loaded through
+`runnerConfig: true` in its `project.json`).
+
 ### Run all affected tasks (CI pattern)
 
 ```bash
