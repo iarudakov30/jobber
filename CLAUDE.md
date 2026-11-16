@@ -231,7 +231,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 | ---------- | ---- | ----------------------------------------------------------- |
 | `auth`     | 3000 | User auth (GraphQL + PostgreSQL/Prisma + gRPC server)       |
 | `jobs`     | 3001 | Job management (GraphQL + outbox to Pulsar + gRPC client)   |
-| `executor` | 3002 | Job execution (Pulsar consumer + gRPC client to `products`) |
+| `executor` | 3002 | Job execution (Pulsar consumer + gRPC clients to `jobs`, `products`, `wallet`) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
 | `wallet`   | 3004 | NexusPay ledger (GraphQL + gRPC server 5003 + PostgreSQL/Drizzle + outbox to Pulsar) |
 | `ui-admin` | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
@@ -255,6 +255,12 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 - Test hook: start the executor with `FAULT_ACK_FAILURES=<n>` (ignored when `NODE_ENV=production`) and its first n messages fail after `execute`, forcing redeliveries.
 
 See `apps/jobs/src/app/jobs/fibonacci/fibonacci.job.ts` and `apps/executor/src/app/jobs/fibonacci/fibonacci.consumer.ts` for the reference implementation.
+
+The `LedgerAudit` job (`apps/jobs/src/app/jobs/ledger-audit/`) is started nightly at 03:00 UTC by
+`LedgerAuditScheduler` (`@nestjs/schedule`; `LEDGER_AUDIT_CRON` in the `jobs` env overrides the
+cron expression, `off` disables it) or by hand with `executeJob(name: "LedgerAudit", data: {})`.
+Its consumer (`apps/executor/src/app/jobs/ledger-audit/`) calls the wallet's gRPC `RunAudit` and
+logs "no issues" or one ERROR line per issue; issues don't fail the job.
 
 The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) follows the same pattern but its consumer (`apps/executor/src/app/jobs/products/load-products.consumer.ts`) additionally calls the `products` service over gRPC to persist the enriched product data via Drizzle.
 

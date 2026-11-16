@@ -41,6 +41,9 @@ spec:
             {{- include "common.env" . | nindent 12 }}
             - name: AUTH_GRPC_SERVICE_URL
               value: "auth-grpc:{{ .Values.auth.port.grpc }}"
+            # The chart doesn't deploy the wallet yet, so there is no ledger to audit.
+            - name: LEDGER_AUDIT_CRON
+              value: "off"
             - name: PORT
               value: "{{ .Values.jobs.port.http }}"
             - name: JOBS_GRPC_SERVICE_URL

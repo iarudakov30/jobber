@@ -11,7 +11,7 @@ person.
 apps/
   auth/        NestJS — users, login, JWT cookie; GraphQL + gRPC server (Authenticate, FindUserByEmail)
   jobs/        NestJS — @Job framework; GraphQL; outbox → Pulsar; gRPC server (Acknowledge)
-  executor/    NestJS — Pulsar consumers for job topics; gRPC clients to jobs and products
+  executor/    NestJS — Pulsar consumers for job topics; gRPC clients to jobs, products and wallet
   products/    NestJS — product persistence (Drizzle); gRPC server (CreateProduct)
   wallet/      NestJS — NexusPay double-entry ledger (Drizzle); GraphQL; gRPC server
                (Credit, GetBalances, RunAudit); outbox → Pulsar

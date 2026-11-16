@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { LoggerModule } from '@jobber/nestjs';
@@ -14,6 +15,8 @@ import { PrismaModule } from './prisma/prisma.module';
     UploadsModule,
     PrismaModule,
     ConfigModule.forRoot({ isGlobal: true, envFilePath: 'apps/jobs/.env' }),
+    // Crons (the nightly LedgerAudit); stops them on shutdown.
+    ScheduleModule.forRoot(),
     JobsModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,

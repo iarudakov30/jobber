@@ -84,6 +84,8 @@ services:
       JOBS_GRPC_SERVICE_URL: 0.0.0.0:5001
       AUTH_GRPC_SERVICE_URL: auth:5000
       PULSAR_SERVICE_URL: pulsar://pulsar:6650
+      # The wallet isn't part of this stack yet, so there is no ledger to audit.
+      LEDGER_AUDIT_CRON: 'off'
       NODE_ENV: production
     depends_on:
       jobs-migrate:

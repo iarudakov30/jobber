@@ -13,7 +13,7 @@ From phase 2 on, work is committed straight to `main` (no feature branches).
 | 2. Contracts and libs | `libs/money`, `wallet.proto` + `FindUserByEmail`, `DrizzleOutboxStore`                                                                    | [02-contracts.md](02-contracts.md)     |
 | 3. Wallet API         | GraphQL `balances` / `entries` / `transfer`, gRPC `WalletService` (incl. `RunAudit`), outbox relay, `wallet:seed`; spec acceptance test 7 | [03-wallet-api.md](03-wallet-api.md)   |
 | 4. Idempotency        | `libs/idempotency` (`@Idempotent()`, PostgreSQL row + Redis lock), k6 load tests; spec acceptance tests 2–6                               | [04-idempotency.md](04-idempotency.md) |
-| 5. Audit job          | `LedgerAudit` job in jobs (nightly) + executor consumer calling `RunAudit`                                                                | Next                                   |
-| 6. React screens      | Wallet and Send pages, GraphQL Codegen, Playwright                                                                                        | Planned                                |
+| 5. Audit job          | `LedgerAudit` job in jobs (nightly, `@nestjs/schedule`) + executor consumer calling `RunAudit`; spec acceptance test 7 through the job    | [05-audit-job.md](05-audit-job.md)     |
+| 6. React screens      | Wallet and Send pages, GraphQL Codegen, Playwright                                                                                        | Next                                   |
 
 The steps after 1 are a proposed order, not part of the spec; adjust as they're built.
