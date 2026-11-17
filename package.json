@@ -43,7 +43,8 @@
     "@jobber/outbox": "dist/libs/outbox/main",
     "@jobber/tracing": "dist/libs/tracing/main",
     "@jobber/money": "dist/libs/money/main",
-    "@jobber/idempotency": "dist/libs/idempotency/main"
+    "@jobber/idempotency": "dist/libs/idempotency/main",
+    "@jobber/rabbitmq": "dist/libs/rabbitmq/main"
   },
   "overrides": {
     "@apollo/server": "^5.5.1"

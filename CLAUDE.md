@@ -31,6 +31,8 @@ npx nx run nexus-e2e:e2e           # Playwright against running auth + wallet (s
 npx nx run nexus:codegen           # GraphQL types from apps/{auth,wallet}/schema.gql; CI fails if stale
 npx nx test wallet                 # real PostgreSQL via Testcontainers: Docker must be running
 npx nx test outbox                 # likewise (DrizzleOutboxStore spec)
+npx nx test rabbitmq               # Testcontainers RabbitMQ (retries, DLQ, delay buckets, reconnect)
+npx nx run rabbitmq:replay --queue=<name>   # move <name>.dlq back to <name> (RABBITMQ_URL, default localhost)
 ```
 
 Node 25+ has a built-in global `localStorage` that is `undefined` without `--localstorage-file` and
@@ -47,7 +49,7 @@ npx nx affected -t lint test build
 ### Infrastructure
 
 ```bash
-docker compose up -d               # start PostgreSQL, Pulsar, Redis, Mailpit and Jaeger
+docker compose up -d               # start PostgreSQL, Pulsar, RabbitMQ, Redis, Mailpit and Jaeger
 docker compose up -d pulsar jaeger # or just what you need
 docker compose down
 ```
@@ -56,6 +58,7 @@ docker compose down
 | -------- | ---------------------- | ---------------------- |
 | Postgres | 5432                   |                        |
 | Pulsar   | 6650                   |                        |
+| RabbitMQ | 5672                   | http://localhost:15672 (guest / guest) |
 | Redis    | 6379                   |                        |
 | Mailpit  | 1025 (SMTP)            | http://localhost:8025  |
 | Jaeger   | 4318 (OTLP/HTTP)       | http://localhost:16686 |
@@ -221,7 +224,7 @@ npm run cache-clean                # reset Nx cache and npm cache
 ## Architecture
 
 Nx monorepo with five NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
-NexusPay pet project), and nine shared libraries.
+NexusPay pet project), and ten shared libraries.
 
 NexusPay (the wallet/payments learning project being built in this repo) is documented in
 `docs/nexuspay/`: purpose and architecture, repo guide, roadmap, and a step-by-step log of what
@@ -394,6 +397,12 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 - **`@jobber/money`** (`libs/money`) — amounts as `bigint` minor units: `ASSETS` (USD, scale 2), `parseAmount` ("12.34" → `1234n`, never rounds), `formatAmount` (exact, via `Intl.NumberFormat` on a decimal string), `toWire`/`fromWire` (canonical decimal strings). No framework imports, so `nexus` can use it too.
 - **`@jobber/idempotency`** (`libs/idempotency`) — `@Idempotent({ operation })` for GraphQL resolvers and HTTP handlers (`IdempotencyInterceptor`), `@IdempotencyKey()` to read the key in the handler, `DrizzleIdempotencyStore` + `idempotencyKeysTable()` (import the table from `@jobber/idempotency/table` in Drizzle schema files: drizzle-kit can't load the decorators), `RedisIdempotencyLock` (no offline queue: fails fast when Redis is down), `IdempotencyCleanup` (hourly expiry). The module provides `IDEMPOTENCY_STORE` and optionally `IDEMPOTENCY_LOCK`; see `apps/wallet/src/app/wallet/wallet.module.ts`.
 - **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`, or `DrizzleOutboxStore.enqueue(tx, records)` for Drizzle apps), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. Delivery is at-least-once.
+- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. No app uses it yet (NexusPay phase 3, step 1).
+  - The connection reconnects in the background (1 s → 30 s backoff) and re-declares the topology (`declareTopology()`: exchanges, quorum queues, `<queue>.retry.<n>` TTL queues, `<queue>.dlq`, delay buckets) on every connect. The app starts while RabbitMQ is down; publishes then reject at once with `RabbitUnavailableError` (the outbox retries them).
+  - `RabbitPublisher.publish(exchange, routingKey, payload, { messageId, headers?, persistent?, expirationMs? })` sends JSON on a confirm channel, resolves when the broker confirms, and adds `traceparent` to the headers.
+  - `RabbitConsumer<T>` (extend it, inject `RabbitConnection`, name the queue; default prefetch 10): `onMessage(data, meta)` gets `messageId`, `routingKey` (the original, kept through retries and delay buckets in `x-original-routing-key`), string `headers` and `attempt`. A throw copies the message to the next retry queue (`x-attempt` + 1, default delays 5 s / 30 s / 5 min, 5 attempts) and acks the original; after the last attempt, or at once for `NonRetryableError` or non-JSON, the copy goes to `<queue>.dlq` with `x-dead-letter-reason`.
+  - Delay bucket: publish to the fanout exchange (e.g. `delay.30m`) with the command's routing key; after the TTL the message reaches the bucket's `target` exchange with that key. Never publish to the bucket queue through the default exchange (that replaces the key).
+  - amqplib is pinned to 2.2.1 (it bundles its own types).
 - **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, a `send()` helper (key, properties, `sequenceId`), and job message DTOs (`FibonacciMessage`, `LoadProductsMessage`)
   - Consumers take `ConsumerOptions`: subscription (default `jobber`, which job consumers keep), type (default `Shared`), redelivery delay (5 s) and max redeliveries (5) before Pulsar moves the message to `<topic>-<subscription>-DLQ`. Give each service that consumes the same topic its own subscription, or they split the messages instead of each getting all of them.
   - `onMessage(data, meta)` gets the message id, partition key, properties and redelivery count. Throwing `NonRetryableError` (or sending unparseable JSON) dead-letters the message at once; any other error nacks it for redelivery. Only a failed handler nacks, never a failed ack, so handlers must tolerate the occasional repeat.
@@ -419,7 +428,9 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
   `jobs`. Known gap: `auth`'s gRPC server records no spans yet, though the `jobs` side of that
   call does.
 - Redis backs the wallet's idempotency fast path (`REDIS_URL`); the wallet keeps working without
-  it. Mailpit runs in compose but no app uses it until NexusPay phase 3.
+  it. Mailpit and RabbitMQ run in compose but no app uses them yet (NexusPay phase 3).
+- RabbitMQ names its data directory after the host name, so the compose service has a fixed
+  `hostname: rabbitmq`; without it a recreated container starts empty.
 
 ### Git Hooks
 

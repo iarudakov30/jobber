@@ -22,7 +22,20 @@ services:
     volumes:
       - pulsar_data:/pulsar/data
 
-  # Not used yet: rate limits, idempotency locks and quotes from phase 2 on.
+  # Commands, delayed commands and email (NexusPay phase 3). Management UI at
+  # http://localhost:15672 (guest / guest).
+  rabbitmq:
+    image: rabbitmq:4-management
+    # RabbitMQ names its data directory after the host name; a fixed one keeps the data when
+    # compose recreates the container.
+    hostname: rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # Idempotency fast path for the wallet; later rate limits and quotes.
   redis:
     image: redis:7
     ports:
@@ -45,3 +58,4 @@ services:
 volumes:
   postgres_data:
   pulsar_data:
+  rabbitmq_data:

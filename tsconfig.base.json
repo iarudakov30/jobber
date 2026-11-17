@@ -27,6 +27,7 @@
       "@jobber/tracing": ["libs/tracing/src/index.ts"],
       "@jobber/money": ["libs/money/src/index.ts"],
       "@jobber/idempotency": ["libs/idempotency/src/index.ts"],
+      "@jobber/rabbitmq": ["libs/rabbitmq/src/index.ts"],
       "@jobber/idempotency/table": [
         "libs/idempotency/src/lib/idempotency-keys.table.ts"
       ]

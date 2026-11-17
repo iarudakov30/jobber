@@ -29,6 +29,8 @@ libs/
                PulsarOutboxPublisher
   money/       bigint minor units: ASSETS, parseAmount, formatAmount, toWire/fromWire
   idempotency/ @Idempotent() (Idempotency-Key): PostgreSQL store, Redis fast path, cleanup
+  rabbitmq/    RabbitConnection (reconnect), RabbitPublisher (confirms), RabbitConsumer<T>
+               (retry queues, DLQ), delay buckets, DLQ replay script
   tracing/     startTracing() — OpenTelemetry bootstrap
 charts/jobber  Helm chart (minikube / EKS)
 docs/          These documents and other guides
@@ -56,6 +58,7 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 | ------------------------------------ | ---------------- | ---------------------- |
 | PostgreSQL                           | 5432             | —                      |
 | Pulsar (standalone, broker dedup on) | 6650             | —                      |
+| RabbitMQ (`rabbitmq:4-management`)   | 5672             | http://localhost:15672 (guest / guest) |
 | Redis                                | 6379             | —                      |
 | Mailpit                              | 1025 (SMTP)      | http://localhost:8025  |
 | Jaeger                               | 4318 (OTLP/HTTP) | http://localhost:16686 |
@@ -106,6 +109,8 @@ npx nx test wallet                                 # real PostgreSQL via Testcon
 npx nx test outbox                                 # also Testcontainers (DrizzleOutboxStore)
 npx nx test money                                  # amount parsing and formatting
 npx nx test idempotency                            # Testcontainers PostgreSQL + Redis
+npx nx test rabbitmq                               # Testcontainers RabbitMQ: retries, DLQ, delays
+npx nx run rabbitmq:replay --queue=<name>          # move <name>.dlq back to <name>
 npx nx run wallet:load-test overdraft              # k6 in Docker against running auth + wallet
                                                    # (also: deadlock, same-key)
 npx nx test nexus -- src/lib/session.spec.ts       # one file (nexus uses Vitest)

@@ -16,7 +16,8 @@ These documents let anyone (including future you) pick the project up cold and u
 | 2   | [Repo guide](02-repo-guide.md)                             | How the monorepo is laid out, how to run, test and debug it, known gotchas                          |
 | 3   | [Roadmap](03-roadmap.md)                                   | The five phases, what each delivers, the decisions already taken                                    |
 | 4   | [Phase 1 — step by step](phase-1/README.md)                | What was actually built in phase 1, step by step, and how each step was verified                    |
-| 4b  | [Phase 2 — step by step](phase-2/README.md)                | The same for phase 2, as it's built                                                                 |
+| 4b  | [Phase 2 — step by step](phase-2/README.md)                | The same for phase 2                                                                                |
+| 4c  | [Phase 3 — step by step](phase-3/README.md)                | The same for phase 3, as it's built                                                                 |
 | 5   | [React app guide](react-app-guide.md)                      | How `apps/nexus` is structured and why, layer by layer, with Angular parallels — for learning React |
 
 The full design spec, with detailed per-phase specs (scope, design, tasks, acceptance tests,
@@ -31,7 +32,7 @@ actually built, and the spec describes the plan.
 | -------------------- | --------------------------------------------------------------------------------------------------------------- | -------- |
 | 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done** |
 | 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **Done** |
-| 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | Planned  |
+| 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | **In progress** (step 1, `libs/rabbitmq`, done) |
 | 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | Planned  |
 | 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned  |
 
