@@ -74,3 +74,11 @@ Progress, step by step: [phase-3/README.md](phase-3/README.md). Step 1 (`libs/ra
 - **Done when:** the reconciliation job reports zero issues after a scripted day of real
   test-mode activity.
 - Optional stretch: swap `auth` for Keycloak.
+
+## Alongside the phases — production drills
+
+Four break-measure-fix experiments on the existing services, done whenever there's a gap between
+phases: a rollout under load without lost requests, event loop blocking in `executor`, a crash
+inside a consumer, a memory leak hunt in `wallet`. Task lists and results:
+[production-drills.md](production-drills.md). Drill 1 also brings health probes and SIGTERM
+handling to the Helm chart, which phase 5 needs for the new apps anyway.

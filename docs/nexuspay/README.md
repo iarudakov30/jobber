@@ -19,6 +19,7 @@ These documents let anyone (including future you) pick the project up cold and u
 | 4b  | [Phase 2 — step by step](phase-2/README.md)                | The same for phase 2                                                                                |
 | 4c  | [Phase 3 — step by step](phase-3/README.md)                | The same for phase 3, as it's built                                                                 |
 | 5   | [React app guide](react-app-guide.md)                      | How `apps/nexus` is structured and why, layer by layer, with Angular parallels — for learning React |
+| 6   | [Production drills](production-drills.md)                  | Four break-measure-fix experiments: rollout under load, event loop blocking, crashes, memory leaks  |
 
 The full design spec, with detailed per-phase specs (scope, design, tasks, acceptance tests,
 risks), lives in Claude Docs:
@@ -28,13 +29,13 @@ actually built, and the spec describes the plan.
 
 ## Status
 
-| Phase                | Content                                                                                                         | State    |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- | -------- |
-| 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done** |
-| 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **Done** |
+| Phase                | Content                                                                                                         | State                                           |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done**                                        |
+| 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **Done**                                        |
 | 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | **In progress** (step 1, `libs/rabbitmq`, done) |
-| 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | Planned  |
-| 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned  |
+| 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | Planned                                         |
+| 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned                                         |
 
 ## Branches (phase 1)
 
