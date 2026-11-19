@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Start all services
 
 ```bash
-npm start                          # serves auth, jobs, executor, products, wallet, ui-admin and nexus concurrently
+npm start                          # serves auth, jobs, executor, products, wallet, payments, ui-admin and nexus concurrently
 ```
 
 ### Individual app commands
@@ -19,7 +19,7 @@ npx nx test <app>                  # run tests
 npx nx lint <app>                  # lint
 ```
 
-Apps: `auth`, `jobs`, `executor`, `products`, `wallet`, `ui-admin`, `nexus` (plus `nexus-e2e`, Playwright)
+Apps: `auth`, `jobs`, `executor`, `products`, `wallet`, `payments`, `ui-admin`, `nexus` (plus `nexus-e2e`, Playwright)
 
 ### Run a single test file
 
@@ -31,6 +31,7 @@ npx nx run nexus-e2e:e2e           # Playwright against running auth + wallet (s
 npx nx run nexus:codegen           # GraphQL types from apps/{auth,wallet}/schema.gql; CI fails if stale
 npx nx test wallet                 # real PostgreSQL via Testcontainers: Docker must be running
 npx nx test outbox                 # likewise (DrizzleOutboxStore spec)
+npx nx test payments               # Testcontainers PostgreSQL + RabbitMQ; Stripe faked, signatures real
 npx nx test rabbitmq               # Testcontainers RabbitMQ (retries, DLQ, delay buckets, reconnect)
 npx nx run rabbitmq:replay --queue=<name>   # move <name>.dlq back to <name> (RABBITMQ_URL, default localhost)
 ```
@@ -195,6 +196,7 @@ npx nx run products:migrate-drizzle   # run Drizzle migrations
 npx nx run wallet:migrate-drizzle     # creates the `wallet` database if missing, then migrates
 npx nx run wallet:generate-drizzle --name=<name>            # migration from schema changes
 npx nx run wallet:generate-drizzle --custom --name=<name>   # empty SQL migration (triggers, seeds)
+npx nx run payments:migrate-drizzle   # creates the `payments` database if missing, then migrates
 npx nx run wallet:seed                # with auth + wallet running: creates alice@/bob@example.com
                                       # (password Test@1234) if missing, credits $100 each, once
 ```
@@ -217,13 +219,13 @@ server passes `loader: GRPC_LOADER_OPTIONS` (`{ longs: String }`) so they arrive
 ### Utilities
 
 ```bash
-npm stop                           # kill Node processes on the app ports (3000-3004, gRPC 5000-5003, 4200, 4300)
+npm stop                           # kill Node processes on the app ports (3000-3005, gRPC 5000-5003, 4200, 4300)
 npm run cache-clean                # reset Nx cache and npm cache
 ```
 
 ## Architecture
 
-Nx monorepo with five NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
+Nx monorepo with six NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
 NexusPay pet project), and ten shared libraries.
 
 NexusPay (the wallet/payments learning project being built in this repo) is documented in
@@ -239,6 +241,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 | `executor` | 3002 | Job execution (Pulsar consumer + gRPC clients to `jobs`, `products`, `wallet`) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
 | `wallet`   | 3004 | NexusPay ledger (GraphQL + gRPC server 5003 + PostgreSQL/Drizzle + outbox to Pulsar) |
+| `payments` | 3005 | NexusPay Stripe top-ups (GraphQL + Stripe webhook + PostgreSQL/Drizzle + outbox to Pulsar and RabbitMQ) |
 | `ui-admin` | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
 | `nexus`    | 4300 | React 19 + Vite frontend for NexusPay (`graphql-request`)   |
 
@@ -314,6 +317,49 @@ NexusPay's money service (phase 2, in progress): the only service that changes b
 - Tests run against a Testcontainers PostgreSQL 18 (`src/testing/test-database.ts`) and check
   after every test that each asset sums to zero and each cached balance equals its entries.
   `wallet.api.spec.ts` drives the GraphQL API over HTTP with only `auth` and Pulsar faked.
+
+### Payments (`payments`)
+
+NexusPay's Stripe Checkout top-ups (phase 3, `apps/payments`, port 3005). It never changes
+balances: it announces `payment-succeeded` and the wallet credits it (phase 3, step 4).
+
+- **Schema** (`apps/payments/src/app/payments/schema.ts`): `payments` (uuid id, `user_id`,
+  `amount` bigint 100..100000, `currency` USD, `status` PENDING | SUCCEEDED | EXPIRED | FAILED,
+  unique `stripe_session_id`), `stripe_events` (event id primary key: each webhook event applies
+  once), `recon_issues` (money and records that disagree; nothing is credited), plus `outbox` and
+  `idempotency_keys`. Every state change is `UPDATE … WHERE id = $1 AND status = 'PENDING'`.
+- **GraphQL** (`/payments`, behind `GqlAuthGuard`): `createTopUp(input: { amount })`
+  (`@Idempotent()`, needs an `Idempotency-Key` header; USD 1 to 1,000, at most USD 2,000 per user
+  per rolling 24 h counting PENDING and SUCCEEDED, else `BAD_USER_INPUT`; Stripe down gives
+  `PAYMENT_PROVIDER_UNAVAILABLE`), `payment(id)` (null unless it's the caller's),
+  `payments(first)`. Schema printed to `apps/payments/schema.gql` (a test fails when stale).
+- **`createTopUp`:** transaction 1 inserts PENDING and puts `payment.expire` in the outbox for the
+  delay bucket `PAYMENT_EXPIRY_BUCKET` (`delay.30m`); then, outside any transaction,
+  `checkout.sessions.create` (idempotency key `checkout-session:<paymentId>`, metadata and
+  `client_reference_id` = payment id, `success_url = APP_URL/wallet?topup=<id>`, expires in
+  31 min); then the session id is stored, or the payment is set FAILED.
+- **Webhook** `POST /payments/webhooks/stripe`: `main.ts` creates the app with `rawBody: true`;
+  `constructEvent` on the raw body or 400 (503 while `STRIPE_WEBHOOK_SECRET` is unset).
+  `applyStripeEvent` runs in one transaction: insert the event id (a duplicate stops there), then
+  `checkout.session.completed` + paid sets SUCCEEDED and writes `payment-succeeded` (Pulsar, key
+  `userId`), unless the payment isn't PENDING or the amount, currency or session differs (a recon
+  issue instead). `checkout.session.expired` sets EXPIRED.
+- **Expiry** (`PaymentCommandsConsumer` on `payments.commands`): calls Stripe's
+  `sessions.expire` first. If Stripe refuses because the session is complete and paid, it settles
+  the payment like the webhook would; an unreachable Stripe throws and the command retries.
+- **Stripe client** (`stripe.client.ts`): `stripe` 23.1.0 pinned, `apiVersion`
+  `2026-10-28.endive` pinned; upgrade both together.
+- **Secrets:** `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` live in `apps/payments/.env.local`
+  (gitignored; `ConfigModule` reads it before `.env`). Every `apps/*/.env` is committed, so
+  never put a secret there.
+- **Stripe CLI** for local webhooks: `stripe login` once, then
+  `stripe listen --forward-to localhost:3005/payments/webhooks/stripe` and copy the printed
+  `whsec_…` into `.env.local`. It changes with every `stripe listen` session, so restart
+  `payments` after. Watch an unpaid top-up expire after a minute with
+  `PAYMENT_EXPIRY_BUCKET=delay.1m`.
+- Tests (`payments.api.spec.ts`) run the real app against Testcontainers PostgreSQL and RabbitMQ
+  (`delay.1m` shortened to 2 s) with `auth`, Pulsar and Stripe's Checkout API faked; webhook
+  signatures are made with `stripe.webhooks.generateTestHeaderString`.
 
 ### Frontend (`ui-admin`)
 
@@ -397,7 +443,7 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 - **`@jobber/money`** (`libs/money`) — amounts as `bigint` minor units: `ASSETS` (USD, scale 2), `parseAmount` ("12.34" → `1234n`, never rounds), `formatAmount` (exact, via `Intl.NumberFormat` on a decimal string), `toWire`/`fromWire` (canonical decimal strings). No framework imports, so `nexus` can use it too.
 - **`@jobber/idempotency`** (`libs/idempotency`) — `@Idempotent({ operation })` for GraphQL resolvers and HTTP handlers (`IdempotencyInterceptor`), `@IdempotencyKey()` to read the key in the handler, `DrizzleIdempotencyStore` + `idempotencyKeysTable()` (import the table from `@jobber/idempotency/table` in Drizzle schema files: drizzle-kit can't load the decorators), `RedisIdempotencyLock` (no offline queue: fails fast when Redis is down), `IdempotencyCleanup` (hourly expiry). The module provides `IDEMPOTENCY_STORE` and optionally `IDEMPOTENCY_LOCK`; see `apps/wallet/src/app/wallet/wallet.module.ts`.
 - **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`, or `DrizzleOutboxStore.enqueue(tx, records)` for Drizzle apps), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. `RabbitOutboxPublisher` (records with `transport: 'rabbitmq'`) publishes to the exchange `destination` with routing key `key` (a delay bucket such as `delay.30m` delays a command) and `messageId = outbox-<service>-<id>`; RabbitMQ doesn't deduplicate, so consumers dedupe on that id. One relay takes both publishers. Delivery is at-least-once.
-- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. No app uses it yet (NexusPay phase 3, steps 1–2).
+- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. Used by `payments` (`commands` exchange, `payments.commands`, delay buckets).
   - The connection reconnects in the background (1 s → 30 s backoff) and re-declares the topology (`declareTopology()`: exchanges, quorum queues, `<queue>.retry.<n>` TTL queues, `<queue>.dlq`, delay buckets) on every connect. The app starts while RabbitMQ is down; publishes then reject at once with `RabbitUnavailableError` (the outbox retries them).
   - `RabbitPublisher.publish(exchange, routingKey, payload, { messageId, headers?, persistent?, expirationMs? })` sends JSON on a confirm channel, resolves when the broker confirms, and adds `traceparent` to the headers.
   - `RabbitConsumer<T>` (extend it, inject `RabbitConnection`, name the queue; default prefetch 10): `onMessage(data, meta)` gets `messageId`, `routingKey` (the original, kept through retries and delay buckets in `x-original-routing-key`), string `headers` and `attempt`. A throw copies the message to the next retry queue (`x-attempt` + 1, default delays 5 s / 30 s / 5 min, 5 attempts) and acks the original; after the last attempt, or at once for `NonRetryableError` or non-JSON, the copy goes to `<queue>.dlq` with `x-dead-letter-reason`.
@@ -428,7 +474,8 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
   `jobs`. Known gap: `auth`'s gRPC server records no spans yet, though the `jobs` side of that
   call does.
 - Redis backs the wallet's idempotency fast path (`REDIS_URL`); the wallet keeps working without
-  it. Mailpit and RabbitMQ run in compose but no app uses them yet (NexusPay phase 3).
+  it. Mailpit runs in compose but no app uses it yet (NexusPay phase 3, step 4); RabbitMQ carries
+  the `payments` commands.
 - RabbitMQ names its data directory after the host name, so the compose service has a fixed
   `hostname: rabbitmq`; without it a recreated container starts empty.
 

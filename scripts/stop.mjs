@@ -8,6 +8,7 @@ const PORTS = {
   3002: 'executor',
   3003: 'products',
   3004: 'wallet',
+  3005: 'payments',
   5000: 'auth gRPC',
   5001: 'products gRPC',
   5002: 'jobs gRPC',

@@ -67,3 +67,6 @@ vitest.config.*.timestamp*
 # Playwright (nexus-e2e) run output
 /apps/nexus-e2e/test-results
 /apps/nexus-e2e/playwright-report
+
+# Local secrets (Stripe keys etc.); the committed apps/*/.env hold only non-secret defaults
+.env.local

@@ -15,6 +15,8 @@ apps/
   products/    NestJS — product persistence (Drizzle); gRPC server (CreateProduct)
   wallet/      NestJS — NexusPay double-entry ledger (Drizzle); GraphQL; gRPC server
                (Credit, GetBalances, RunAudit); outbox → Pulsar
+  payments/    NestJS — Stripe Checkout top-ups (Drizzle); GraphQL; signed webhook;
+               outbox → Pulsar + RabbitMQ; payment.expire consumer
   ui-admin/    Angular 22 — the jobber jobs console
   nexus/       React 19 + Vite — the NexusPay app (login, Wallet, Send); GraphQL Codegen
   nexus-e2e/   Playwright tests of nexus against the real auth + wallet
@@ -45,15 +47,16 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 
 ## Services and ports
 
-| Service  | HTTP                     | gRPC | Database               | Notes                                                                                                                                                        |
-| -------- | ------------------------ | ---- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| auth     | 3000 (`/auth` GraphQL)   | 5000 | `jobber-auth` (Prisma) | Sets the HttpOnly `Authentication` cookie                                                                                                                    |
-| jobs     | 3001 (`/jobs` GraphQL)   | 5002 | `jobber` (Prisma)      | Tables `Job`, `JobItem`, `outbox`                                                                                                                            |
-| executor | 3002                     | —    | —                      | Consumes job topics, subscription `jobber`                                                                                                                   |
-| products | 3003                     | 5001 | `products` (Drizzle)   | `products.source_ref` is unique                                                                                                                              |
-| wallet   | 3004 (`/wallet` GraphQL) | 5003 | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox`, `idempotency_keys`; Redis for the idempotency fast path; `npx nx run wallet:seed` |
-| ui-admin | 4200                     | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                                                                                                       |
-| nexus    | 4300                     | —    | —                      | React; Vite proxies `/api/auth` to 3000 and `/api/wallet` to 3004                                                                                            |
+| Service  | HTTP                                                         | gRPC | Database               | Notes                                                                                                                                                                           |
+| -------- | ------------------------------------------------------------ | ---- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| auth     | 3000 (`/auth` GraphQL)                                       | 5000 | `jobber-auth` (Prisma) | Sets the HttpOnly `Authentication` cookie                                                                                                                                       |
+| jobs     | 3001 (`/jobs` GraphQL)                                       | 5002 | `jobber` (Prisma)      | Tables `Job`, `JobItem`, `outbox`                                                                                                                                               |
+| executor | 3002                                                         | —    | —                      | Consumes job topics, subscription `jobber`                                                                                                                                      |
+| products | 3003                                                         | 5001 | `products` (Drizzle)   | `products.source_ref` is unique                                                                                                                                                 |
+| wallet   | 3004 (`/wallet` GraphQL)                                     | 5003 | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox`, `idempotency_keys`; Redis for the idempotency fast path; `npx nx run wallet:seed`                    |
+| payments | 3005 (`/payments` GraphQL, `POST /payments/webhooks/stripe`) | —    | `payments` (Drizzle)   | `payments`, `stripe_events`, `recon_issues`, `outbox`, `idempotency_keys`; RabbitMQ `payments.commands` + delay buckets; Stripe keys in `apps/payments/.env.local` (gitignored) |
+| ui-admin | 4200                                                         | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                                                                                                                          |
+| nexus    | 4300                                                         | —    | —                      | React; Vite proxies `/api/auth` to 3000 and `/api/wallet` to 3004                                                                                                               |
 
 | Infrastructure (docker compose)      | Port(s)          | UI                                     |
 | ------------------------------------ | ---------------- | -------------------------------------- |
@@ -161,8 +164,13 @@ exactly once. The variable is ignored when `NODE_ENV=production`.
 
 ## Environment variables added by NexusPay
 
-| Variable                      | Where                       | Purpose                                                                |
-| ----------------------------- | --------------------------- | ---------------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | every backend `apps/*/.env` | Where traces go (Jaeger, `http://localhost:4318`); unset = tracing off |
-| `OTEL_SDK_DISABLED`           | optional                    | `true` turns tracing off                                               |
-| `FAULT_ACK_FAILURES`          | executor, tests only        | Fail the first n messages after `execute`                              |
+| Variable                      | Where                       | Purpose                                                                                                  |
+| ----------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | every backend `apps/*/.env` | Where traces go (Jaeger, `http://localhost:4318`); unset = tracing off                                   |
+| `OTEL_SDK_DISABLED`           | optional                    | `true` turns tracing off                                                                                 |
+| `FAULT_ACK_FAILURES`          | executor, tests only        | Fail the first n messages after `execute`                                                                |
+| `RABBITMQ_URL`                | payments                    | `amqp://localhost:5672`                                                                                  |
+| `STRIPE_SECRET_KEY`           | `apps/payments/.env.local`  | Stripe test-mode secret key (`sk_test_…`); never in a committed file                                     |
+| `STRIPE_WEBHOOK_SECRET`       | `apps/payments/.env.local`  | `whsec_…` printed by `stripe listen`; changes with every `stripe listen` session, restart payments after |
+| `APP_URL`                     | payments                    | Where Checkout returns the browser (`http://localhost:4300`)                                             |
+| `PAYMENT_EXPIRY_BUCKET`       | payments                    | `delay.30m` (default) or `delay.1m` to watch an unpaid top-up expire after a minute                      |

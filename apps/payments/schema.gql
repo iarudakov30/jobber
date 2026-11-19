@@ -1,0 +1,61 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+input CreateTopUpInput {
+  """USD minor units, "100" to "100000" ($1.00 to $1,000.00)."""
+  amount: MinorUnits!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""
+An amount in minor units of its asset, as a decimal string: "1250" is $12.50.
+"""
+scalar MinorUnits
+
+type Mutation {
+  """
+  Starts a top-up and returns the Stripe Checkout page to send the browser to. Requires an Idempotency-Key header: a retry with the same key and input returns the first result.
+  """
+  createTopUp(input: CreateTopUpInput!): TopUp!
+}
+
+"""A top-up of the wallet through Stripe Checkout."""
+type Payment {
+  amount: MinorUnits!
+  createdAt: DateTime!
+  currency: String!
+  id: ID!
+  status: PaymentStatus!
+  updatedAt: DateTime!
+}
+
+"""
+PENDING until Stripe reports the outcome; then SUCCEEDED (credited), EXPIRED (not paid in time) or FAILED (Checkout could not be started).
+"""
+enum PaymentStatus {
+  EXPIRED
+  FAILED
+  PENDING
+  SUCCEEDED
+}
+
+type Query {
+  """
+  One of the signed-in user's payments; null if there is none with that id.
+  """
+  payment(id: ID!): Payment
+
+  """The signed-in user's payments, newest first."""
+  payments(first: Int! = 20): [Payment!]!
+}
+
+type TopUp {
+  """Stripe's hosted Checkout page; send the browser there."""
+  checkoutUrl: String!
+  paymentId: ID!
+}
