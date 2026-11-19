@@ -16,6 +16,10 @@ export interface FindUserByEmailRequest {
   email: string;
 }
 
+export interface GetUserRequest {
+  id: number;
+}
+
 export interface User {
   id: number;
   email: string;
@@ -27,6 +31,10 @@ export interface AuthServiceClient {
   /** For other services (wallet transfers by email). NOT_FOUND when no user has that email. */
 
   findUserByEmail(request: FindUserByEmailRequest): Observable<User>;
+
+  /** For other services (the email worker looks up the address). NOT_FOUND when no user has that id. */
+
+  getUser(request: GetUserRequest): Observable<User>;
 }
 
 export interface AuthServiceController {
@@ -39,11 +47,19 @@ export interface AuthServiceController {
   findUserByEmail(
     request: FindUserByEmailRequest,
   ): Promise<User> | Observable<User> | User;
+
+  /** For other services (the email worker looks up the address). NOT_FOUND when no user has that id. */
+
+  getUser(request: GetUserRequest): Promise<User> | Observable<User> | User;
 }
 
 export function AuthServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ['authenticate', 'findUserByEmail'];
+    const grpcMethods: string[] = [
+      'authenticate',
+      'findUserByEmail',
+      'getUser',
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(
         constructor.prototype,

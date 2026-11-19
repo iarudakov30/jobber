@@ -3,3 +3,4 @@ export * from './lib/pulsar.client';
 export * from './lib/pulsar.consumer';
 export * from './lib/messages';
 export * from './lib/serialize';
+export * from './lib/validate-message';

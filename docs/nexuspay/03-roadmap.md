@@ -41,7 +41,8 @@ acceptance tests pass.
 
 ## Phase 3 — Stripe top-up + RabbitMQ (~2 weeks, in progress)
 
-Progress, step by step: [phase-3/README.md](phase-3/README.md). Step 1 (`libs/rabbitmq`) is done.
+Progress, step by step: [phase-3/README.md](phase-3/README.md). Steps 1 (`libs/rabbitmq`) and 2 (contracts:
+`RabbitOutboxPublisher`, `PaymentSucceededMessage`, `GetUser`) are done.
 
 - `apps/payments` (3005): `createTopUp`, Stripe Checkout, signed webhook (`rawBody`), payment
   state machine with conditional `UPDATE … WHERE status = 'PENDING'`.

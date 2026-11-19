@@ -1,8 +1,4 @@
-import {
-  Logger,
-  OnApplicationShutdown,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import {
   ChannelModel,
   ConfirmChannel,
@@ -151,10 +147,13 @@ export class RabbitConnection implements OnModuleInit, OnApplicationShutdown {
     } catch (e) {
       // amqplib reports only "channel closed"; the broker's reason came as the channel's error.
       const reason = this.channelErrors.get(channel);
+      // `cause` set by hand: the `new Error(msg, { cause })` overload needs lib es2022, and every
+      // project that imports this library would have to raise its lib for it.
       throw reason
-        ? new Error(`Publish to ${exchange} refused: ${reason.message}`, {
-            cause: e,
-          })
+        ? Object.assign(
+            new Error(`Publish to ${exchange} refused: ${reason.message}`),
+            { cause: e },
+          )
         : e;
     }
   }

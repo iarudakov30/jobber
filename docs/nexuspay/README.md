@@ -29,13 +29,13 @@ actually built, and the spec describes the plan.
 
 ## Status
 
-| Phase                | Content                                                                                                         | State                                           |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done**                                        |
-| 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **Done**                                        |
-| 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | **In progress** (step 1, `libs/rabbitmq`, done) |
-| 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | Planned                                         |
-| 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned                                         |
+| Phase                | Content                                                                                                         | State                                 |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done**                              |
+| 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **Done**                              |
+| 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | **In progress** (steps 1–2 of 5 done) |
+| 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | Planned                               |
+| 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned                               |
 
 ## Branches (phase 1)
 

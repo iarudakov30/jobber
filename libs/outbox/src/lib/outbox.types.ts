@@ -4,7 +4,7 @@
  * ```sql
  * CREATE TABLE outbox (
  *   id           BIGSERIAL PRIMARY KEY,
- *   transport    TEXT        NOT NULL,             -- 'pulsar' (later also 'rabbitmq')
+ *   transport    TEXT        NOT NULL,             -- 'pulsar' or 'rabbitmq'
  *   destination  TEXT        NOT NULL,             -- topic or exchange
  *   key          TEXT,                             -- partition or routing key
  *   payload      JSONB       NOT NULL,

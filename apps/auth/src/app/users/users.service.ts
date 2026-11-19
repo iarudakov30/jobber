@@ -26,6 +26,14 @@ export class UsersService {
     });
   }
 
+  /** Null when nobody has that id; never returns the password hash. */
+  async findById(id: number): Promise<User | null> {
+    return this.prismaService.user.findUnique({
+      where: { id },
+      omit: { password: true },
+    });
+  }
+
   async createUser(data: Prisma.UserCreateInput): Promise<User> {
     return this.prismaService.user.create({
       data: {

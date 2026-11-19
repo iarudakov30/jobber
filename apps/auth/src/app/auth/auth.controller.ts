@@ -6,6 +6,7 @@ import {
   AuthServiceController,
   AuthServiceControllerMethods,
   FindUserByEmailRequest,
+  GetUserRequest,
   GrpcLoggingInterceptor,
   GrpcStatus,
   User,
@@ -38,6 +39,25 @@ export class AuthController implements AuthServiceController {
       throw new RpcException({
         code: GrpcStatus.NOT_FOUND,
         message: 'No user has that email',
+      });
+    }
+    return { id: user.id, email: user.email };
+  }
+
+  /** Called by other services (the email worker, for the recipient's address). */
+  async getUser({ id }: GetUserRequest): Promise<User> {
+    // proto3 sends 0 for a missing field, so a caller that forgot the id lands here.
+    if (!Number.isInteger(id) || id < 1) {
+      throw new RpcException({
+        code: GrpcStatus.INVALID_ARGUMENT,
+        message: 'id must be a positive integer',
+      });
+    }
+    const user = await this.usersService.findById(id);
+    if (!user) {
+      throw new RpcException({
+        code: GrpcStatus.NOT_FOUND,
+        message: 'No user has that id',
       });
     }
     return { id: user.id, email: user.email };

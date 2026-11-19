@@ -6,6 +6,8 @@ service AuthService {
   rpc Authenticate(AuthenticateRequest) returns (User);
   // For other services (wallet transfers by email). NOT_FOUND when no user has that email.
   rpc FindUserByEmail(FindUserByEmailRequest) returns (User);
+  // For other services (the email worker looks up the address). NOT_FOUND when no user has that id.
+  rpc GetUser(GetUserRequest) returns (User);
 }
 
 message AuthenticateRequest {
@@ -14,6 +16,10 @@ message AuthenticateRequest {
 
 message FindUserByEmailRequest {
   string email = 1;
+}
+
+message GetUserRequest {
+  int32 id = 1;
 }
 
 message User {
