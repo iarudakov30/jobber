@@ -32,6 +32,7 @@ npx nx run nexus:codegen           # GraphQL types from apps/{auth,wallet}/schem
 npx nx test wallet                 # real PostgreSQL via Testcontainers: Docker must be running
 npx nx test outbox                 # likewise (DrizzleOutboxStore spec)
 npx nx test payments               # Testcontainers PostgreSQL + RabbitMQ; Stripe faked, signatures real
+npx nx test executor               # email worker: Testcontainers RabbitMQ, Redis, Mailpit
 npx nx test rabbitmq               # Testcontainers RabbitMQ (retries, DLQ, delay buckets, reconnect)
 npx nx run rabbitmq:replay --queue=<name>   # move <name>.dlq back to <name> (RABBITMQ_URL, default localhost)
 ```
@@ -238,7 +239,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 | ---------- | ---- | ----------------------------------------------------------- |
 | `auth`     | 3000 | User auth (GraphQL + PostgreSQL/Prisma + gRPC server)       |
 | `jobs`     | 3001 | Job management (GraphQL + outbox to Pulsar + gRPC client)   |
-| `executor` | 3002 | Job execution (Pulsar consumer + gRPC clients to `jobs`, `products`, `wallet`) |
+| `executor` | 3002 | Job execution (Pulsar consumer + gRPC clients to `jobs`, `products`, `wallet`, `auth`) and the NexusPay email worker (RabbitMQ → SMTP) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
 | `wallet`   | 3004 | NexusPay ledger (GraphQL + gRPC server 5003 + PostgreSQL/Drizzle + outbox to Pulsar) |
 | `payments` | 3005 | NexusPay Stripe top-ups (GraphQL + Stripe webhook + PostgreSQL/Drizzle + outbox to Pulsar and RabbitMQ) |
@@ -249,7 +250,8 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 
 1. **GraphQL (external)** — clients talk to `auth` and `jobs` via Apollo GraphQL APIs
 2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email, and `GetUser`, for the email worker); other services call `wallet`'s `WalletService` (`Credit`, `GetBalances`, `RunAudit`); `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
-3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them
+3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them. NexusPay events too: `payments` → `payment-succeeded` → `wallet`
+4. **RabbitMQ (async)** — work queues and timers: `payment.expire` through the `delay.30m` bucket back into `payments`; `email.topup` from `wallet` to the executor's email worker
 
 ### Job Framework
 
@@ -274,7 +276,7 @@ The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) 
 
 ### Wallet ledger (`wallet`)
 
-NexusPay's money service (phase 2, in progress): the only service that changes balances.
+NexusPay's money service (phase 2; top-up credits since phase 3): the only service that changes balances.
 
 - **Schema** (`apps/wallet/src/app/ledger/schema.ts`): `assets` (USD, scale 2), `accounts`
   (owner + asset + kind, cached `balance`), `transactions` (`UNIQUE (type, external_ref)`),
@@ -301,7 +303,17 @@ NexusPay's money service (phase 2, in progress): the only service that changes b
 - **gRPC `WalletService`** (5003, `wallet.proto`): `Credit` (from `seed` or `stripe_clearing`;
   `seed` is refused in production), `GetBalances`, `RunAudit` (`LedgerService.audit()`: cached
   balances vs entries, unbalanced transactions, in one REPEATABLE READ snapshot).
-- **Outbox:** each transfer writes `transfer-completed` (`{ transactionId, fromUserId, toUserId,
+- **Top-ups:** `PaymentSucceededConsumer` (`apps/wallet/src/app/topups/`, Pulsar topic
+  `payment-succeeded`, subscription `wallet`, Key_Shared) validates the message
+  (`validateMessage`; bad data is dead-lettered) and posts `type: 'topup'`,
+  `externalRef = paymentId`, `stripe_clearing −X / user available +X`, with the RabbitMQ
+  `notifications` / `email.topup` record `{ userId, paymentId, amount, currency }` in the same
+  transaction, so a redelivery credits once and emails once. `FAULT_CRASH_AFTER_CREDIT=1` (not in
+  production) exits after the commit and before the ack. The wallet declares the notifications
+  topology too (`RabbitModule` in `app.module.ts`), so an email published before the executor
+  ever started still has a queue.
+- **Outbox** (`OutboxModule`, global, `apps/wallet/src/app/outbox/`): one relay with the Pulsar
+  and the RabbitMQ publisher. Each transfer writes `transfer-completed` (`{ transactionId, fromUserId, toUserId,
   asset, amount }`) in its transaction; `OutboxRelay` publishes it to Pulsar (no consumer yet).
 - **Idempotency:** `transfer` is `@Idempotent()` and requires an `Idempotency-Key` header: a retry
   with the same key and input gets the stored response (`Idempotent-Replayed: true`), the same
@@ -317,6 +329,24 @@ NexusPay's money service (phase 2, in progress): the only service that changes b
 - Tests run against a Testcontainers PostgreSQL 18 (`src/testing/test-database.ts`) and check
   after every test that each asset sums to zero and each cached balance equals its entries.
   `wallet.api.spec.ts` drives the GraphQL API over HTTP with only `auth` and Pulsar faked.
+
+### Email worker (`executor`)
+
+`apps/executor/src/app/notifications/`, loaded only when `RABBITMQ_URL` is set
+(`ConditionalModule`), so executor deployments without RabbitMQ (docker-compose.apps.yaml, Helm)
+start as before.
+
+- `EmailConsumer` on `notifications.email` (routing key `email.topup`): validates
+  `TopUpEmailMessage`, skips a `messageId` already in Redis (`email:sent:<messageId>`, set after
+  sending, 7-day TTL), asks auth `GetUser` for the address, sends with nodemailer to `SMTP_URL`
+  (`EMAIL_FROM`). An unknown user, bad data or a missing `messageId` go to the DLQ at once; SMTP,
+  Redis or auth failures retry (5 s / 30 s / 5 min, 5 attempts), then
+  `notifications.email.dlq` → `npx nx run rabbitmq:replay --queue=notifications.email`.
+- A crash between sending and remembering can send twice; acceptable for an email, never for
+  money.
+- nodemailer 10 ships its own types (no `@types/nodemailer`).
+- Tests (`email.consumer.spec.ts`): Testcontainers RabbitMQ, Redis and Mailpit (its API checks
+  the inbox), retries shortened to 300 ms / 600 ms.
 
 ### Payments (`payments`)
 
@@ -442,8 +472,9 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 - **`@jobber/tracing`** (`libs/tracing`) — `startTracing(serviceName)`: OpenTelemetry SDK with http, express, Nest, GraphQL, gRPC and pg (only inside a traced request) instrumentation, exporting over OTLP/HTTP. Call it on the line right after `require('module-alias/register')` in `main.ts`, before anything loads NestJS: instrumentations patch modules when they are first required. Pulsar isn't instrumented; `send()` and the outbox write `traceparent` into message properties and `PulsarConsumer` continues the trace from them.
 - **`@jobber/money`** (`libs/money`) — amounts as `bigint` minor units: `ASSETS` (USD, scale 2), `parseAmount` ("12.34" → `1234n`, never rounds), `formatAmount` (exact, via `Intl.NumberFormat` on a decimal string), `toWire`/`fromWire` (canonical decimal strings). No framework imports, so `nexus` can use it too.
 - **`@jobber/idempotency`** (`libs/idempotency`) — `@Idempotent({ operation })` for GraphQL resolvers and HTTP handlers (`IdempotencyInterceptor`), `@IdempotencyKey()` to read the key in the handler, `DrizzleIdempotencyStore` + `idempotencyKeysTable()` (import the table from `@jobber/idempotency/table` in Drizzle schema files: drizzle-kit can't load the decorators), `RedisIdempotencyLock` (no offline queue: fails fast when Redis is down), `IdempotencyCleanup` (hourly expiry). The module provides `IDEMPOTENCY_STORE` and optionally `IDEMPOTENCY_LOCK`; see `apps/wallet/src/app/wallet/wallet.module.ts`.
-- **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`, or `DrizzleOutboxStore.enqueue(tx, records)` for Drizzle apps), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. `RabbitOutboxPublisher` (records with `transport: 'rabbitmq'`) publishes to the exchange `destination` with routing key `key` (a delay bucket such as `delay.30m` delays a command) and `messageId = outbox-<service>-<id>`; RabbitMQ doesn't deduplicate, so consumers dedupe on that id. One relay takes both publishers. Delivery is at-least-once.
-- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. Used by `payments` (`commands` exchange, `payments.commands`, delay buckets).
+- **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`, or `DrizzleOutboxStore.enqueue(tx, records)` for Drizzle apps), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, one ordered stream per transport (a RabbitMQ outage only holds back RabbitMQ records, each transport backs off on its own), published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. `RabbitOutboxPublisher` (records with `transport: 'rabbitmq'`) publishes to the exchange `destination` with routing key `key` (a delay bucket such as `delay.30m` delays a command) and `messageId = outbox-<service>-<id>`; RabbitMQ doesn't deduplicate, so consumers dedupe on that id. One relay takes both publishers. Delivery is at-least-once.
+- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. Used by `payments` (`commands` exchange, `payments.commands`, delay buckets), `wallet` (publishes `email.topup`) and `executor` (email worker).
+  - Shared notifications contract (`notifications.ts`): `NOTIFICATIONS_EXCHANGE`, `EMAIL_QUEUE` (`notifications.email`, bound to `email.*`), `EMAIL_TOPUP`, `notificationsTopology(retry?)` (declared by publisher and consumer alike, with the same retry, or RabbitMQ refuses the redeclare) and `TopUpEmailMessage` (class-validator).
   - The connection reconnects in the background (1 s → 30 s backoff) and re-declares the topology (`declareTopology()`: exchanges, quorum queues, `<queue>.retry.<n>` TTL queues, `<queue>.dlq`, delay buckets) on every connect. The app starts while RabbitMQ is down; publishes then reject at once with `RabbitUnavailableError` (the outbox retries them).
   - `RabbitPublisher.publish(exchange, routingKey, payload, { messageId, headers?, persistent?, expirationMs? })` sends JSON on a confirm channel, resolves when the broker confirms, and adds `traceparent` to the headers.
   - `RabbitConsumer<T>` (extend it, inject `RabbitConnection`, name the queue; default prefetch 10): `onMessage(data, meta)` gets `messageId`, `routingKey` (the original, kept through retries and delay buckets in `x-original-routing-key`), string `headers` and `attempt`. A throw copies the message to the next retry queue (`x-attempt` + 1, default delays 5 s / 30 s / 5 min, 5 attempts) and acks the original; after the last attempt, or at once for `NonRetryableError` or non-JSON, the copy goes to `<queue>.dlq` with `x-dead-letter-reason`.
@@ -471,11 +502,12 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
   exports to `OTEL_EXPORTER_OTLP_ENDPOINT` (set in each `apps/*/.env`; unset it, or set
   `OTEL_SDK_DISABLED=true`, to turn tracing off). One job shows as one trace: the `jobs` GraphQL
   request → outbox `<topic> publish` → executor `<topic> process` → `Acknowledge` gRPC back into
-  `jobs`. Known gap: `auth`'s gRPC server records no spans yet, though the `jobs` side of that
-  call does.
+  `jobs`. A top-up is one trace too: `payments` webhook → `payment-succeeded publish` → wallet
+  `payment-succeeded process` → `notifications publish` → executor `notifications.email process`
+  → `GetUser` in auth (auth's gRPC server spans are recorded).
 - Redis backs the wallet's idempotency fast path (`REDIS_URL`); the wallet keeps working without
-  it. Mailpit runs in compose but no app uses it yet (NexusPay phase 3, step 4); RabbitMQ carries
-  the `payments` commands.
+  it; the executor's email worker keeps `email:sent:<messageId>` there (7 days). Mailpit catches
+  the emails (`SMTP_URL`, UI on 8025). RabbitMQ carries the `payments` commands and the emails.
 - RabbitMQ names its data directory after the host name, so the compose service has a fixed
   `hostname: rabbitmq`; without it a recreated container starts empty.
 

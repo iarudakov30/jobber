@@ -3,6 +3,7 @@ import {
   NewOutboxRecord,
   OutboxRecord,
   OutboxStore,
+  OutboxTransport,
 } from './outbox.types';
 import { withTraceHeaders } from './trace-headers';
 
@@ -72,6 +73,7 @@ export class PrismaOutboxStore implements OutboxStore {
   processBatch(
     limit: number,
     publish: (record: OutboxRecord) => Promise<void>,
+    transport?: OutboxTransport,
   ): Promise<BatchResult> {
     return this.prisma.$transaction(
       async (tx) => {
@@ -79,6 +81,7 @@ export class PrismaOutboxStore implements OutboxStore {
           SELECT id, transport, destination, key, payload, headers
           FROM outbox
           WHERE published_at IS NULL
+            AND (${transport ?? null}::text IS NULL OR transport = ${transport ?? null})
           ORDER BY id
           LIMIT ${limit}
           FOR UPDATE SKIP LOCKED`;

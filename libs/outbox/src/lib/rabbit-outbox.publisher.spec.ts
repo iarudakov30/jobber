@@ -17,6 +17,7 @@ import {
   OutboxPublisher,
   OutboxRecord,
   OutboxStore,
+  OutboxTransport,
 } from './outbox.types';
 import { RabbitOutboxPublisher } from './rabbit-outbox.publisher';
 
@@ -73,7 +74,10 @@ describe('RabbitOutboxPublisher', () => {
   });
 });
 
-/** Holds records in memory with the store's contract: id order, stop at the first failure. */
+/**
+ * Holds records in memory with the store's contract: id order (per transport when asked), stop at
+ * the first failure.
+ */
 class MemoryOutboxStore implements OutboxStore {
   readonly records: (OutboxRecord & { published: boolean })[] = [];
 
@@ -94,9 +98,13 @@ class MemoryOutboxStore implements OutboxStore {
   async processBatch(
     limit: number,
     publish: (record: OutboxRecord) => Promise<void>,
+    transport?: OutboxTransport,
   ): Promise<BatchResult> {
     let published = 0;
-    for (const r of this.records.filter((x) => !x.published).slice(0, limit)) {
+    const pending = this.records.filter(
+      (x) => !x.published && (!transport || x.transport === transport),
+    );
+    for (const r of pending.slice(0, limit)) {
       try {
         await publish(r);
       } catch (error) {
@@ -170,7 +178,10 @@ describe('OutboxRelay → RabbitMQ (Testcontainers)', () => {
   let commands: CollectingConsumer;
 
   beforeAll(async () => {
-    container = await new RabbitMQContainer('rabbitmq:4-management').start();
+    container = await new RabbitMQContainer('rabbitmq:4-management')
+      // RabbitMQ boots slowly when several projects start one at once (nx affected).
+      .withStartupTimeout(120_000)
+      .start();
     connection = new RabbitConnection({
       url: container.getAmqpUrl(),
       topology,
@@ -303,6 +314,8 @@ describe('OutboxRelay → RabbitMQ (Testcontainers)', () => {
     admin.start();
     await admin.whenConnected();
     await admin.stop();
+    // The relay backs RabbitMQ off for 200 ms after the failure.
+    await new Promise((r) => setTimeout(r, 250));
 
     await expect(relay.tick()).resolves.toBe(2);
     expect(store.unpublished()).toEqual([]);

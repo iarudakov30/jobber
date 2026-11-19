@@ -32,6 +32,10 @@ export interface OutboxRelayOptions {
  * Publishes outbox records in the background: runs a batch, and after an empty or failed one
  * sleeps with backoff. `poke()` wakes it right away after a write.
  *
+ * Each transport is published separately, in id order within it: a RabbitMQ outage holds back
+ * only RabbitMQ records (retried with their own backoff), never the Pulsar ones written after
+ * them.
+ *
  * Delivery is at-least-once: a crash between publishing and marking a record publishes it again,
  * so consumers must be idempotent.
  */
@@ -44,6 +48,11 @@ export class OutboxRelay
   private readonly minIdleMs: number;
   private readonly maxIdleMs: number;
   private idleMs: number;
+  /** Per transport, after a failure: wait before trying it again. */
+  private readonly retry = new Map<
+    OutboxTransport,
+    { backoffMs: number; at: number }
+  >();
   private running = false;
   private loop?: Promise<void>;
   private wake?: () => void;
@@ -88,21 +97,49 @@ export class OutboxRelay
     this.wake?.();
   }
 
-  /** Runs one batch; returns how many records went out. */
+  /**
+   * Runs one batch per transport (skipping a transport that is backing off after a failure).
+   * Returns how many records went out, or -1 when nothing did and something failed.
+   */
   async tick(): Promise<number> {
+    let published = 0;
+    let failed = false;
+    for (const transport of this.publishers.keys()) {
+      const retry = this.retry.get(transport);
+      if (retry && Date.now() < retry.at) {
+        continue;
+      }
+      const result = await this.batch(transport);
+      if (result < 0) {
+        failed = true;
+        const backoffMs = Math.min(
+          Math.max((retry?.backoffMs ?? 0) * 2, this.minIdleMs),
+          this.maxIdleMs,
+        );
+        this.retry.set(transport, { backoffMs, at: Date.now() + backoffMs });
+      } else {
+        this.retry.delete(transport);
+        published += result;
+      }
+    }
+    return published === 0 && failed ? -1 : published;
+  }
+
+  private async batch(transport: OutboxTransport): Promise<number> {
     try {
       const { published, error } = await this.store.processBatch(
         this.batchSize,
         (record) => this.publish(record),
+        transport,
       );
       if (error) {
         this.logger.error(
-          `Publish failed after ${published} record(s); retrying: ${errorText(error)}`,
+          `${transport}: publish failed after ${published} record(s); retrying: ${errorText(error)}`,
         );
       }
       return error ? -1 : published;
     } catch (e) {
-      this.logger.error(`Outbox batch failed: ${errorText(e)}`);
+      this.logger.error(`${transport}: outbox batch failed: ${errorText(e)}`);
       return -1;
     }
   }

@@ -23,6 +23,7 @@ import {
 } from '../../testing/test-database';
 import { DatabaseModule } from '../database/database.module';
 import { graphQLOptions } from '../graphql.options';
+import { OutboxModule } from '../outbox/outbox.module';
 import { WalletController } from './wallet.controller';
 import { WalletModule } from './wallet.module';
 
@@ -77,6 +78,7 @@ beforeAll(async () => {
     imports: [
       ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
       DatabaseModule,
+      OutboxModule,
       WalletModule,
       GraphQLModule.forRoot<ApolloDriverConfig>(graphQLOptions(schemaFile)),
     ],

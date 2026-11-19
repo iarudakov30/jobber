@@ -10,12 +10,6 @@ import {
   IdempotencyCleanup,
   RedisIdempotencyLock,
 } from '@jobber/idempotency';
-import {
-  DrizzleOutboxStore,
-  OutboxRelay,
-  PulsarOutboxPublisher,
-} from '@jobber/outbox';
-import { PulsarClient, PulsarModule } from '@jobber/pulsar';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { LedgerModule } from '../ledger/ledger.module';
 import { LedgerDatabase } from '../ledger/ledger.service';
@@ -26,7 +20,6 @@ import { WalletService } from './wallet.service';
 @Module({
   imports: [
     LedgerModule,
-    PulsarModule,
     ClientsModule.registerAsync([
       {
         // GqlAuthGuard (Authenticate) and transfers by email (FindUserByEmail).
@@ -48,20 +41,6 @@ import { WalletService } from './wallet.service';
   providers: [
     WalletService,
     WalletResolver,
-    {
-      provide: DrizzleOutboxStore,
-      useFactory: (db: LedgerDatabase) => new DrizzleOutboxStore(db),
-      inject: [DATABASE_CONNECTION],
-    },
-    {
-      // Starts polling on application bootstrap and stops before shutdown.
-      provide: OutboxRelay,
-      useFactory: (store: DrizzleOutboxStore, pulsarClient: PulsarClient) =>
-        new OutboxRelay(store, [
-          new PulsarOutboxPublisher(pulsarClient, 'wallet'),
-        ]),
-      inject: [DrizzleOutboxStore, PulsarClient],
-    },
     // @Idempotent() on transfer: PostgreSQL is the guarantee, Redis the fast path.
     {
       provide: IDEMPOTENCY_STORE,

@@ -47,11 +47,13 @@ export interface OutboxStore {
   /**
    * In one transaction: claims up to `limit` unpublished records in id order (skipping rows
    * another relay holds), publishes them one by one, and marks the published ones. Stops at the
-   * first failed publish; the rest stay unpublished for the next batch.
+   * first failed publish; the rest stay unpublished for the next batch. With `transport`, only
+   * that transport's records, so one broker's outage can't hold back another's messages.
    */
   processBatch(
     limit: number,
     publish: (record: OutboxRecord) => Promise<void>,
+    transport?: OutboxTransport,
   ): Promise<BatchResult>;
 }
 

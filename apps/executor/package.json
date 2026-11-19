@@ -2,7 +2,12 @@
   "name": "@jobber/executor",
   "version": "0.0.0",
   "dependencies": {
-    "fibonacci": "^1.6.12"
+    "fibonacci": "^1.6.12",
+    "ioredis": "^6.0.0",
+    "nodemailer": "10.3.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@testcontainers/rabbitmq": "^12.2.1",
+    "testcontainers": "^12.2.1"
+  }
 }

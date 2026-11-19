@@ -79,12 +79,25 @@ describe('PrismaOutboxStore', () => {
 
       expect(result).toEqual({ published: 2, error: undefined });
       expect(calls[0].sql).toContain('FOR UPDATE SKIP LOCKED');
-      expect(calls[0].values).toEqual([100]);
+      expect(calls[0].values).toEqual([null, null, 100]);
       expect(calls[1].sql).toMatch(/^UPDATE outbox SET published_at = now\(\)/);
       expect(calls[1].values).toEqual([['1', '2']]);
       expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
         timeout: 60_000,
       });
+    });
+
+    it('filters by transport when given one', async () => {
+      const { store, calls } = storeWith([row(1)]);
+
+      await store.processBatch(
+        10,
+        jest.fn().mockResolvedValue(undefined),
+        'rabbitmq',
+      );
+
+      expect(calls[0].sql).toContain('transport = ');
+      expect(calls[0].values).toEqual(['rabbitmq', 'rabbitmq', 10]);
     });
 
     it('stops at the first failure but still marks what went out', async () => {

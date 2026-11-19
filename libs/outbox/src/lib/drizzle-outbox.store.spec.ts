@@ -134,6 +134,28 @@ describe('DrizzleOutboxStore.processBatch', () => {
     expect(await unpublishedIds()).toEqual([2, 3]);
   });
 
+  it('claims only the given transport, so one broker cannot block another', async () => {
+    await enqueue([
+      record(1, { transport: 'rabbitmq' }),
+      record(2),
+      record(3, { transport: 'rabbitmq' }),
+      record(4),
+    ]);
+    const seen: bigint[] = [];
+
+    const result = await store.processBatch(
+      100,
+      async (r) => {
+        seen.push(r.id);
+      },
+      'pulsar',
+    );
+
+    expect(result).toEqual({ published: 2, error: undefined });
+    expect(seen).toEqual([2n, 4n]);
+    expect(await unpublishedIds()).toEqual([1, 3]);
+  });
+
   it('never gives the same record to two relays at once', async () => {
     await enqueue(Array.from({ length: 50 }, (_, i) => record(i)));
     const published: bigint[] = [];

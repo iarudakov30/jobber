@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "dependencies": {
     "@opentelemetry/api": "^1.10.0",
-    "amqplib": "2.2.1"
+    "amqplib": "2.2.1",
+    "class-validator": "^0.15.1"
   },
   "devDependencies": {
     "@testcontainers/rabbitmq": "^12.2.1",

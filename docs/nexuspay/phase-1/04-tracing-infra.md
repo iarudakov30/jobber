@@ -80,7 +80,8 @@ already seen.
 
 - `auth`'s gRPC server records no spans (its HTTP and GraphQL spans work, and the `jobs` side of
   `Authenticate` is traced). The bundle load order and the `@grpc/grpc-js` copy were checked and
-  are fine; the cause is still open.
+  are fine; the cause is still open. *Update (phase 3, step 4): resolved by then; traces now show
+  auth's `Authenticate` and `GetUser` server spans.*
 - The updated Dockerfiles weren't test-built (memory limits on the dev machine).
 - Redis and Mailpit aren't used by any app until phases 2–3.
 - Jaeger v2 (`jaegertracing/jaeger`) serves its query API under `/api/v3/...`, not `/api/...`.

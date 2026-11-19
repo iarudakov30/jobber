@@ -97,7 +97,10 @@ describe('RabbitMQ (Testcontainers)', () => {
   let commands: TestConsumer;
 
   beforeAll(async () => {
-    container = await new RabbitMQContainer('rabbitmq:4-management').start();
+    container = await new RabbitMQContainer('rabbitmq:4-management')
+      // RabbitMQ boots slowly when several projects start one at once (nx affected).
+      .withStartupTimeout(120_000)
+      .start();
     url = container.getAmqpUrl();
     connection = new RabbitConnection({
       url,

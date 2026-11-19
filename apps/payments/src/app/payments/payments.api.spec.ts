@@ -195,7 +195,10 @@ function pay(paymentId: string, changes: Partial<FakeSession> = {}) {
 beforeAll(async () => {
   [testDb, rabbit] = await Promise.all([
     startTestDatabase(),
-    new RabbitMQContainer('rabbitmq:4-management').start(),
+    new RabbitMQContainer('rabbitmq:4-management')
+      // RabbitMQ boots slowly when several projects start one at once (nx affected).
+      .withStartupTimeout(120_000)
+      .start(),
   ]);
   pool = testDb.pool;
   for (const method of ['create', 'expire', 'retrieve'] as const) {

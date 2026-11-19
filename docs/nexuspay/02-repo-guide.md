@@ -11,10 +11,12 @@ person.
 apps/
   auth/        NestJS — users, login, JWT cookie; GraphQL + gRPC server (Authenticate, FindUserByEmail, GetUser)
   jobs/        NestJS — @Job framework; GraphQL; outbox → Pulsar; gRPC server (Acknowledge)
-  executor/    NestJS — Pulsar consumers for job topics; gRPC clients to jobs, products and wallet
+  executor/    NestJS — Pulsar consumers for job topics; email worker on RabbitMQ
+               (notifications.email → Mailpit); gRPC clients to jobs, products, wallet, auth
   products/    NestJS — product persistence (Drizzle); gRPC server (CreateProduct)
   wallet/      NestJS — NexusPay double-entry ledger (Drizzle); GraphQL; gRPC server
-               (Credit, GetBalances, RunAudit); outbox → Pulsar
+               (Credit, GetBalances, RunAudit); credits payment-succeeded;
+               outbox → Pulsar + RabbitMQ
   payments/    NestJS — Stripe Checkout top-ups (Drizzle); GraphQL; signed webhook;
                outbox → Pulsar + RabbitMQ; payment.expire consumer
   ui-admin/    Angular 22 — the jobber jobs console
@@ -33,7 +35,8 @@ libs/
   money/       bigint minor units: ASSETS, parseAmount, formatAmount, toWire/fromWire
   idempotency/ @Idempotent() (Idempotency-Key): PostgreSQL store, Redis fast path, cleanup
   rabbitmq/    RabbitConnection (reconnect), RabbitPublisher (confirms), RabbitConsumer<T>
-               (retry queues, DLQ), delay buckets, DLQ replay script
+               (retry queues, DLQ), delay buckets, DLQ replay script,
+               notifications topology + TopUpEmailMessage
   tracing/     startTracing() — OpenTelemetry bootstrap
 charts/jobber  Helm chart (minikube / EKS)
 docs/          These documents and other guides
@@ -47,16 +50,16 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 
 ## Services and ports
 
-| Service  | HTTP                                                         | gRPC | Database               | Notes                                                                                                                                                                           |
-| -------- | ------------------------------------------------------------ | ---- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| auth     | 3000 (`/auth` GraphQL)                                       | 5000 | `jobber-auth` (Prisma) | Sets the HttpOnly `Authentication` cookie                                                                                                                                       |
-| jobs     | 3001 (`/jobs` GraphQL)                                       | 5002 | `jobber` (Prisma)      | Tables `Job`, `JobItem`, `outbox`                                                                                                                                               |
-| executor | 3002                                                         | —    | —                      | Consumes job topics, subscription `jobber`                                                                                                                                      |
-| products | 3003                                                         | 5001 | `products` (Drizzle)   | `products.source_ref` is unique                                                                                                                                                 |
-| wallet   | 3004 (`/wallet` GraphQL)                                     | 5003 | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox`, `idempotency_keys`; Redis for the idempotency fast path; `npx nx run wallet:seed`                    |
-| payments | 3005 (`/payments` GraphQL, `POST /payments/webhooks/stripe`) | —    | `payments` (Drizzle)   | `payments`, `stripe_events`, `recon_issues`, `outbox`, `idempotency_keys`; RabbitMQ `payments.commands` + delay buckets; Stripe keys in `apps/payments/.env.local` (gitignored) |
-| ui-admin | 4200                                                         | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                                                                                                                          |
-| nexus    | 4300                                                         | —    | —                      | React; Vite proxies `/api/auth` to 3000 and `/api/wallet` to 3004                                                                                                               |
+| Service  | HTTP                                                         | gRPC | Database               | Notes                                                                                                                                                                                                                                                   |
+| -------- | ------------------------------------------------------------ | ---- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| auth     | 3000 (`/auth` GraphQL)                                       | 5000 | `jobber-auth` (Prisma) | Sets the HttpOnly `Authentication` cookie                                                                                                                                                                                                               |
+| jobs     | 3001 (`/jobs` GraphQL)                                       | 5002 | `jobber` (Prisma)      | Tables `Job`, `JobItem`, `outbox`                                                                                                                                                                                                                       |
+| executor | 3002                                                         | —    | —                      | Consumes job topics (subscription `jobber`); with `RABBITMQ_URL` set, also the email worker on `notifications.email` (SMTP to Mailpit, `GetUser` from auth, Redis dedupe)                                                                               |
+| products | 3003                                                         | 5001 | `products` (Drizzle)   | `products.source_ref` is unique                                                                                                                                                                                                                         |
+| wallet   | 3004 (`/wallet` GraphQL)                                     | 5003 | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox`, `idempotency_keys`; Redis for the idempotency fast path; consumes `payment-succeeded` (subscription `wallet`, Key_Shared) and queues `email.topup`; `npx nx run wallet:seed` |
+| payments | 3005 (`/payments` GraphQL, `POST /payments/webhooks/stripe`) | —    | `payments` (Drizzle)   | `payments`, `stripe_events`, `recon_issues`, `outbox`, `idempotency_keys`; RabbitMQ `payments.commands` + delay buckets; Stripe keys in `apps/payments/.env.local` (gitignored)                                                                         |
+| ui-admin | 4200                                                         | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                                                                                                                                                                                                  |
+| nexus    | 4300                                                         | —    | —                      | React; Vite proxies `/api/auth` to 3000 and `/api/wallet` to 3004                                                                                                                                                                                       |
 
 | Infrastructure (docker compose)      | Port(s)          | UI                                     |
 | ------------------------------------ | ---------------- | -------------------------------------- |
@@ -85,6 +88,7 @@ npx nx run auth:migrate-prisma            # auth (Prisma)
 cd apps/jobs && npx prisma migrate dev    # jobs (Prisma): Job, JobItem, outbox
 npx nx run products:migrate-drizzle       # products (Drizzle)
 npx nx run wallet:migrate-drizzle         # wallet (Drizzle); creates the database first
+npx nx run payments:migrate-drizzle       # payments (Drizzle); likewise
 npx nx run wallet:seed                    # with auth + wallet running: alice@/bob@example.com, $100 each
 ```
 
@@ -114,6 +118,8 @@ npx nx test outbox                                 # also Testcontainers (Drizzl
 npx nx test money                                  # amount parsing and formatting
 npx nx test idempotency                            # Testcontainers PostgreSQL + Redis
 npx nx test rabbitmq                               # Testcontainers RabbitMQ: retries, DLQ, delays
+npx nx test payments                               # Testcontainers PostgreSQL + RabbitMQ; Stripe faked
+npx nx test executor                               # email worker: Testcontainers RabbitMQ, Redis, Mailpit
 npx nx run rabbitmq:replay --queue=<name>          # move <name>.dlq back to <name>
 npx nx run wallet:load-test overdraft              # k6 in Docker against running auth + wallet
                                                    # (also: deadlock, same-key)
@@ -122,18 +128,35 @@ npx nx run nexus-e2e:e2e                           # Playwright; needs auth + wa
 npx nx run nexus:codegen                           # regenerate GraphQL types (CI checks them)
 ```
 
-**Fault injection.** Start the executor with `FAULT_ACK_FAILURES=3` and its first 3 messages fail
-right after doing their work, so Pulsar redelivers them. Use it to prove a job still completes
-exactly once. The variable is ignored when `NODE_ENV=production`.
+**Fault injection** (both ignored when `NODE_ENV=production`):
+
+- `FAULT_ACK_FAILURES=3` on the executor: its first 3 job messages fail right after doing their
+  work, so Pulsar redelivers them. Proves a job still completes exactly once.
+- `FAULT_CRASH_AFTER_CREDIT=1` on the wallet: the process exits right after a top-up credit
+  commits and before the Pulsar ack. Restart without it: the redelivery is recognised
+  ("already credited"), and there is still one credit and one email.
+
+**Live check of a top-up without the Stripe CLI.** Start `payments` with any
+`STRIPE_WEBHOOK_SECRET` (for example `whsec_local`). Then sign a `checkout.session.completed`
+event for a real `createTopUp` with `stripe.webhooks.generateTestHeaderString` and POST it to
+`/payments/webhooks/stripe`. Everything after Stripe (credit, email, trace) runs for real.
 
 ## Observing the system
 
 - **Traces:** open Jaeger at http://localhost:16686 and pick service `jobs` or `executor`. One job
   is one trace: GraphQL request → outbox `<topic> publish` → executor `<topic> process` →
-  `Acknowledge` gRPC back into `jobs`. Set `OTEL_SDK_DISABLED=true` (or remove
-  `OTEL_EXPORTER_OTLP_ENDPOINT` from an app's `.env`) to turn tracing off.
-- **Outbox:** `select id, destination, published_at from outbox order by id desc limit 10;` in the
-  `jobber` database. Rows with `published_at IS NULL` are waiting for the relay.
+  `Acknowledge` gRPC back into `jobs`. A top-up is one trace too: `payments` webhook →
+  `payment-succeeded publish` → wallet `payment-succeeded process` → `notifications publish`
+  → executor `notifications.email process` → `GetUser` in auth. Set `OTEL_SDK_DISABLED=true`
+  (or remove `OTEL_EXPORTER_OTLP_ENDPOINT` from an app's `.env`) to turn tracing off.
+- **Outbox:** `select id, transport, destination, published_at from outbox order by id desc limit 10;`
+  in the service's database (`jobber`, `wallet`, `payments`). Rows with `published_at IS NULL`
+  are waiting for the relay. Each transport is its own ordered stream, so RabbitMQ rows waiting
+  for a broker that is down don't hold back the Pulsar rows.
+- **RabbitMQ:** the UI at http://localhost:15672 (guest / guest), or
+  `docker exec jobber-rabbitmq-1 rabbitmqctl list_queues name messages`. A non-empty
+  `<queue>.dlq` needs a look, then `npx nx run rabbitmq:replay --queue=<queue>`.
+- **Emails:** Mailpit at http://localhost:8025.
 - **Pulsar:**
 
   ```bash
@@ -169,8 +192,12 @@ exactly once. The variable is ignored when `NODE_ENV=production`.
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | every backend `apps/*/.env` | Where traces go (Jaeger, `http://localhost:4318`); unset = tracing off                                   |
 | `OTEL_SDK_DISABLED`           | optional                    | `true` turns tracing off                                                                                 |
 | `FAULT_ACK_FAILURES`          | executor, tests only        | Fail the first n messages after `execute`                                                                |
-| `RABBITMQ_URL`                | payments                    | `amqp://localhost:5672`                                                                                  |
+| `RABBITMQ_URL`                | payments, wallet, executor  | `amqp://localhost:5672`; without it the executor starts without the email worker                         |
 | `STRIPE_SECRET_KEY`           | `apps/payments/.env.local`  | Stripe test-mode secret key (`sk_test_…`); never in a committed file                                     |
 | `STRIPE_WEBHOOK_SECRET`       | `apps/payments/.env.local`  | `whsec_…` printed by `stripe listen`; changes with every `stripe listen` session, restart payments after |
 | `APP_URL`                     | payments                    | Where Checkout returns the browser (`http://localhost:4300`)                                             |
 | `PAYMENT_EXPIRY_BUCKET`       | payments                    | `delay.30m` (default) or `delay.1m` to watch an unpaid top-up expire after a minute                      |
+| `REDIS_URL`                   | wallet, payments, executor  | Idempotency fast path; the email worker's sent marks                                                     |
+| `SMTP_URL`                    | executor                    | `smtp://localhost:1025` (Mailpit)                                                                        |
+| `EMAIL_FROM`                  | executor                    | Sender of NexusPay emails                                                                                |
+| `FAULT_CRASH_AFTER_CREDIT`    | wallet, tests only          | `1`: exit after a top-up credit commits, before the ack                                                  |

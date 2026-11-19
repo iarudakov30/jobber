@@ -324,6 +324,23 @@ export function confirmedPublish(
   });
 }
 
+/**
+ * A readable reason for logs and `x-dead-letter-reason`. Some errors have an empty message: a
+ * refused connection tried on ::1 and 127.0.0.1 is an `AggregateError` whose text is only in
+ * its `errors` (nodemailer, Node's net). Then the inner messages and the code are used.
+ */
 export function errorText(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  if (!(e instanceof Error)) {
+    return String(e);
+  }
+  if (e.message) {
+    return e.message;
+  }
+  const inner = (e as { errors?: unknown[] }).errors;
+  const code = (e as { code?: unknown }).code;
+  const parts = [
+    ...(Array.isArray(inner) ? inner.map(errorText) : []),
+    ...(code ? [String(code)] : []),
+  ];
+  return parts.length ? parts.join('; ') : e.name;
 }

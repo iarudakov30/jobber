@@ -16,8 +16,10 @@ COPY webpack.*.config.js ./
 
 COPY apps/executor ./apps/executor
 COPY libs/grpc ./libs/grpc
+COPY libs/money ./libs/money
 COPY libs/nestjs ./libs/nestjs
 COPY libs/pulsar ./libs/pulsar
+COPY libs/rabbitmq ./libs/rabbitmq
 COPY libs/tracing ./libs/tracing
 
 # Install dependencies
@@ -39,6 +41,8 @@ COPY --from=builder /workspace/apps/executor/package.json ./apps/executor/packag
 COPY --from=builder /workspace/libs/tracing/package.json ./libs/tracing/package.json
 COPY --from=builder /workspace/libs/grpc/package.json ./libs/grpc/package.json
 COPY --from=builder /workspace/libs/pulsar/package.json ./libs/pulsar/package.json
+COPY --from=builder /workspace/libs/money/package.json ./libs/money/package.json
+COPY --from=builder /workspace/libs/rabbitmq/package.json ./libs/rabbitmq/package.json
 COPY --from=builder /workspace/package-lock.json ./
 
 ENV NODE_ENV=production
