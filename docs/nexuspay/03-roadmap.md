@@ -39,11 +39,12 @@ acceptance tests pass.
 - **Done when:** k6 fires 200 concurrent $1 transfers from a $100 wallet and exactly 100 succeed
   with no overdraft; 50 parallel requests with one `Idempotency-Key` create exactly one transfer.
 
-## Phase 3 — Stripe top-up + RabbitMQ (~2 weeks, in progress)
+## Phase 3 — Stripe top-up + RabbitMQ (~2 weeks, done)
 
 Progress, step by step: [phase-3/README.md](phase-3/README.md). Steps 1 (`libs/rabbitmq`), 2 (contracts:
 `RabbitOutboxPublisher`, `PaymentSucceededMessage`, `GetUser`) 3 (`apps/payments`)
-and 4 (wallet credit, email worker) are done.
+4 (wallet credit, email worker) and 5 (top-up screen, live run with the Stripe CLI) are done:
+all 11 acceptance tests pass.
 
 - `apps/payments` (3005): `createTopUp`, Stripe Checkout, signed webhook (`rawBody`), payment
   state machine with conditional `UPDATE … WHERE status = 'PENDING'`.

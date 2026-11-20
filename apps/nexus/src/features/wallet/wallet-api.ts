@@ -2,6 +2,7 @@ import { graphql } from '../../gql/wallet';
 import type {
   BalancesQuery,
   EntriesQuery,
+  TopUpEntryQuery,
   TransferMutation,
 } from '../../gql/wallet/graphql';
 import { walletClient } from '../../lib/graphql';
@@ -10,6 +11,7 @@ export type Balance = BalancesQuery['balances'][number];
 export type EntryPage = EntriesQuery['entries'];
 export type LedgerEntry = EntryPage['items'][number];
 export type Transfer = TransferMutation['transfer'];
+export type TopUpEntry = NonNullable<TopUpEntryQuery['topUp']>;
 
 const BALANCES = graphql(`
   query Balances {
@@ -47,6 +49,16 @@ const TRANSFER = graphql(`
   }
 `);
 
+const TOP_UP_ENTRY = graphql(`
+  query TopUpEntry($paymentId: ID!) {
+    topUp(paymentId: $paymentId) {
+      id
+      amount
+      asset
+    }
+  }
+`);
+
 /** Query keys: invalidate `walletKeys.all` after a transfer to refresh balances and history. */
 export const walletKeys = {
   all: ['wallet'] as const,
@@ -64,6 +76,18 @@ export async function fetchEntries(after: string | null): Promise<EntryPage> {
   return (
     await walletClient.request(ENTRIES, { after, first: HISTORY_PAGE_SIZE })
   ).entries;
+}
+
+/**
+ * The wallet's entry for a top-up, or null until the wallet has credited it. The payment turns
+ * SUCCEEDED a moment before the credit, which travels through Pulsar.
+ */
+export async function fetchTopUpEntry(
+  paymentId: string,
+): Promise<TopUpEntry | null> {
+  return (
+    (await walletClient.request(TOP_UP_ENTRY, { paymentId })).topUp ?? null
+  );
 }
 
 /**

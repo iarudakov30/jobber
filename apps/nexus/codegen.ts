@@ -1,8 +1,8 @@
 import type { CodegenConfig } from '@graphql-codegen/cli';
 
-// Typed GraphQL documents for the two backends the app calls, from the schema files they print
+// Typed GraphQL documents for the backends the app calls, from the schema files they print
 // on startup (no running server needed): `npx nx run nexus:codegen`. Write queries with the
-// `graphql()` function of the matching output (src/gql/auth or src/gql/wallet); CI fails when
+// `graphql()` function of the matching output (src/gql/auth, src/gql/wallet or src/gql/payments); CI fails when
 // the generated files are stale.
 const shared = {
   preset: 'client' as const,
@@ -28,6 +28,14 @@ const config: CodegenConfig = {
       schema: '../wallet/schema.gql',
       documents: [
         'src/features/wallet/**/*.{ts,tsx}',
+        '!src/**/*.spec.{ts,tsx}',
+      ],
+    },
+    'src/gql/payments/': {
+      ...shared,
+      schema: '../payments/schema.gql',
+      documents: [
+        'src/features/topup/**/*.{ts,tsx}',
         '!src/**/*.spec.{ts,tsx}',
       ],
     },

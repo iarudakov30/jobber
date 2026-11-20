@@ -20,7 +20,7 @@ apps/
   payments/    NestJS — Stripe Checkout top-ups (Drizzle); GraphQL; signed webhook;
                outbox → Pulsar + RabbitMQ; payment.expire consumer
   ui-admin/    Angular 22 — the jobber jobs console
-  nexus/       React 19 + Vite — the NexusPay app (login, Wallet, Send); GraphQL Codegen
+  nexus/       React 19 + Vite — the NexusPay app (login, Wallet, Send, Top up); GraphQL Codegen
   nexus-e2e/   Playwright tests of nexus against the real auth + wallet
 libs/
   graphql/     AbstractModel, GqlContext, GqlAuthGuard
@@ -59,7 +59,7 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 | wallet   | 3004 (`/wallet` GraphQL)                                     | 5003 | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox`, `idempotency_keys`; Redis for the idempotency fast path; consumes `payment-succeeded` (subscription `wallet`, Key_Shared) and queues `email.topup`; `npx nx run wallet:seed` |
 | payments | 3005 (`/payments` GraphQL, `POST /payments/webhooks/stripe`) | —    | `payments` (Drizzle)   | `payments`, `stripe_events`, `recon_issues`, `outbox`, `idempotency_keys`; RabbitMQ `payments.commands` + delay buckets; Stripe keys in `apps/payments/.env.local` (gitignored)                                                                         |
 | ui-admin | 4200                                                         | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                                                                                                                                                                                                  |
-| nexus    | 4300                                                         | —    | —                      | React; Vite proxies `/api/auth` to 3000 and `/api/wallet` to 3004                                                                                                                                                                                       |
+| nexus    | 4300                                                         | —    | —                      | React; Vite proxies `/api/auth` to 3000, `/api/wallet` to 3004 and `/api/payments` to 3005                                                                                                                                                                                      |
 
 | Infrastructure (docker compose)      | Port(s)          | UI                                     |
 | ------------------------------------ | ---------------- | -------------------------------------- |
@@ -136,6 +136,18 @@ npx nx run nexus:codegen                           # regenerate GraphQL types (C
   commits and before the Pulsar ack. Restart without it: the redelivery is recognised
   ("already credited"), and there is still one credit and one email.
 
+**A real top-up with the Stripe CLI** (spec acceptance tests 2 and 3; `stripe login` once):
+
+1. Put the output of `stripe listen --print-secret` into `apps/payments/.env.local` as
+   `STRIPE_WEBHOOK_SECRET`.
+2. `stripe listen --events "checkout.session.completed,checkout.session.expired" --forward-to localhost:3005/payments/webhooks/stripe`
+   (CLI 1.55 refuses to start without `--events`; in PowerShell keep the list quoted).
+3. `docker compose up -d`, then serve `auth`, `wallet`, `payments`, `executor` and `nexus`.
+4. In http://localhost:4300: Top up → $50 → pay with card 4242 4242 4242 4242, any future date,
+   any CVC. Back on the Wallet page the notice goes from "Waiting for Stripe" to "$50.00 added".
+5. `stripe events resend <evt_id>` (the id is in the `stripe listen` output) any number of
+   times: still one credit and one email.
+
 **Live check of a top-up without the Stripe CLI.** Start `payments` with any
 `STRIPE_WEBHOOK_SECRET` (for example `whsec_local`). Then sign a `checkout.session.completed`
 event for a real `createTopUp` with `stripe.webhooks.generateTestHeaderString` and POST it to
@@ -194,7 +206,7 @@ event for a real `createTopUp` with `stripe.webhooks.generateTestHeaderString` a
 | `FAULT_ACK_FAILURES`          | executor, tests only        | Fail the first n messages after `execute`                                                                |
 | `RABBITMQ_URL`                | payments, wallet, executor  | `amqp://localhost:5672`; without it the executor starts without the email worker                         |
 | `STRIPE_SECRET_KEY`           | `apps/payments/.env.local`  | Stripe test-mode secret key (`sk_test_…`); never in a committed file                                     |
-| `STRIPE_WEBHOOK_SECRET`       | `apps/payments/.env.local`  | `whsec_…` printed by `stripe listen`; changes with every `stripe listen` session, restart payments after |
+| `STRIPE_WEBHOOK_SECRET`       | `apps/payments/.env.local`  | `whsec_…` from `stripe listen --print-secret`; stays the same for one `stripe login`, restart payments after a change |
 | `APP_URL`                     | payments                    | Where Checkout returns the browser (`http://localhost:4300`)                                             |
 | `PAYMENT_EXPIRY_BUCKET`       | payments                    | `delay.30m` (default) or `delay.1m` to watch an unpaid top-up expire after a minute                      |
 | `REDIS_URL`                   | wallet, payments, executor  | Idempotency fast path; the email worker's sent marks                                                     |

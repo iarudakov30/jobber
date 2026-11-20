@@ -5,7 +5,12 @@ import { Idempotent, IdempotencyKey } from '@jobber/idempotency';
 import { User } from '@jobber/grpc';
 import { CurrentUser } from './current-user.decorator';
 import { TransferInput } from './dto/transfer.input';
-import { Balance, EntryPage, Transfer } from './models/wallet.models';
+import {
+  Balance,
+  EntryPage,
+  LedgerEntry,
+  Transfer,
+} from './models/wallet.models';
 import { asGraphQL } from './wallet.errors';
 import { WalletService } from './wallet.service';
 
@@ -31,6 +36,19 @@ export class WalletResolver {
     return asGraphQL(() =>
       this.wallet.entries(user.id, { asset, after, first }),
     );
+  }
+
+  @Query(() => LedgerEntry, {
+    nullable: true,
+    description:
+      "The signed-in user's entry for a Stripe top-up; null until the wallet has credited it " +
+      '(the payment shows SUCCEEDED a moment before).',
+  })
+  topUp(
+    @CurrentUser() user: User,
+    @Args('paymentId', { type: () => ID }) paymentId: string,
+  ): Promise<LedgerEntry | null> {
+    return asGraphQL(() => this.wallet.topUp(user.id, paymentId));
   }
 
   @Mutation(() => Transfer, {

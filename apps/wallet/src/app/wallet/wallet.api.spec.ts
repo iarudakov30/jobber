@@ -359,6 +359,42 @@ describe('GraphQL', () => {
     ]);
   });
 
+  it("finds a top-up's entry once it is credited, for its owner only", async () => {
+    const alice = await signUp();
+    const bob = await signUp();
+    const paymentId = randomUUID();
+    const TOP_UP = `
+      query ($paymentId: ID!) {
+        topUp(paymentId: $paymentId) { type asset amount }
+      }`;
+    type Found = { topUp: { type: string; amount: string } | null };
+
+    const before = await gql<Found>(alice.token, TOP_UP, { paymentId });
+    await controller.credit({
+      userId: alice.id,
+      asset: 'USD',
+      amount: '5000',
+      fromSystemAccount: 'stripe_clearing',
+      type: 'topup',
+      externalRef: paymentId,
+    });
+    const after = await gql<Found>(alice.token, TOP_UP, { paymentId });
+    const asBob = await gql<Found>(bob.token, TOP_UP, { paymentId });
+    const malformed = await gql(alice.token, TOP_UP, { paymentId: 'x' });
+
+    expect(before).toEqual({ data: { topUp: null } });
+    expect(after.data?.topUp).toEqual({
+      type: 'topup',
+      asset: 'USD',
+      amount: '5000',
+    });
+    expect(asBob).toEqual({ data: { topUp: null } });
+    expect(malformed.errors?.[0]).toMatchObject({
+      message: 'paymentId must be a payment id (a UUID)',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  });
+
   it('refuses a malformed cursor', async () => {
     const alice = await signUp();
 

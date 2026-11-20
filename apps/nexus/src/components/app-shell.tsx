@@ -35,6 +35,13 @@ export function AppShell() {
                   Wallet
                 </Link>
                 <Link
+                  to="/topup"
+                  className="text-slate-600 hover:text-slate-900"
+                  activeProps={{ className: 'font-medium text-slate-900' }}
+                >
+                  Top up
+                </Link>
+                <Link
                   to="/send"
                   className="text-slate-600 hover:text-slate-900"
                   activeProps={{ className: 'font-medium text-slate-900' }}

@@ -369,7 +369,16 @@ Vitest treats a returned function as teardown. That's why the body there is wrap
 
 ---
 
-## 7. What's not there yet (coming in phase 2)
+## 7. Added later
+
+- **Phase 2:** the Wallet and Send pages, `useQuery` / `useInfiniteQuery`, cache invalidation
+  after a transfer, and the global `FORBIDDEN` handling in `query-client.ts`.
+- **Phase 3, step 5:** the Top up page and the return from Stripe. `TopUpStatus` is the example
+  of polling with TanStack Query: `refetchInterval` as a function that stops on a final answer, a
+  second query that starts only when the first succeeds (`enabled`), and an invalidation once the
+  wallet has the money. See [05-topup-screen.md](phase-3/05-topup-screen.md).
+
+## 8. What was planned here at the time (phase 1)
 
 - **`useQuery`** — loading the balance and history with caching, loading states and retries.
 - **Cache invalidation** after a mutation: send money → the balance reloads.

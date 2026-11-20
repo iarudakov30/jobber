@@ -11,12 +11,18 @@ import { AppShell } from './components/app-shell';
 import { AuthCard } from './features/auth/auth-card';
 import { LoginForm } from './features/auth/login-form';
 import { RegisterForm } from './features/auth/register-form';
+import { TopUpPage } from './features/topup/topup-page';
 import { SendPage } from './features/wallet/send-page';
 import { WalletPage } from './features/wallet/wallet-page';
 import { session } from './lib/session';
 
 interface LoginSearch {
   returnUrl?: string;
+}
+
+interface WalletSearch {
+  /** Set by Stripe's success_url: the payment to follow until it's credited. */
+  topup?: string;
 }
 
 /** Only same-app paths: `//evil.com` or `https://…` would turn the login page into an open redirect. */
@@ -46,8 +52,27 @@ const homeRoute = createRoute({
 const walletRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/wallet',
+  validateSearch: (search: Record<string, unknown>): WalletSearch => ({
+    topup: typeof search['topup'] === 'string' ? search['topup'] : undefined,
+  }),
   beforeLoad: requireSession,
-  component: WalletPage,
+  component: function WalletRoute() {
+    const { topup } = walletRoute.useSearch();
+    const navigate = walletRoute.useNavigate();
+    return (
+      <WalletPage
+        topUpId={topup}
+        onDismissTopUp={() => navigate({ search: {}, replace: true })}
+      />
+    );
+  },
+});
+
+const topUpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/topup',
+  beforeLoad: requireSession,
+  component: () => <TopUpPage />,
 });
 
 const sendRoute = createRoute({
@@ -131,6 +156,7 @@ export const router = createRouter({
   routeTree: rootRoute.addChildren([
     homeRoute,
     walletRoute,
+    topUpRoute,
     sendRoute,
     loginRoute,
     registerRoute,

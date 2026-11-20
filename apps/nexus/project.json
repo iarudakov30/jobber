@@ -14,7 +14,8 @@
         "{projectRoot}/codegen.ts",
         "{projectRoot}/src/features/**/*",
         "{workspaceRoot}/apps/auth/schema.gql",
-        "{workspaceRoot}/apps/wallet/schema.gql"
+        "{workspaceRoot}/apps/wallet/schema.gql",
+        "{workspaceRoot}/apps/payments/schema.gql"
       ],
       "outputs": ["{projectRoot}/src/gql"],
       "cache": true

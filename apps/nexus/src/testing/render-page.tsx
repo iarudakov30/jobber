@@ -13,6 +13,7 @@ import type { ComponentType } from 'react';
 
 /** The wallet API as the browser sees it in tests (jsdom's origin + the proxied path). */
 export const WALLET_URL = 'http://localhost:3000/api/wallet';
+export const PAYMENTS_URL = 'http://localhost:3000/api/payments';
 
 /** An MSW server for one spec file: `onUnhandledRequest: 'error'` catches unexpected calls. */
 export function mockServer() {

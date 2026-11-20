@@ -57,6 +57,11 @@ type Query {
 
   """The signed-in user's ledger entries, newest first."""
   entries(after: ID, asset: String, first: Int! = 50): EntryPage!
+
+  """
+  The signed-in user's entry for a Stripe top-up; null until the wallet has credited it (the payment shows SUCCEEDED a moment before).
+  """
+  topUp(paymentId: ID!): LedgerEntry
 }
 
 type Transfer {

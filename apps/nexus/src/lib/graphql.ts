@@ -12,6 +12,7 @@ export function graphqlClient(path: string): GraphQLClient {
 
 export const authClient = graphqlClient('/api/auth');
 export const walletClient = graphqlClient('/api/wallet');
+export const paymentsClient = graphqlClient('/api/payments');
 
 /** The `extensions.code` of a GraphQL error response (`FORBIDDEN`, `CONFLICT`, ...). */
 export function graphqlErrorCode(error: unknown): string | undefined {

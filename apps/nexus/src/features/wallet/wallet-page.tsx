@@ -7,6 +7,7 @@ import { FormError } from '../../components/ui/field';
 import { cn } from '../../lib/cn';
 import { errorMessages } from '../../lib/errors';
 import { formatMinorUnits } from '../../lib/money';
+import { TopUpStatus } from '../topup/top-up-status';
 import {
   type LedgerEntry,
   fetchBalances,
@@ -25,7 +26,17 @@ const dateFormat = new Intl.DateTimeFormat('en-US', {
   timeStyle: 'short',
 });
 
-export function WalletPage() {
+/**
+ * Balances and history. `topUpId` is set when Stripe sends the browser back after a top-up
+ * (`/wallet?topup=<paymentId>`); the page then follows that payment until it is credited.
+ */
+export function WalletPage({
+  topUpId,
+  onDismissTopUp = () => undefined,
+}: {
+  topUpId?: string;
+  onDismissTopUp?: () => void;
+} = {}) {
   const balances = useQuery({
     queryKey: walletKeys.balances,
     queryFn: fetchBalances,
@@ -42,13 +53,29 @@ export function WalletPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Wallet</h1>
-        <Link
-          to="/send"
-          className="inline-flex h-10 items-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          Send money
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to="/topup"
+            className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50"
+          >
+            Top up
+          </Link>
+          <Link
+            to="/send"
+            className="inline-flex h-10 items-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            Send money
+          </Link>
+        </div>
       </div>
+
+      {topUpId && (
+        <TopUpStatus
+          key={topUpId}
+          paymentId={topUpId}
+          onDismiss={onDismissTopUp}
+        />
+      )}
 
       <Card title="Balances">
         {balances.isPending && <p className="text-slate-500">Loading…</p>}

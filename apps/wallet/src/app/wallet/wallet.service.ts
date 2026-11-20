@@ -1,7 +1,7 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { randomUUID } from 'crypto';
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { SQL, and, desc, eq, lt } from 'drizzle-orm';
 import { firstValueFrom } from 'rxjs';
 import {
   AUTH_SERVICE_NAME,
@@ -59,6 +59,8 @@ export interface CreditInput {
 }
 
 export const MAX_PAGE_SIZE = 100;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * System accounts `Credit` may draw from. `seed` is the dev faucet (`wallet:seed`), refused in
@@ -146,7 +148,39 @@ export class WalletService implements OnModuleInit {
       conditions.push(lt(entries.id, BigInt(options.after)));
     }
 
-    const rows = await this.db
+    const rows = await this.userEntries(conditions)
+      .orderBy(desc(entries.id))
+      .limit(first + 1);
+
+    const items = rows
+      .slice(0, first)
+      .map((r) => ({ ...r, id: r.id.toString() }));
+    return {
+      items,
+      nextCursor: rows.length > first ? items[items.length - 1].id : null,
+    };
+  }
+
+  /**
+   * The user's entry for a Stripe top-up (`type 'topup'`, `externalRef = paymentId`), or null
+   * until the wallet has credited it. `payments` reports SUCCEEDED before the credit, which
+   * arrives through Pulsar, so the app polls this to know when the balance has the money.
+   */
+  async topUp(userId: number, paymentId: string): Promise<EntryRow | null> {
+    if (!UUID.test(paymentId)) {
+      throw new WalletInputError('paymentId must be a payment id (a UUID)');
+    }
+    const [row] = await this.userEntries([
+      eq(accounts.ownerType, 'user'),
+      eq(accounts.ownerId, String(userId)),
+      eq(transactions.type, 'topup'),
+      eq(transactions.externalRef, paymentId.toLowerCase()),
+    ]).limit(1);
+    return row ? { ...row, id: row.id.toString() } : null;
+  }
+
+  private userEntries(conditions: SQL[]) {
+    return this.db
       .select({
         id: entries.id,
         transactionId: entries.transactionId,
@@ -159,16 +193,7 @@ export class WalletService implements OnModuleInit {
       .innerJoin(accounts, eq(accounts.id, entries.accountId))
       .innerJoin(transactions, eq(transactions.id, entries.transactionId))
       .where(and(...conditions))
-      .orderBy(desc(entries.id))
-      .limit(first + 1);
-
-    const items = rows
-      .slice(0, first)
-      .map((r) => ({ ...r, id: r.id.toString() }));
-    return {
-      items,
-      nextCursor: rows.length > first ? items[items.length - 1].id : null,
-    };
+      .$dynamic();
   }
 
   /**

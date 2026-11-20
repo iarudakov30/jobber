@@ -28,7 +28,7 @@ npx nx test auth --testFile=apps/auth/src/app/auth/auth.service.spec.ts
 npx nx test ui-admin --include=apps/ui-admin/src/app/auth/session.spec.ts   # ui-admin uses Vitest, not Jest
 npx nx test nexus -- src/lib/session.spec.ts                    # nexus runs plain Vitest from apps/nexus
 npx nx run nexus-e2e:e2e           # Playwright against running auth + wallet (starts the nexus dev server)
-npx nx run nexus:codegen           # GraphQL types from apps/{auth,wallet}/schema.gql; CI fails if stale
+npx nx run nexus:codegen           # GraphQL types from apps/{auth,wallet,payments}/schema.gql; CI fails if stale
 npx nx test wallet                 # real PostgreSQL via Testcontainers: Docker must be running
 npx nx test outbox                 # likewise (DrizzleOutboxStore spec)
 npx nx test payments               # Testcontainers PostgreSQL + RabbitMQ; Stripe faked, signatures real
@@ -294,7 +294,8 @@ NexusPay's money service (phase 2; top-up credits since phase 3): the only servi
   `DrizzleOutboxStore` (none for a duplicate or a refused posting). `ensureAccounts(userId, asset)` / `ensureSystemAccount(name, asset)` create accounts
   lazily.
 - **GraphQL** (`/wallet`, code-first, `apps/wallet/src/app/wallet/`): `balances`, `entries(asset, after,
-  first)` (newest first, cursor = last entry id), `transfer(input: { toEmail, asset, amount })`, all
+  first)` (newest first, cursor = last entry id), `topUp(paymentId)` (the user's entry for a
+  Stripe top-up, `null` until credited; the React app polls it after `payments` says SUCCEEDED), `transfer(input: { toEmail, asset, amount })`, all
   behind `GqlAuthGuard`. Money is the `MinorUnits` scalar: a decimal string of minor units, never a
   JSON number. Caller mistakes are `BAD_USER_INPUT` (or `BAD_REQUEST` from `ValidationPipe`) with
   messages that start with the field name. The app prints its schema to `apps/wallet/schema.gql`
@@ -382,10 +383,13 @@ balances: it announces `payment-succeeded` and the wallet credits it (phase 3, s
 - **Secrets:** `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` live in `apps/payments/.env.local`
   (gitignored; `ConfigModule` reads it before `.env`). Every `apps/*/.env` is committed, so
   never put a secret there.
-- **Stripe CLI** for local webhooks: `stripe login` once, then
-  `stripe listen --forward-to localhost:3005/payments/webhooks/stripe` and copy the printed
-  `whsec_…` into `.env.local`. It changes with every `stripe listen` session, so restart
-  `payments` after. Watch an unpaid top-up expire after a minute with
+- **Stripe CLI** for local webhooks: `stripe login` once; `stripe listen --print-secret` gives the
+  `whsec_…` for `.env.local` (the same for every session of that login; restart `payments` after
+  changing it). Then
+  `stripe listen --events "checkout.session.completed,checkout.session.expired" --forward-to localhost:3005/payments/webhooks/stripe`:
+  CLI 1.55 refuses to start without `--events`, and PowerShell needs the list quoted.
+  `stripe events resend <evt_id>` replays a webhook. The manual run is in
+  `docs/nexuspay/02-repo-guide.md`. Watch an unpaid top-up expire after a minute with
   `PAYMENT_EXPIRY_BUCKET=delay.1m`.
 - Tests (`payments.api.spec.ts`) run the real app against Testcontainers PostgreSQL and RabbitMQ
   (`delay.1m` shortened to 2 s) with `auth`, Pulsar and Stripe's Checkout API faked; webhook
@@ -440,19 +444,25 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 - **Server errors:** `applyServerErrors()` (`src/lib/errors.ts`) is the React counterpart of
   `serverErrors()`: class-validator messages go on the field they name, the rest on `root.server`.
 - **API:** relative `/api/<service>` URLs; `vite.config.mts` proxies them with `/api` stripped
-  (`/api/auth` → 3000, `/api/wallet` → 3004), keeping the HttpOnly cookie same-origin.
+  (`/api/auth` → 3000, `/api/wallet` → 3004, `/api/payments` → 3005), keeping the HttpOnly cookie same-origin.
   `createQueryClient()` (`src/lib/query-client.ts`) clears the session and goes to `/login` on
   any `FORBIDDEN` answer.
 - **GraphQL Codegen** (`apps/nexus/codegen.ts`, `npx nx run nexus:codegen`): client preset, one
-  output per backend (`src/gql/auth`, `src/gql/wallet`) from the schema files the backends print
-  on startup (`apps/auth/schema.gql`, `apps/wallet/schema.gql`; each has a test that fails when
+  output per backend (`src/gql/auth`, `src/gql/wallet`, `src/gql/payments`; documents from
+  `features/auth`, `features/wallet`, `features/topup`) from the schema files the backends print
+  on startup (`apps/auth/schema.gql`, `apps/wallet/schema.gql`, `apps/payments/schema.gql`; each has a test that fails when
   it is stale). Write documents with that output's `graphql()` (see `features/wallet/wallet-api.ts`)
   and rerun codegen; CI regenerates and fails on any difference. `src/gql` is excluded from
   Prettier and ESLint. `MinorUnits` and `DateTime` are strings; use `@jobber/money` to parse and
   format amounts.
 - **Pages:** `/wallet` (balances, history with "Load more") and `/send` (one `Idempotency-Key` per
   transfer, reused when the same recipient and amount are retried; an in-flight ref ignores a
-  double submit). `/` redirects to `/wallet`.
+  double submit). `/topup` (one `Idempotency-Key` per amount, `createTopUp`, then
+  `window.location.assign(checkoutUrl)` through the `goTo` prop; the button stays disabled while
+  the browser leaves). Stripe returns to `/wallet?topup=<paymentId>`: `TopUpStatus`
+  (`features/topup/top-up-status.tsx`) polls `payment(id)`, then the wallet's `topUp(paymentId)`,
+  once a second for up to 30 s each, and invalidates `['wallet']` only after the credit.
+  `/` redirects to `/wallet`.
 - **Tests:** Vitest + Testing Library; pages that call the API use MSW 3 (`graphql` comes from
   `msw/graphql`) through `src/testing/render-page.tsx` (`mockServer()`, `renderPage()`).
   `apps/nexus-e2e` runs Playwright (Chromium) against the real `auth` and `wallet`: global setup

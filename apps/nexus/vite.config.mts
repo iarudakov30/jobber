@@ -22,6 +22,7 @@ export default defineConfig(() => ({
     proxy: {
       '/api/auth': api('http://localhost:3000'),
       '/api/wallet': api('http://localhost:3004'),
+      '/api/payments': api('http://localhost:3005'),
     },
   },
   preview: {

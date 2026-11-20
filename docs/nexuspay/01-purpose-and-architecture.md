@@ -36,15 +36,15 @@ balance change is a ledger transaction; every page updates live over a WebSocket
 
 ## Architecture
 
-### What runs today (phase 3, step 4)
+### What runs today (end of phase 3)
 
 Every box below exists and is tested. Solid arrows carry data, dotted ones are gRPC calls. The
-React app can't start a top-up yet (that's step 5); until then `createTopUp` is called directly.
+browser leaves for Stripe's Checkout page to pay and comes back to `/wallet?topup=<id>`.
 
 ```mermaid
 flowchart LR
   subgraph browser["Browser"]
-    NEXUS["nexus 4300<br/>React: login, Wallet, Send"]
+    NEXUS["nexus 4300<br/>React: login, Wallet,<br/>Send, Top up"]
     ADMIN["ui-admin 4200<br/>Angular jobs console"]
   end
   subgraph services["NestJS services"]
@@ -67,6 +67,8 @@ flowchart LR
 
   NEXUS -- GraphQL --> AUTH
   NEXUS -- GraphQL --> WAL
+  NEXUS -- GraphQL --> PAY
+  NEXUS -- "redirect to Checkout,<br/>back to /wallet?topup=id" --> STRIPE
   ADMIN -- GraphQL --> AUTH
   ADMIN -- GraphQL --> JOBS
 
@@ -227,10 +229,21 @@ sequenceDiagram
   R->>E: notifications.email
   E->>A: GetUser(userId)
   E->>M: SMTP, then remember email:sent:{messageId} in Redis
+  S-->>UI: redirect to /wallet?topup={paymentId}
+  loop every second, up to 30 s
+    UI->>P: payment(id) until SUCCEEDED / EXPIRED / FAILED
+  end
+  loop every second, up to 30 s
+    UI->>W: topUp(paymentId) until credited
+  end
+  UI->>W: refetch balances and history
   Note over P,R: 30 min later: payment.expire → payments asks Stripe to expire the session first
 ```
 
-The live balance push over a WebSocket comes in phase 4; until then the React app polls.
+The redirect back can come before the webhook, and "SUCCEEDED" in `payments` comes before the
+credit in the wallet, so the app waits for both before it reloads the balance
+([phase 3, step 5](phase-3/05-topup-screen.md)). The live balance push over a WebSocket comes in
+phase 4 and replaces the polling.
 
 Each arrow that can be repeated is safe to repeat: the API call by `Idempotency-Key`, the Stripe
 call by its idempotency key, the webhook by `stripe_events.event_id`, the credit by
