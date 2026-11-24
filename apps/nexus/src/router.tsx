@@ -1,5 +1,4 @@
 import {
-  Link,
   createRootRoute,
   createRoute,
   createRouter,
@@ -8,9 +7,8 @@ import {
 } from '@tanstack/react-router';
 
 import { AppShell } from './components/app-shell';
-import { AuthCard } from './features/auth/auth-card';
-import { LoginForm } from './features/auth/login-form';
-import { RegisterForm } from './features/auth/register-form';
+import { LoginPage } from './features/auth/login-page';
+import { RegisterPage } from './features/auth/register-page';
 import { TopUpPage } from './features/topup/topup-page';
 import { SendPage } from './features/wallet/send-page';
 import { WalletPage } from './features/wallet/wallet-page';
@@ -94,28 +92,11 @@ const loginRoute = createRoute({
       throw redirect({ to: '/' });
     }
   },
-  component: function LoginPage() {
+  component: function LoginRoute() {
     const { returnUrl } = loginRoute.useSearch();
     const router = useRouter();
     return (
-      <AuthCard
-        title="Sign in"
-        footer={
-          <>
-            No account yet?{' '}
-            <Link
-              to="/register"
-              className="font-medium text-slate-900 underline"
-            >
-              Create one
-            </Link>
-          </>
-        }
-      >
-        <LoginForm
-          onSuccess={() => router.history.push(safeReturnUrl(returnUrl))}
-        />
-      </AuthCard>
+      <LoginPage onSuccess={() => router.history.push(safeReturnUrl(returnUrl))} />
     );
   },
 });
@@ -128,26 +109,10 @@ const registerRoute = createRoute({
       throw redirect({ to: '/' });
     }
   },
-  component: function RegisterPage() {
+  component: function RegisterRoute() {
     const router = useRouter();
     return (
-      <AuthCard
-        title="Create your account"
-        footer={
-          <>
-            Already have an account?{' '}
-            <Link
-              to="/login"
-              search={{}}
-              className="font-medium text-slate-900 underline"
-            >
-              Sign in
-            </Link>
-          </>
-        }
-      >
-        <RegisterForm onSuccess={() => router.navigate({ to: '/wallet' })} />
-      </AuthCard>
+      <RegisterPage onSuccess={() => router.navigate({ to: '/wallet' })} />
     );
   },
 });
