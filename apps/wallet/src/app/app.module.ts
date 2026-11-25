@@ -4,7 +4,12 @@ import { ApolloDriverConfig } from '@nestjs/apollo';
 import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'path';
 import { LoggerModule } from '@jobber/nestjs';
-import { RabbitModule, notificationsTopology } from '@jobber/rabbitmq';
+import {
+  RabbitModule,
+  mergeTopologies,
+  notificationsTopology,
+  realtimeTopology,
+} from '@jobber/rabbitmq';
 import { DatabaseModule } from './database/database.module';
 import { graphQLOptions } from './graphql.options';
 import { LedgerModule } from './ledger/ledger.module';
@@ -18,12 +23,13 @@ import { WalletModule } from './wallet/wallet.module';
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     // Declares the notifications exchange and the email queue, so an email published before the
-    // executor ever ran still has a queue to wait in.
+    // executor ever ran still has a queue to wait in, and the realtime exchange for the
+    // balance and fill messages.
     RabbitModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         url: configService.getOrThrow('RABBITMQ_URL'),
-        topology: notificationsTopology(),
+        topology: mergeTopologies(notificationsTopology(), realtimeTopology()),
         connectionName: 'wallet',
       }),
     }),

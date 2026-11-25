@@ -1,18 +1,20 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
 import {
   AuditResult,
   Balances,
   CreditRequest,
   GetBalancesRequest,
   GrpcLoggingInterceptor,
-  GrpcStatus,
+  HoldRef,
+  HoldRequest,
   PostingResult,
+  SettleTradeRequest,
   WalletServiceController,
   WalletServiceControllerMethods,
 } from '@jobber/grpc';
 import { fromWire, toWire } from '@jobber/money';
 import { LedgerService } from '../ledger/ledger.service';
+import { TradingService } from '../trading/trading.service';
 import { asRpc } from './wallet.errors';
 import { WalletService } from './wallet.service';
 
@@ -24,6 +26,7 @@ export class WalletController implements WalletServiceController {
   constructor(
     private readonly wallet: WalletService,
     private readonly ledger: LedgerService,
+    private readonly trading: TradingService,
   ) {}
 
   credit(request: CreditRequest): Promise<PostingResult> {
@@ -46,23 +49,26 @@ export class WalletController implements WalletServiceController {
     return { issues: await this.ledger.audit() };
   }
 
-  // Trading RPCs: the contract is in wallet.proto; phase 4 step 2 implements them.
-  settleTrade(): never {
-    throw notYet('SettleTrade');
+  // Trading RPCs for the market. Each is idempotent by its id: a retry returns the first
+  // posting with duplicate: true.
+  settleTrade(request: SettleTradeRequest): Promise<PostingResult> {
+    return asRpc(() =>
+      this.trading.settleTrade({
+        ...request,
+        qty: fromWire(request.qty),
+        usdAmount: fromWire(request.usdAmount),
+        fee: fromWire(request.fee),
+      }),
+    );
   }
 
-  placeHold(): never {
-    throw notYet('PlaceHold');
+  placeHold(request: HoldRequest): Promise<PostingResult> {
+    return asRpc(() =>
+      this.trading.placeHold({ ...request, amount: fromWire(request.amount) }),
+    );
   }
 
-  releaseHold(): never {
-    throw notYet('ReleaseHold');
+  releaseHold({ holdId }: HoldRef): Promise<PostingResult> {
+    return asRpc(() => this.trading.releaseHold(holdId));
   }
-}
-
-function notYet(rpc: string): RpcException {
-  return new RpcException({
-    code: GrpcStatus.UNIMPLEMENTED,
-    message: `${rpc} is not implemented yet`,
-  });
 }

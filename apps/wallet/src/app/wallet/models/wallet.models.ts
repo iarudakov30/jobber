@@ -57,3 +57,25 @@ export class Transfer {
   @Field()
   asset: string;
 }
+
+@ObjectType({
+  description:
+    'A coin the signed-in user holds through trades, with its average cost (fees included).',
+})
+export class Position {
+  @Field()
+  coin: string;
+
+  @Field(() => MinorUnits, { description: 'Coin minor units (8 decimals).' })
+  qty: bigint;
+
+  @Field(() => MinorUnits, {
+    description: 'USD cents paid for qty, fees included.',
+  })
+  costBasis: bigint;
+
+  @Field(() => MinorUnits, {
+    description: 'USD cents per whole coin, rounded down.',
+  })
+  averagePrice: bigint;
+}

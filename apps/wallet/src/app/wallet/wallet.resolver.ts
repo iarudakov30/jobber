@@ -9,19 +9,33 @@ import {
   Balance,
   EntryPage,
   LedgerEntry,
+  Position,
   Transfer,
 } from './models/wallet.models';
 import { asGraphQL } from './wallet.errors';
+import { TradingService } from '../trading/trading.service';
 import { WalletService } from './wallet.service';
 
 @Resolver()
 @UseGuards(GqlAuthGuard)
 export class WalletResolver {
-  constructor(private readonly wallet: WalletService) {}
+  constructor(
+    private readonly wallet: WalletService,
+    private readonly trading: TradingService,
+  ) {}
 
   @Query(() => [Balance], { description: "The signed-in user's balances." })
   balances(@CurrentUser() user: User): Promise<Balance[]> {
     return this.wallet.balances(user.id);
+  }
+
+  @Query(() => [Position], {
+    description:
+      "The signed-in user's coins bought through trades and not sold since, with their " +
+      'average cost, in coin list order.',
+  })
+  positions(@CurrentUser() user: User): Promise<Position[]> {
+    return this.trading.positions(user.id);
   }
 
   @Query(() => EntryPage, {

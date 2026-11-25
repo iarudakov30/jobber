@@ -51,12 +51,32 @@ type Mutation {
   transfer(input: TransferInput!): Transfer!
 }
 
+"""
+A coin the signed-in user holds through trades, with its average cost (fees included).
+"""
+type Position {
+  """USD cents per whole coin, rounded down."""
+  averagePrice: MinorUnits!
+  coin: String!
+
+  """USD cents paid for qty, fees included."""
+  costBasis: MinorUnits!
+
+  """Coin minor units (8 decimals)."""
+  qty: MinorUnits!
+}
+
 type Query {
   """The signed-in user's balances."""
   balances: [Balance!]!
 
   """The signed-in user's ledger entries, newest first."""
   entries(after: ID, asset: String, first: Int! = 50): EntryPage!
+
+  """
+  The signed-in user's coins bought through trades and not sold since, with their average cost, in coin list order.
+  """
+  positions: [Position!]!
 
   """
   The signed-in user's entry for a Stripe top-up; null until the wallet has credited it (the payment shows SUCCEEDED a moment before).

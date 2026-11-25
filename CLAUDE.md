@@ -249,7 +249,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 ### Communication Patterns
 
 1. **GraphQL (external)** — clients talk to `auth` and `jobs` via Apollo GraphQL APIs
-2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email, and `GetUser`, for the email worker); other services call `wallet`'s `WalletService` (`Credit`, `GetBalances`, `RunAudit`; `SettleTrade`, `PlaceHold`, `ReleaseHold` for the market from phase 4); `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
+2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email, and `GetUser`, for the email worker); other services call `wallet`'s `WalletService` (`Credit`, `GetBalances`, `RunAudit`; `SettleTrade`, `PlaceHold`, `ReleaseHold` for the market); `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
 3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them. NexusPay events too: `payments` → `payment-succeeded` → `wallet`
 4. **RabbitMQ (async)** — work queues and timers: `payment.expire` through the `delay.30m` bucket back into `payments`; `email.topup` from `wallet` to the executor's email worker
 
@@ -280,7 +280,8 @@ NexusPay's money service (phase 2; top-up credits since phase 3): the only servi
 
 - **Schema** (`apps/wallet/src/app/ledger/schema.ts`): `assets` (USD, scale 2), `accounts`
   (owner + asset + kind, cached `balance`), `transactions` (`UNIQUE (type, external_ref)`),
-  `entries` (signed amounts). Amounts are `bigint` minor units everywhere; never JS numbers.
+  `entries` (signed amounts), `holds` (limit order reservations: ACTIVE | CAPTURED | RELEASED).
+  Amounts are `bigint` minor units everywhere; never JS numbers.
 - **Database guarantees** (custom migration `drizzle/0001_ledger_triggers.sql` plus constraints):
   a deferred trigger rejects at COMMIT any transaction whose entries don't sum to zero per
   asset; entries are append-only (UPDATE, DELETE, TRUNCATE raise); user accounts can't go
@@ -307,9 +308,23 @@ NexusPay's money service (phase 2; top-up credits since phase 3): the only servi
   after changing the API.
 - **gRPC `WalletService`** (5003, `wallet.proto`): `Credit` (from `seed` or `stripe_clearing`;
   `seed` is refused in production), `GetBalances`, `RunAudit` (`LedgerService.audit()`: cached
-  balances vs entries, unbalanced transactions, in one REPEATABLE READ snapshot). `SettleTrade`,
-  `PlaceHold`, `ReleaseHold` (phase 4 trading contract) answer `UNIMPLEMENTED` until phase 4
-  step 2.
+  balances vs entries, unbalanced transactions, in one REPEATABLE READ snapshot), and the
+  trading RPCs below. Errors: `INVALID_ARGUMENT` (caller mistakes), `FAILED_PRECONDITION`
+  (insufficient funds, a hold no longer ACTIVE: nothing written), `NOT_FOUND` (unknown hold).
+- **Trading** (`apps/wallet/src/app/trading/`, phase 4): `TradingService`, each call idempotent by
+  its id. `PlaceHold` inserts an ACTIVE `holds` row (id = the limit order's id) and posts `hold`
+  (available → held) in one transaction; `ReleaseHold` posts `release` (held → available).
+  `SettleTrade` posts `trade` (`externalRef = tradeId`) against the `market_maker` system account,
+  fee to `fees`; with `holdId` the user's side comes from the hold (locked `FOR UPDATE` before the
+  duplicate check), the rest goes back to available and the hold is CAPTURED. A retry with other
+  terms is refused. In the same transaction, when the market maker drops below 100 coins an
+  `inventory` posting refills it to 1,000 from `genesis`. Writes `trade-executed` (Pulsar) and a
+  realtime `fill`. GraphQL `positions` replays the user's trade metadata into quantity and
+  average cost (faucet coins aren't counted).
+- **Realtime balances:** every posting writes, per (user, asset) it touched, a RabbitMQ
+  `realtime` / `user.<id>` record `{ type: 'balance', asset, available, held }` (absolute values).
+  It locks both accounts of the pair, so for one (user, asset) a later change has a higher outbox
+  id. Use `LedgerService.postIn(tx, input)` for work that must commit with a posting.
 - **Top-ups:** `PaymentSucceededConsumer` (`apps/wallet/src/app/topups/`, Pulsar topic
   `payment-succeeded`, subscription `wallet`, Key_Shared) validates the message
   (`validateMessage`; bad data is dead-lettered) and posts `type: 'topup'`,
@@ -489,8 +504,9 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 - **`@jobber/money`** (`libs/money`) — amounts as `bigint` minor units: `ASSETS` (USD, scale 2, `kind: 'fiat'`; coins NXC, BLIP, ORB, WISP, scale 8, `kind: 'coin'`), `COINS`, `FIAT`, `isCoin`, `isFiat`, `parseAmount` ("12.34" → `1234n`, never rounds), `formatAmount` (exact, via `Intl.NumberFormat` on a decimal string; coins as `1.50000000 NXC`, since `Intl` refuses non-ISO codes), `toWire`/`fromWire` (canonical decimal strings). No framework imports, so `nexus` can use it too.
 - **`@jobber/idempotency`** (`libs/idempotency`) — `@Idempotent({ operation })` for GraphQL resolvers and HTTP handlers (`IdempotencyInterceptor`), `@IdempotencyKey()` to read the key in the handler, `DrizzleIdempotencyStore` + `idempotencyKeysTable()` (import the table from `@jobber/idempotency/table` in Drizzle schema files: drizzle-kit can't load the decorators), `RedisIdempotencyLock` (no offline queue: fails fast when Redis is down), `IdempotencyCleanup` (hourly expiry). The module provides `IDEMPOTENCY_STORE` and optionally `IDEMPOTENCY_LOCK`; see `apps/wallet/src/app/wallet/wallet.module.ts`.
 - **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`, or `DrizzleOutboxStore.enqueue(tx, records)` for Drizzle apps), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, one ordered stream per transport (a RabbitMQ outage only holds back RabbitMQ records, each transport backs off on its own), published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. `RabbitOutboxPublisher` (records with `transport: 'rabbitmq'`) publishes to the exchange `destination` with routing key `key` (a delay bucket such as `delay.30m` delays a command) and `messageId = outbox-<service>-<id>`; RabbitMQ doesn't deduplicate, so consumers dedupe on that id. One relay takes both publishers. Delivery is at-least-once.
-- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. Used by `payments` (`commands` exchange, `payments.commands`, delay buckets), `wallet` (publishes `email.topup`) and `executor` (email worker).
+- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. Used by `payments` (`commands` exchange, `payments.commands`, delay buckets), `wallet` (publishes `email.topup` and realtime `user.<id>` messages) and `executor` (email worker).
   - Shared notifications contract (`notifications.ts`): `NOTIFICATIONS_EXCHANGE`, `EMAIL_QUEUE` (`notifications.email`, bound to `email.*`), `EMAIL_TOPUP`, `notificationsTopology(retry?)` (declared by publisher and consumer alike, with the same retry, or RabbitMQ refuses the redeclare) and `TopUpEmailMessage` (class-validator).
+  - Realtime contract (`realtime.ts`, phase 4): `REALTIME_EXCHANGE` (`realtime`, topic), `userChannel(id)` (`user.<id>`), `priceChannel(coin)` (`prices.<coin>`), `realtimeTopology()`, `RealtimeBalanceMessage`, `RealtimeFillMessage`. `mergeTopologies(...parts)` combines topologies (the wallet declares notifications + realtime).
   - The connection reconnects in the background (1 s → 30 s backoff) and re-declares the topology (`declareTopology()`: exchanges, quorum queues, `<queue>.retry.<n>` TTL queues, `<queue>.dlq`, delay buckets) on every connect. The app starts while RabbitMQ is down; publishes then reject at once with `RabbitUnavailableError` (the outbox retries them).
   - `RabbitPublisher.publish(exchange, routingKey, payload, { messageId, headers?, persistent?, expirationMs? })` sends JSON on a confirm channel, resolves when the broker confirms, and adds `traceparent` to the headers.
   - `RabbitConsumer<T>` (extend it, inject `RabbitConnection`, name the queue; default prefetch 10): `onMessage(data, meta)` gets `messageId`, `routingKey` (the original, kept through retries and delay buckets in `x-original-routing-key`), string `headers` and `attempt`. A throw copies the message to the next retry queue (`x-attempt` + 1, default delays 5 s / 30 s / 5 min, 5 attempts) and acks the original; after the last attempt, or at once for `NonRetryableError` or non-JSON, the copy goes to `<queue>.dlq` with `x-dead-letter-reason`.

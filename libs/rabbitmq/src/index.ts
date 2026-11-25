@@ -4,3 +4,4 @@ export * from './lib/rabbit.publisher';
 export * from './lib/rabbit.consumer';
 export * from './lib/rabbit.module';
 export * from './lib/notifications';
+export * from './lib/realtime';

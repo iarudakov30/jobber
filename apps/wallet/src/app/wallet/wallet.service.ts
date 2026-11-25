@@ -314,7 +314,7 @@ export class WalletService implements OnModuleInit {
       this.ledger.ensureSystemAccount(fromSystemAccount, asset),
       this.ledger.ensureAccounts(userId, asset),
     ]);
-    return this.ledger.post({
+    const result = await this.ledger.post({
       type,
       externalRef,
       legs: [
@@ -323,6 +323,10 @@ export class WalletService implements OnModuleInit {
       ],
       metadata: { fromSystemAccount, toUserId: userId },
     });
+    if (!result.duplicate) {
+      this.relay.poke(); // the user's realtime balance message
+    }
+    return result;
   }
 
   private async findUser(email: string): Promise<User | null> {

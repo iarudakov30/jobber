@@ -13,6 +13,7 @@ import {
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { LedgerModule } from '../ledger/ledger.module';
 import { LedgerDatabase } from '../ledger/ledger.service';
+import { TradingModule } from '../trading/trading.module';
 import { WalletController } from './wallet.controller';
 import { WalletResolver } from './wallet.resolver';
 import { WalletService } from './wallet.service';
@@ -20,6 +21,7 @@ import { WalletService } from './wallet.service';
 @Module({
   imports: [
     LedgerModule,
+    TradingModule,
     ClientsModule.registerAsync([
       {
         // GqlAuthGuard (Authenticate) and transfers by email (FindUserByEmail).

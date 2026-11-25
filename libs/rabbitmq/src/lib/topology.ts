@@ -46,6 +46,15 @@ export interface RabbitTopology {
   delayBuckets?: DelayBucketSpec[];
 }
 
+/** One topology from several (the wallet declares notifications and realtime, for example). */
+export function mergeTopologies(...parts: RabbitTopology[]): RabbitTopology {
+  return {
+    exchanges: parts.flatMap((p) => p.exchanges ?? []),
+    queues: parts.flatMap((p) => p.queues ?? []),
+    delayBuckets: parts.flatMap((p) => p.delayBuckets ?? []),
+  };
+}
+
 /** 5 s, 30 s, then 5 min between attempts; dead-lettered after the 5th. */
 export const DEFAULT_RETRY: RetrySpec = {
   delaysMs: [5_000, 30_000, 300_000],

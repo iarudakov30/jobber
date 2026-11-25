@@ -5,6 +5,7 @@ import {
   check,
   foreignKey,
   index,
+  integer,
   jsonb,
   pgTable,
   smallint,
@@ -69,6 +70,10 @@ export const transactions = pgTable(
   },
   (t) => [
     unique('transactions_type_external_ref_unique').on(t.type, t.externalRef),
+    // `positions` reads one user's trades in order; a trade's user is in its metadata.
+    index('transactions_trade_user_idx')
+      .on(sql`(${t.metadata} ->> 'userId')`, t.createdAt)
+      .where(sql`${t.type} = 'trade'`),
   ],
 );
 
@@ -98,5 +103,34 @@ export const entries = pgTable(
     index('entries_account_id_id_idx').on(t.accountId, t.id),
     index('entries_transaction_id_idx').on(t.transactionId),
     check('amount_non_zero', sql`${t.amount} <> 0`),
+  ],
+);
+
+// A limit order's reservation (phase 4). The id is the market's order id. PlaceHold inserts it
+// ACTIVE together with its `hold` posting (available → held); SettleTrade captures it, or
+// ReleaseHold releases it (held → available). Only an ACTIVE hold can change, under FOR UPDATE.
+export const holds = pgTable(
+  'holds',
+  {
+    id: uuid('id').primaryKey(),
+    userId: integer('user_id').notNull(),
+    asset: text('asset')
+      .notNull()
+      .references(() => assets.code),
+    amount: bigint('amount', { mode: 'bigint' }).notNull(),
+    status: text('status').notNull(), // 'ACTIVE' | 'CAPTURED' | 'RELEASED'
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check('holds_amount_positive', sql`${t.amount} > 0`),
+    check(
+      'holds_status_valid',
+      sql`${t.status} IN ('ACTIVE', 'CAPTURED', 'RELEASED')`,
+    ),
   ],
 );

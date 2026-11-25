@@ -6,6 +6,7 @@ import {
   InsufficientFundsError,
   InvalidPostingError,
 } from '../ledger/ledger.errors';
+import { HoldNotFoundError, HoldStateError } from '../trading/trading.errors';
 
 /**
  * A request the caller can fix. Messages start with the input field they're about when there is
@@ -43,14 +44,27 @@ export async function asGraphQL<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Runs `fn`, reporting the caller's mistakes as gRPC `INVALID_ARGUMENT` / `FAILED_PRECONDITION`. */
+/**
+ * Runs `fn`, reporting the caller's mistakes as gRPC `INVALID_ARGUMENT`, a refused posting
+ * (insufficient funds, a hold no longer active) as `FAILED_PRECONDITION` and an unknown hold as
+ * `NOT_FOUND`.
+ */
 export async function asRpc<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (error) {
-    if (error instanceof InsufficientFundsError) {
+    if (
+      error instanceof InsufficientFundsError ||
+      error instanceof HoldStateError
+    ) {
       throw new RpcException({
         code: GrpcStatus.FAILED_PRECONDITION,
+        message: error.message,
+      });
+    }
+    if (error instanceof HoldNotFoundError) {
+      throw new RpcException({
+        code: GrpcStatus.NOT_FOUND,
         message: error.message,
       });
     }

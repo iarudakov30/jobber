@@ -1,7 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { alias } from 'drizzle-orm/pg-core';
+import { toWire } from '@jobber/money';
 import { DrizzleOutboxStore, NewOutboxRecord } from '@jobber/outbox';
+import {
+  REALTIME_EXCHANGE,
+  RealtimeBalanceMessage,
+  userChannel,
+} from '@jobber/rabbitmq';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import {
   InsufficientFundsError,
@@ -12,6 +19,13 @@ import * as schema from './schema';
 import { accounts, entries, transactions } from './schema';
 
 export type LedgerDatabase = NodePgDatabase<typeof schema>;
+/** The `tx` a `LedgerDatabase.transaction()` callback receives. */
+export type LedgerTransaction = Parameters<
+  Parameters<LedgerDatabase['transaction']>[0]
+>[0];
+
+/** The other account of a user's (asset) pair: available ↔ held. */
+const sibling = alias(accounts, 'sibling');
 
 export interface PostingLeg {
   accountId: bigint;
@@ -38,6 +52,11 @@ export interface PostingResult {
   transactionId: string;
   /** True when (type, externalRef) was already posted; nothing new was written. */
   duplicate: boolean;
+}
+
+export interface PostingRow {
+  id: string;
+  metadata: unknown;
 }
 
 export interface AuditIssue {
@@ -71,98 +90,199 @@ export class LedgerService {
    */
   async post(input: PostingInput): Promise<PostingResult> {
     validate(input);
+    return this.db.transaction((tx) => this.postIn(tx, input));
+  }
 
-    return this.db.transaction(async (tx) => {
-      // The unique (type, external_ref) makes the posting idempotent. A concurrent post of the
-      // same ref waits here until the first one commits or rolls back.
-      const [created] = await tx
-        .insert(transactions)
-        .values({
-          type: input.type,
-          externalRef: input.externalRef,
-          metadata: input.metadata ?? {},
-        })
-        .onConflictDoNothing({
-          target: [transactions.type, transactions.externalRef],
-        })
-        .returning({ id: transactions.id });
+  /**
+   * `post()` inside the caller's transaction, for work that must commit or roll back with the
+   * posting (a hold row, a top-up of the market maker). Errors leave `tx` to be rolled back.
+   */
+  async postIn(
+    tx: LedgerTransaction,
+    input: PostingInput,
+  ): Promise<PostingResult> {
+    validate(input);
 
-      if (!created) {
-        const [existing] = await tx
-          .select({ id: transactions.id })
-          .from(transactions)
-          .where(
-            and(
-              eq(transactions.type, input.type),
-              eq(transactions.externalRef, input.externalRef),
-            ),
-          );
-        return { transactionId: existing.id, duplicate: true };
+    // The unique (type, external_ref) makes the posting idempotent. A concurrent post of the
+    // same ref waits here until the first one commits or rolls back.
+    const [created] = await tx
+      .insert(transactions)
+      .values({
+        type: input.type,
+        externalRef: input.externalRef,
+        metadata: input.metadata ?? {},
+      })
+      .onConflictDoNothing({
+        target: [transactions.type, transactions.externalRef],
+      })
+      .returning({ id: transactions.id });
+
+    if (!created) {
+      const existing = await this.findPosting(
+        tx,
+        input.type,
+        input.externalRef,
+      );
+      return { transactionId: (existing as PostingRow).id, duplicate: true };
+    }
+
+    // Net change per account.
+    const deltas = new Map<bigint, bigint>();
+    for (const leg of input.legs) {
+      deltas.set(leg.accountId, (deltas.get(leg.accountId) ?? 0n) + leg.amount);
+    }
+
+    // Locked in ascending id order: two postings that touch the same accounts always lock them
+    // in the same order, so they can't deadlock. A user account's sibling (available ↔ held of
+    // the same asset) is locked too, so the balance message below reads both under the lock.
+    const legIds = [...deltas.keys()];
+    const siblings = await tx
+      .select({ id: sibling.id })
+      .from(accounts)
+      .innerJoin(
+        sibling,
+        and(
+          eq(sibling.ownerType, accounts.ownerType),
+          eq(sibling.ownerId, accounts.ownerId),
+          eq(sibling.asset, accounts.asset),
+        ),
+      )
+      .where(and(inArray(accounts.id, legIds), eq(accounts.ownerType, 'user')));
+    const lockIds = [
+      ...new Set([...legIds, ...siblings.map((s) => s.id)]),
+    ].sort(compareBigint);
+
+    const locked = await tx
+      .select({
+        id: accounts.id,
+        asset: accounts.asset,
+        ownerType: accounts.ownerType,
+      })
+      .from(accounts)
+      .where(inArray(accounts.id, lockIds))
+      .orderBy(asc(accounts.id))
+      .for('update');
+    const assetOf = new Map(locked.map((a) => [a.id, a.asset]));
+    for (const leg of input.legs) {
+      const asset = assetOf.get(leg.accountId);
+      if (asset === undefined) {
+        throw new InvalidPostingError(`Unknown account ${leg.accountId}`);
       }
-
-      // Net change per account, applied (and locked) in ascending id order: two postings that
-      // touch the same accounts always lock them in the same order, so they can't deadlock.
-      const deltas = new Map<bigint, bigint>();
-      for (const leg of input.legs) {
-        deltas.set(
-          leg.accountId,
-          (deltas.get(leg.accountId) ?? 0n) + leg.amount,
+      if (asset !== leg.asset) {
+        throw new InvalidPostingError(
+          `Account ${leg.accountId} holds ${asset}, not ${leg.asset}`,
         );
       }
-      const accountIds = [...deltas.keys()].sort(compareBigint);
+    }
 
-      const locked = await tx
-        .select({ id: accounts.id, asset: accounts.asset })
-        .from(accounts)
-        .where(inArray(accounts.id, accountIds))
-        .orderBy(asc(accounts.id))
-        .for('update');
-      const assetOf = new Map(locked.map((a) => [a.id, a.asset]));
-      for (const leg of input.legs) {
-        const asset = assetOf.get(leg.accountId);
-        if (asset === undefined) {
-          throw new InvalidPostingError(`Unknown account ${leg.accountId}`);
+    for (const accountId of [...legIds].sort(compareBigint)) {
+      const delta = deltas.get(accountId) ?? 0n;
+      if (delta === 0n) continue;
+      try {
+        await tx
+          .update(accounts)
+          .set({ balance: sql`${accounts.balance} + ${delta}` })
+          .where(eq(accounts.id, accountId));
+      } catch (error) {
+        if (isConstraintViolation(error, 'user_balance_non_negative')) {
+          throw new InsufficientFundsError(accountId);
         }
-        if (asset !== leg.asset) {
-          throw new InvalidPostingError(
-            `Account ${leg.accountId} holds ${asset}, not ${leg.asset}`,
-          );
-        }
+        throw error;
       }
+    }
 
-      for (const accountId of accountIds) {
-        const delta = deltas.get(accountId) ?? 0n;
-        if (delta === 0n) continue;
-        try {
-          await tx
-            .update(accounts)
-            .set({ balance: sql`${accounts.balance} + ${delta}` })
-            .where(eq(accounts.id, accountId));
-        } catch (error) {
-          if (isConstraintViolation(error, 'user_balance_non_negative')) {
-            throw new InsufficientFundsError(accountId);
-          }
-          throw error;
-        }
-      }
+    await tx.insert(entries).values(
+      input.legs.map((leg) => ({
+        transactionId: created.id,
+        accountId: leg.accountId,
+        asset: leg.asset,
+        amount: leg.amount,
+      })),
+    );
 
-      await tx.insert(entries).values(
-        input.legs.map((leg) => ({
-          transactionId: created.id,
-          accountId: leg.accountId,
-          asset: leg.asset,
-          amount: leg.amount,
-        })),
+    const userAccountIds = locked
+      .filter((a) => a.ownerType === 'user')
+      .map((a) => a.id);
+    const events = [
+      ...(await this.balanceMessages(tx, userAccountIds)),
+      ...(input.outbox?.(created.id) ?? []),
+    ];
+    if (events.length) {
+      await this.outbox.enqueue(tx, events);
+    }
+
+    // The deferred entries_balanced trigger re-checks the sums at COMMIT.
+    return { transactionId: created.id, duplicate: false };
+  }
+
+  /** The posting with this (type, externalRef), if any. */
+  async findPosting(
+    tx: LedgerTransaction | LedgerDatabase,
+    type: string,
+    externalRef: string,
+  ): Promise<PostingRow | null> {
+    const [row] = await tx
+      .select({ id: transactions.id, metadata: transactions.metadata })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.type, type),
+          eq(transactions.externalRef, externalRef),
+        ),
       );
+    return row ?? null;
+  }
 
-      const events = input.outbox?.(created.id) ?? [];
-      if (events.length) {
-        await this.outbox.enqueue(tx, events);
+  /**
+   * One realtime `balance` message per (user, asset) among `accountIds`, with the balances as
+   * this transaction leaves them. The caller holds both accounts of each pair locked, so for
+   * one (user, asset) the outbox ids follow the order the balances changed in.
+   */
+  private async balanceMessages(
+    tx: LedgerTransaction,
+    accountIds: bigint[],
+  ): Promise<NewOutboxRecord[]> {
+    if (!accountIds.length) return [];
+    const rows = await tx
+      .select({
+        ownerId: accounts.ownerId,
+        asset: accounts.asset,
+        kind: accounts.kind,
+        balance: accounts.balance,
+      })
+      .from(accounts)
+      .where(inArray(accounts.id, accountIds))
+      .orderBy(asc(accounts.id));
+
+    const byPair = new Map<
+      string,
+      { ownerId: string; message: RealtimeBalanceMessage }
+    >();
+    for (const row of rows) {
+      const pair = `${row.ownerId}\u0000${row.asset}`;
+      let entry = byPair.get(pair);
+      if (!entry) {
+        entry = {
+          ownerId: row.ownerId,
+          message: {
+            type: 'balance',
+            asset: row.asset,
+            available: '0',
+            held: '0',
+          },
+        };
+        byPair.set(pair, entry);
       }
-
-      // The deferred entries_balanced trigger re-checks the sums at COMMIT.
-      return { transactionId: created.id, duplicate: false };
-    });
+      if (row.kind === 'available' || row.kind === 'held') {
+        entry.message[row.kind] = toWire(row.balance);
+      }
+    }
+    return [...byPair.values()].map(({ ownerId, message }) => ({
+      transport: 'rabbitmq',
+      destination: REALTIME_EXCHANGE,
+      key: userChannel(ownerId),
+      payload: message,
+    }));
   }
 
   /**

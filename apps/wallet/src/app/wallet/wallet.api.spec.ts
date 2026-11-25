@@ -360,6 +360,37 @@ describe('GraphQL', () => {
     expect(await usd(alice.token)).toBe('10000');
   });
 
+  it("lists the user's positions from their trades", async () => {
+    const alice = await signUp(100);
+    await controller.settleTrade({
+      tradeId: randomUUID(),
+      userId: alice.id,
+      coin: 'NXC',
+      side: 'BUY',
+      qty: '150000000',
+      usdAmount: '3000',
+      fee: '15',
+      holdId: '',
+    });
+
+    const { data, errors } = await gql(
+      alice.token,
+      '{ positions { coin qty costBasis averagePrice } }',
+    );
+
+    expect(errors).toBeUndefined();
+    expect(data).toEqual({
+      positions: [
+        {
+          coin: 'NXC',
+          qty: '150000000',
+          costBasis: '3015',
+          averagePrice: '2010',
+        },
+      ],
+    });
+  });
+
   it('pages through the history, newest first', async () => {
     const alice = await signUp(100);
     const bob = await signUp();
@@ -684,17 +715,91 @@ describe('gRPC WalletService', () => {
     });
   });
 
-  it.each([
-    ['settleTrade', () => controller.settleTrade()],
-    ['placeHold', () => controller.placeHold()],
-    ['releaseHold', () => controller.releaseHold()],
-  ])('answers %s with UNIMPLEMENTED until step 2', (_, call) => {
-    expect(call).toThrow(
-      expect.objectContaining({
-        error: expect.objectContaining({ code: GrpcStatus.UNIMPLEMENTED }),
-      }),
-    );
+  it('places a hold and settles a limit order through it, amounts as strings', async () => {
+    const alice = await signUp(100);
+    const holdId = randomUUID();
+
+    const hold = await controller.placeHold({
+      holdId,
+      userId: alice.id,
+      asset: 'USD',
+      amount: '2010',
+    });
+    expect(await controller.getBalances({ userId: alice.id })).toEqual({
+      balances: [{ asset: 'USD', available: '7990', held: '2010' }],
+    });
+
+    const trade = {
+      tradeId: holdId,
+      userId: alice.id,
+      coin: 'NXC',
+      side: 'BUY',
+      qty: '100000000',
+      usdAmount: '2000',
+      fee: '10',
+      holdId,
+    };
+    const first = await controller.settleTrade(trade);
+    const again = await controller.settleTrade(trade);
+
+    expect(hold.duplicate).toBe(false);
+    expect(first.duplicate).toBe(false);
+    expect(again).toEqual({
+      transactionId: first.transactionId,
+      duplicate: true,
+    });
+    expect(await controller.getBalances({ userId: alice.id })).toEqual({
+      balances: [
+        { asset: 'USD', available: '7990', held: '0' },
+        { asset: 'NXC', available: '100000000', held: '0' },
+      ],
+    });
+    expect(relay.poke).toHaveBeenCalled();
   });
+
+  it.each([
+    [
+      'a hold beyond the balance',
+      async () =>
+        controller.placeHold({
+          holdId: randomUUID(),
+          userId: (await signUp()).id,
+          asset: 'USD',
+          amount: '1',
+        }),
+      GrpcStatus.FAILED_PRECONDITION,
+      /Insufficient funds/,
+    ],
+    [
+      'an unknown hold',
+      () => controller.releaseHold({ holdId: randomUUID() }),
+      GrpcStatus.NOT_FOUND,
+      /does not exist/,
+    ],
+    [
+      'a quantity that is not minor units',
+      () =>
+        controller.settleTrade({
+          tradeId: randomUUID(),
+          userId: 1,
+          coin: 'NXC',
+          side: 'BUY',
+          qty: '1.5',
+          usdAmount: '100',
+          fee: '1',
+          holdId: '',
+        }),
+      GrpcStatus.INVALID_ARGUMENT,
+      /not an amount in minor units/,
+    ],
+  ])(
+    'answers %s with the matching gRPC status',
+    async (_, call, code, message) => {
+      await expect(call()).rejects.toMatchObject({
+        error: { code, message: expect.stringMatching(message) },
+      });
+    },
+  );
 
   it('audits the books: nothing to report', async () => {
     await signUp(10);
