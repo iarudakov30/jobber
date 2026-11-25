@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package market;
+
+// The fake market (phase 4, apps/market). Prices are int64 USD cents per whole coin; TypeScript
+// sees int64 as decimal strings (ts-proto forceLong=string, proto-loader longs: String).
+service MarketService {
+  // Writes one day of 1-minute candles for a coin from the simulator's seeded random walk, for
+  // the BackfillCandles job (one call per coin-day). Upserts by (coin, interval, start), so a
+  // repeat writes the same candles again instead of adding rows.
+  rpc GenerateCandles(GenerateCandlesRequest) returns (GenerateCandlesResult);
+}
+
+message GenerateCandlesRequest {
+  string coin = 1;
+  // A UTC date, YYYY-MM-DD, before today.
+  string day = 2;
+}
+
+message GenerateCandlesResult {
+  // Candles written: 1440 for a full day.
+  int32 written = 1;
+}

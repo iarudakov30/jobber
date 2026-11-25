@@ -1,5 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { Pool } from 'pg';
+import { ASSETS } from '@jobber/money';
 import {
   TestDatabase,
   expectBooksBalanced,
@@ -282,6 +283,15 @@ describe('ledger invariants enforced by the database', () => {
     );
 
     expect(await wrongAsset).toMatch(/entries_account_asset_fk/);
+  });
+
+  it('knows every asset in @jobber/money, with the same scale', async () => {
+    const rows = await db.select().from(schema.assets);
+    const scales = Object.fromEntries(rows.map((r) => [r.code, r.scale]));
+
+    for (const [code, { scale }] of Object.entries(ASSETS)) {
+      expect({ code, scale: scales[code] }).toEqual({ code, scale });
+    }
   });
 });
 

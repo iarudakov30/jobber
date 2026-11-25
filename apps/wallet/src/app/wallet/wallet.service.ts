@@ -10,7 +10,14 @@ import {
   Packages,
   User,
 } from '@jobber/grpc';
-import { ASSETS, AssetCode, isAssetCode, toWire } from '@jobber/money';
+import {
+  ASSETS,
+  AssetCode,
+  FIAT,
+  isAssetCode,
+  isFiat,
+  toWire,
+} from '@jobber/money';
 import { canonicalJson as canonical } from '@jobber/idempotency';
 import { OutboxRelay } from '@jobber/outbox';
 import { DATABASE_CONNECTION } from '../database/database-connection';
@@ -88,7 +95,11 @@ export class WalletService implements OnModuleInit {
       this.authClient.getService<AuthServiceClient>(AUTH_SERVICE_NAME);
   }
 
-  /** One row per supported asset; a new user's accounts are created on this first read. */
+  /**
+   * One row per fiat currency (a new user's accounts are created on this first read), then one
+   * per coin the user has accounts for. Coin accounts arrive with the first trade, so someone who
+   * never traded sees no zero coin rows.
+   */
   async balances(userId: number): Promise<UserBalance[]> {
     const ownerId = String(userId);
     const read = () =>
@@ -104,8 +115,7 @@ export class WalletService implements OnModuleInit {
         );
 
     let rows = await read();
-    const assets = Object.keys(ASSETS) as AssetCode[];
-    const missing = assets.filter(
+    const missing = FIAT.filter(
       (asset) => rows.filter((r) => r.asset === asset).length < 2,
     );
     if (missing.length) {
@@ -115,6 +125,10 @@ export class WalletService implements OnModuleInit {
       rows = await read();
     }
 
+    const owned = new Set(rows.map((r) => r.asset));
+    const assets = (Object.keys(ASSETS) as AssetCode[]).filter(
+      (asset) => isFiat(asset) || owned.has(asset),
+    );
     return assets.map((asset) => {
       const of = (kind: string) =>
         rows.find((r) => r.asset === asset && r.kind === kind)?.balance ?? 0n;
@@ -210,7 +224,8 @@ export class WalletService implements OnModuleInit {
     idempotencyKey?: string,
   ): Promise<{ transactionId: string; asset: string; amount: bigint }> {
     const { asset, amount } = input;
-    if (!isAssetCode(asset)) {
+    // Coins move only through trades: a gift of coins would have no cost basis in `positions`.
+    if (!isFiat(asset)) {
       throw new WalletInputError(`asset ${asset} is not supported`);
     }
     if (amount <= 0n) {

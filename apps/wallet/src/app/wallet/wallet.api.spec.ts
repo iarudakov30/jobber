@@ -298,6 +298,53 @@ describe('GraphQL', () => {
     expect(await usd(alice.token)).toBe('10000');
   });
 
+  it('refuses to transfer coins: they move only through trades', async () => {
+    const alice = await signUp();
+    const bob = await signUp();
+    await controller.credit({
+      userId: alice.id,
+      asset: 'NXC',
+      amount: '100000000',
+      fromSystemAccount: 'seed',
+      type: 'seed',
+      externalRef: `seed-coin:${alice.id}`,
+    });
+
+    const { data, errors } = await gql(
+      alice.token,
+      TRANSFER,
+      { input: { toEmail: bob.email, asset: 'NXC', amount: '1' } },
+      { 'idempotency-key': randomUUID() },
+    );
+
+    expect(data).toBeNull();
+    expect(errors?.[0].extensions?.code).toBe('BAD_REQUEST');
+    expect(errors?.[0].extensions?.originalError?.message).toEqual([
+      'asset must be one of the following values: USD',
+    ]);
+  });
+
+  it('lists a coin only once the user holds an account in it', async () => {
+    const alice = await signUp();
+    await controller.credit({
+      userId: alice.id,
+      asset: 'ORB',
+      amount: '250000000',
+      fromSystemAccount: 'seed',
+      type: 'seed',
+      externalRef: `seed-coin:${alice.id}`,
+    });
+
+    expect(await gql(alice.token, BALANCES)).toEqual({
+      data: {
+        balances: [
+          { asset: 'USD', available: '0', held: '0' },
+          { asset: 'ORB', available: '250000000', held: '0' },
+        ],
+      },
+    });
+  });
+
   it.each([
     ['a JSON number', 1250],
     ['a decimal', '12.50'],
@@ -635,6 +682,18 @@ describe('gRPC WalletService', () => {
         message: expect.stringMatching(message),
       },
     });
+  });
+
+  it.each([
+    ['settleTrade', () => controller.settleTrade()],
+    ['placeHold', () => controller.placeHold()],
+    ['releaseHold', () => controller.releaseHold()],
+  ])('answers %s with UNIMPLEMENTED until step 2', (_, call) => {
+    expect(call).toThrow(
+      expect.objectContaining({
+        error: expect.objectContaining({ code: GrpcStatus.UNIMPLEMENTED }),
+      }),
+    );
   });
 
   it('audits the books: nothing to report', async () => {

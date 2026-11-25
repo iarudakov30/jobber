@@ -3,4 +3,5 @@ export enum Packages {
   PRODUCTS = 'products',
   JOBS = 'jobs',
   WALLET = 'wallet',
+  MARKET = 'market',
 }

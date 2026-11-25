@@ -1,10 +1,12 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
 import {
   AuditResult,
   Balances,
   CreditRequest,
   GetBalancesRequest,
   GrpcLoggingInterceptor,
+  GrpcStatus,
   PostingResult,
   WalletServiceController,
   WalletServiceControllerMethods,
@@ -43,4 +45,24 @@ export class WalletController implements WalletServiceController {
   async runAudit(): Promise<AuditResult> {
     return { issues: await this.ledger.audit() };
   }
+
+  // Trading RPCs: the contract is in wallet.proto; phase 4 step 2 implements them.
+  settleTrade(): never {
+    throw notYet('SettleTrade');
+  }
+
+  placeHold(): never {
+    throw notYet('PlaceHold');
+  }
+
+  releaseHold(): never {
+    throw notYet('ReleaseHold');
+  }
+}
+
+function notYet(rpc: string): RpcException {
+  return new RpcException({
+    code: GrpcStatus.UNIMPLEMENTED,
+    message: `${rpc} is not implemented yet`,
+  });
 }

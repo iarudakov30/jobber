@@ -2,6 +2,7 @@ export * from './lib/types/proto/auth';
 export * from './lib/types/proto/products';
 export * from './lib/types/proto/jobs';
 export * from './lib/types/proto/wallet';
+export * from './lib/types/proto/market';
 export * from './lib/types/packages';
 export * from './lib/types/loader-options';
 export * from './lib/types/status';

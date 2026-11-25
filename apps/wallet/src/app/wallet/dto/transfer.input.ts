@@ -1,6 +1,6 @@
 import { Field, InputType } from '@nestjs/graphql';
 import { IsEmail, IsIn, ValidateBy } from 'class-validator';
-import { ASSETS } from '@jobber/money';
+import { FIAT } from '@jobber/money';
 import { MinorUnits } from '../models/minor-units.scalar';
 
 /** class-validator's `@IsPositive()` only accepts JS numbers. */
@@ -20,8 +20,9 @@ export class TransferInput {
   @IsEmail()
   toEmail: string;
 
+  /** Fiat only: coins move through trades. */
   @Field()
-  @IsIn(Object.keys(ASSETS))
+  @IsIn(FIAT)
   asset: string;
 
   @Field(() => MinorUnits)

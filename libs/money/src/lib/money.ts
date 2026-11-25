@@ -4,10 +4,28 @@
  * Nothing here goes through a JS `number`, so no amount is ever rounded.
  */
 export const ASSETS = {
-  USD: { scale: 2 },
-} as const; // coins arrive in phase 4
+  USD: { scale: 2, kind: 'fiat' },
+  // Invented coins for the fake market (phase 4): not real tickers, never real prices.
+  NXC: { scale: 8, kind: 'coin' },
+  BLIP: { scale: 8, kind: 'coin' },
+  ORB: { scale: 8, kind: 'coin' },
+  WISP: { scale: 8, kind: 'coin' },
+} as const satisfies Record<string, { scale: number; kind: 'fiat' | 'coin' }>;
 
 export type AssetCode = keyof typeof ASSETS;
+
+type AssetsOfKind<Kind> = {
+  [K in AssetCode]: (typeof ASSETS)[K]['kind'] extends Kind ? K : never;
+}[AssetCode];
+
+export type CoinCode = AssetsOfKind<'coin'>;
+export type FiatCode = AssetsOfKind<'fiat'>;
+
+/** Coins in `ASSETS` order: `['NXC', 'BLIP', 'ORB', 'WISP']`. Users get them only by trading. */
+export const COINS = (Object.keys(ASSETS) as AssetCode[]).filter(isCoin);
+
+/** Fiat currencies: every user has accounts in them; they are topped up and transferred. */
+export const FIAT = (Object.keys(ASSETS) as AssetCode[]).filter(isFiat);
 
 /** Largest amount a PostgreSQL `bigint` (and a protobuf `int64`) can hold. */
 export const MAX_MINOR_UNITS = 2n ** 63n - 1n;
@@ -21,7 +39,15 @@ export function isAssetCode(value: string): value is AssetCode {
   return Object.prototype.hasOwnProperty.call(ASSETS, value);
 }
 
-/** Digits after the decimal point: 2 for USD. */
+export function isCoin(value: string): value is CoinCode {
+  return isAssetCode(value) && ASSETS[value].kind === 'coin';
+}
+
+export function isFiat(value: string): value is FiatCode {
+  return isAssetCode(value) && ASSETS[value].kind === 'fiat';
+}
+
+/** Digits after the decimal point: 2 for USD, 8 for a coin. */
 export function scaleOf(asset: AssetCode): number {
   const info = ASSETS[asset];
   if (!info) {
@@ -55,10 +81,12 @@ export function parseAmount(input: string, asset: AssetCode): bigint {
 }
 
 /**
- * Formats minor units for display: 123456n USD → "$1,234.56" (en-US).
+ * Formats minor units for display: 123456n USD → "$1,234.56", 150000000n NXC →
+ * "1.50000000 NXC" (en-US).
  *
  * The amount reaches `Intl.NumberFormat` as a decimal string, which it formats exactly, so
- * amounts above `Number.MAX_SAFE_INTEGER` keep every digit.
+ * amounts above `Number.MAX_SAFE_INTEGER` keep every digit. Coins aren't ISO 4217 currencies
+ * (`Intl` refuses a four-letter code), so they are plain numbers followed by the code.
  */
 export function formatAmount(
   minor: bigint,
@@ -66,16 +94,19 @@ export function formatAmount(
   locale = 'en-US',
 ): string {
   const scale = scaleOf(asset);
+  const coin = isCoin(asset);
   const formatter = new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: asset,
+    ...(coin
+      ? { style: 'decimal' as const }
+      : { style: 'currency' as const, currency: asset }),
     minimumFractionDigits: scale,
     maximumFractionDigits: scale,
   });
   // `format(string)` (Intl.NumberFormat v3) is typed only in TypeScript's ES2023 lib.
-  return (formatter as unknown as { format(value: string): string }).format(
-    toDecimal(minor, scale),
-  );
+  const text = (
+    formatter as unknown as { format(value: string): string }
+  ).format(toDecimal(minor, scale));
+  return coin ? `${text} ${asset}` : text;
 }
 
 /** Minor units as a plain decimal in major units, with no grouping: 123456n, 2 → "1234.56". */

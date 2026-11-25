@@ -47,6 +47,36 @@ export interface AuditResult {
   issues: AuditIssue[];
 }
 
+export interface SettleTradeRequest {
+  /** The market's order id: the ledger externalRef, so a trade settles once. */
+  tradeId: string;
+  userId: number;
+  coin: string;
+  /** BUY | SELL */
+  side: string;
+  /** Coin minor units (8 decimals). */
+  qty: string;
+  /** USD cents for qty, before the fee. The market rounds it in the house's favour. */
+  usdAmount: string;
+  /** USD cents, always charged on top of a buy and out of a sell's proceeds. */
+  fee: string;
+  /** The limit order's hold; empty for a market order. */
+  holdId: string;
+}
+
+export interface HoldRequest {
+  /** The limit order's id: the ledger externalRef of the hold and of its release. */
+  holdId: string;
+  userId: number;
+  /** USD for a buy, the coin for a sell. */
+  asset: string;
+  amount: string;
+}
+
+export interface HoldRef {
+  holdId: string;
+}
+
 /**
  * NexusPay's ledger. Amounts are int64 minor units (cents for USD); TypeScript sees them as
  * decimal strings (ts-proto forceLong=string, proto-loader longs: String).
@@ -65,6 +95,23 @@ export interface WalletServiceClient {
   /** Recomputes every balance from the entries and reports what doesn't match. */
 
   runAudit(request: RunAuditRequest): Observable<AuditResult>;
+
+  /**
+   * Swaps USD and coins between the user and the market maker, plus the fee: for a buy, user
+   * USD -(usdAmount + fee), market_maker USD +usdAmount, fees USD +fee, market_maker coin -qty,
+   * user coin +qty; a sell is the mirror, the fee taken from the proceeds. With holdId, the
+   * user's side comes out of that hold and any remainder goes back to available.
+   */
+
+  settleTrade(request: SettleTradeRequest): Observable<PostingResult>;
+
+  /** Moves amount from the user's available balance to held (a limit order's funds). */
+
+  placeHold(request: HoldRequest): Observable<PostingResult>;
+
+  /** Moves an active hold back to available (a cancelled or expired limit order). */
+
+  releaseHold(request: HoldRef): Observable<PostingResult>;
 }
 
 /**
@@ -91,11 +138,41 @@ export interface WalletServiceController {
   runAudit(
     request: RunAuditRequest,
   ): Promise<AuditResult> | Observable<AuditResult> | AuditResult;
+
+  /**
+   * Swaps USD and coins between the user and the market maker, plus the fee: for a buy, user
+   * USD -(usdAmount + fee), market_maker USD +usdAmount, fees USD +fee, market_maker coin -qty,
+   * user coin +qty; a sell is the mirror, the fee taken from the proceeds. With holdId, the
+   * user's side comes out of that hold and any remainder goes back to available.
+   */
+
+  settleTrade(
+    request: SettleTradeRequest,
+  ): Promise<PostingResult> | Observable<PostingResult> | PostingResult;
+
+  /** Moves amount from the user's available balance to held (a limit order's funds). */
+
+  placeHold(
+    request: HoldRequest,
+  ): Promise<PostingResult> | Observable<PostingResult> | PostingResult;
+
+  /** Moves an active hold back to available (a cancelled or expired limit order). */
+
+  releaseHold(
+    request: HoldRef,
+  ): Promise<PostingResult> | Observable<PostingResult> | PostingResult;
 }
 
 export function WalletServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ['credit', 'getBalances', 'runAudit'];
+    const grpcMethods: string[] = [
+      'credit',
+      'getBalances',
+      'runAudit',
+      'settleTrade',
+      'placeHold',
+      'releaseHold',
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(
         constructor.prototype,

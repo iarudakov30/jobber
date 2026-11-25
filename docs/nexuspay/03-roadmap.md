@@ -57,7 +57,9 @@ all 11 acceptance tests pass.
 - **Done when:** a test-card top-up credits once and emails once, replaying the webhook 10× still
   credits once, and an unpaid payment expires.
 
-## Phase 4 — Fake market + realtime (~3 weeks)
+## Phase 4 — Fake market + realtime (~3 weeks, in progress)
+
+Progress, step by step: [phase-4/README.md](phase-4/README.md). Step 1 (contracts) is done.
 
 - `apps/market` (3006): seeded random-walk price simulator (one leader via a Redis lock), candles,
   10-second quotes in Redis, market and limit orders, `SettleTrade`, holds, `order.expire`.

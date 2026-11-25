@@ -1,11 +1,15 @@
 import {
   ASSETS,
   AssetCode,
+  COINS,
+  FIAT,
   MAX_MINOR_UNITS,
   MoneyFormatError,
   formatAmount,
   fromWire,
   isAssetCode,
+  isCoin,
+  isFiat,
   parseAmount,
   toDecimal,
   toWire,
@@ -54,6 +58,20 @@ describe('parseAmount', () => {
   it('rejects an unknown asset', () => {
     expect(() => parseAmount('1', 'XXX' as AssetCode)).toThrow(/Unknown asset/);
   });
+
+  it.each([
+    ['1', 100_000_000n],
+    ['0.00000001', 1n],
+    ['21000000.5', 2_100_000_050_000_000n],
+  ])('reads NXC "%s" as %p (8 decimals)', (input, expected) => {
+    expect(parseAmount(input, 'NXC')).toBe(expected);
+  });
+
+  it('never rounds a ninth coin decimal', () => {
+    expect(() => parseAmount('0.000000001', 'NXC')).toThrow(
+      /8 decimal places/,
+    );
+  });
 });
 
 describe('formatAmount', () => {
@@ -72,6 +90,37 @@ describe('formatAmount', () => {
   it('follows the locale', () => {
     // de-DE puts the symbol after the number, separated by a no-break space.
     expect(formatAmount(123456n, 'USD', 'de-DE')).toBe('1.234,56 $');
+  });
+});
+
+describe('formatAmount for coins', () => {
+  it.each([
+    [150_000_000n, 'NXC', '1.50000000 NXC'],
+    [1n, 'BLIP', '0.00000001 BLIP'],
+    [123_456_789_012_345_678n, 'WISP', '1,234,567,890.12345678 WISP'],
+    [-5n, 'ORB', '-0.00000005 ORB'],
+  ] as const)('shows %p %s as %s', (minor, asset, expected) => {
+    expect(formatAmount(minor, asset)).toBe(expected);
+  });
+});
+
+describe('asset kinds', () => {
+  it('lists the coins and the fiat currencies', () => {
+    expect(COINS).toEqual(['NXC', 'BLIP', 'ORB', 'WISP']);
+    expect(FIAT).toEqual(['USD']);
+  });
+
+  it('gives every coin 8 decimals', () => {
+    expect(COINS.map((coin) => ASSETS[coin].scale)).toEqual([8, 8, 8, 8]);
+  });
+
+  it('tells coins from fiat', () => {
+    expect(isCoin('NXC')).toBe(true);
+    expect(isCoin('USD')).toBe(false);
+    expect(isFiat('USD')).toBe(true);
+    expect(isFiat('NXC')).toBe(false);
+    expect(isCoin('toString')).toBe(false);
+    expect(isFiat('toString')).toBe(false);
   });
 });
 

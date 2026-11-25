@@ -11,6 +11,20 @@ service WalletService {
   rpc GetBalances(GetBalancesRequest) returns (Balances);
   // Recomputes every balance from the entries and reports what doesn't match.
   rpc RunAudit(RunAuditRequest) returns (AuditResult);
+
+  // Trading (phase 4; implemented in step 2, UNIMPLEMENTED until then). All three are
+  // idempotent by their id: a retry after an unknown outcome posts nothing new and returns
+  // duplicate = true. Too little available balance → FAILED_PRECONDITION, nothing written.
+
+  // Swaps USD and coins between the user and the market maker, plus the fee: for a buy, user
+  // USD -(usdAmount + fee), market_maker USD +usdAmount, fees USD +fee, market_maker coin -qty,
+  // user coin +qty; a sell is the mirror, the fee taken from the proceeds. With holdId, the
+  // user's side comes out of that hold and any remainder goes back to available.
+  rpc SettleTrade(SettleTradeRequest) returns (PostingResult);
+  // Moves amount from the user's available balance to held (a limit order's funds).
+  rpc PlaceHold(HoldRequest) returns (PostingResult);
+  // Moves an active hold back to available (a cancelled or expired limit order).
+  rpc ReleaseHold(HoldRef) returns (PostingResult);
 }
 
 message CreditRequest {
@@ -50,4 +64,34 @@ message AuditIssue {
 
 message AuditResult {
   repeated AuditIssue issues = 1;
+}
+
+message SettleTradeRequest {
+  // The market's order id: the ledger externalRef, so a trade settles once.
+  string tradeId = 1;
+  int32 userId = 2;
+  string coin = 3;
+  // BUY | SELL
+  string side = 4;
+  // Coin minor units (8 decimals).
+  int64 qty = 5;
+  // USD cents for qty, before the fee. The market rounds it in the house's favour.
+  int64 usdAmount = 6;
+  // USD cents, always charged on top of a buy and out of a sell's proceeds.
+  int64 fee = 7;
+  // The limit order's hold; empty for a market order.
+  string holdId = 8;
+}
+
+message HoldRequest {
+  // The limit order's id: the ledger externalRef of the hold and of its release.
+  string holdId = 1;
+  int32 userId = 2;
+  // USD for a buy, the coin for a sell.
+  string asset = 3;
+  int64 amount = 4;
+}
+
+message HoldRef {
+  string holdId = 1;
 }
