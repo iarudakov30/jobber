@@ -1,0 +1,73 @@
+{
+  "name": "realtime",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/realtime/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "args": ["--node-env=production"],
+        "cwd": "apps/realtime"
+      },
+      "configurations": {
+        "development": {
+          "args": ["--node-env=development"]
+        }
+      }
+    },
+    "prune-lockfile": {
+      "dependsOn": ["build"],
+      "cache": true,
+      "executor": "@nx/js:prune-lockfile",
+      "outputs": [
+        "{workspaceRoot}/dist/apps/realtime/package.json",
+        "{workspaceRoot}/dist/apps/realtime/package-lock.json"
+      ],
+      "options": {
+        "buildTarget": "build"
+      }
+    },
+    "copy-workspace-modules": {
+      "dependsOn": ["build"],
+      "cache": true,
+      "outputs": ["{workspaceRoot}/dist/apps/realtime/workspace_modules"],
+      "executor": "@nx/js:copy-workspace-modules",
+      "options": {
+        "buildTarget": "build"
+      }
+    },
+    "prune": {
+      "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
+      "executor": "nx:noop"
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "realtime:build",
+        "runBuildTargetDependencies": false,
+        "watch": true,
+        "port": 9236
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "realtime:build:development"
+        },
+        "production": {
+          "buildTarget": "realtime:build:production"
+        }
+      }
+    },
+    "load-test": {
+      "command": "node ../../scripts/k6.mjs",
+      "options": {
+        "cwd": "{projectRoot}"
+      }
+    }
+  },
+  "tags": []
+}

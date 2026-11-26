@@ -38,6 +38,9 @@ type DeliveryHandler = (
   channel: ConfirmChannel,
 ) => Promise<void>;
 
+/** Runs on every (re)connect, after the topology and the consumers; a throw fails the connect. */
+export type ConnectHook = (model: ChannelModel) => Promise<void>;
+
 interface Subscription {
   queue: string;
   prefetch: number;
@@ -55,6 +58,7 @@ interface Subscription {
 export class RabbitConnection implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(RabbitConnection.name);
   private readonly subscriptions: Subscription[] = [];
+  private readonly connectHooks: ConnectHook[] = [];
   private readonly minDelayMs: number;
   private readonly maxDelayMs: number;
   private model?: ChannelModel;
@@ -124,6 +128,20 @@ export class RabbitConnection implements OnModuleInit, OnApplicationShutdown {
     if (model) {
       this.subscribe(model, subscription).catch((e) =>
         this.logger.error(`Consuming ${queue} failed: ${errorText(e)}`),
+      );
+    }
+  }
+
+  /**
+   * Runs `hook` now if connected, and after every reconnect: for setups the topology can't
+   * describe, such as a server-named exclusive queue (`TransientQueue`).
+   */
+  onConnect(hook: ConnectHook): void {
+    this.connectHooks.push(hook);
+    const model = this.model;
+    if (model) {
+      hook(model).catch((e) =>
+        this.logger.error(`Connect hook failed: ${errorText(e)}`),
       );
     }
   }
@@ -242,6 +260,9 @@ export class RabbitConnection implements OnModuleInit, OnApplicationShutdown {
       await setup.close();
       for (const subscription of this.subscriptions) {
         await this.subscribe(model, subscription);
+      }
+      for (const hook of this.connectHooks) {
+        await hook(model);
       }
     } catch (e) {
       await model.close().catch(() => undefined);

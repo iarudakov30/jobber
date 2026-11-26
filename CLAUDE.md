@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Start all services
 
 ```bash
-npm start                          # serves auth, jobs, executor, products, wallet, payments, market, ui-admin and nexus concurrently
+npm start                          # serves auth, jobs, executor, products, wallet, payments, market, realtime, ui-admin and nexus concurrently
 ```
 
 ### Individual app commands
@@ -19,7 +19,7 @@ npx nx test <app>                  # run tests
 npx nx lint <app>                  # lint
 ```
 
-Apps: `auth`, `jobs`, `executor`, `products`, `wallet`, `payments`, `market`, `ui-admin`, `nexus` (plus `nexus-e2e`, Playwright)
+Apps: `auth`, `jobs`, `executor`, `products`, `wallet`, `payments`, `market`, `realtime`, `ui-admin`, `nexus` (plus `nexus-e2e`, Playwright)
 
 ### Run a single test file
 
@@ -33,6 +33,8 @@ npx nx test wallet                 # real PostgreSQL via Testcontainers: Docker 
 npx nx test outbox                 # likewise (DrizzleOutboxStore spec)
 npx nx test payments               # Testcontainers PostgreSQL + RabbitMQ; Stripe faked, signatures real
 npx nx test market                 # Testcontainers PostgreSQL, Redis, RabbitMQ; leader failover, orders against a fake wallet gRPC server (~1 min)
+npx nx test realtime               # gateway replicas on Testcontainers RabbitMQ with real ws clients
+npx nx run realtime:load-test prices-and-fills   # k6: 1,000 sockets for 5 min while trading (auth, wallet, market, realtime running)
 npx nx test executor               # email worker: Testcontainers RabbitMQ, Redis, Mailpit
 npx nx test rabbitmq               # Testcontainers RabbitMQ (retries, DLQ, delay buckets, reconnect)
 npx nx run rabbitmq:replay --queue=<name>   # move <name>.dlq back to <name> (RABBITMQ_URL, default localhost)
@@ -222,13 +224,13 @@ server passes `loader: GRPC_LOADER_OPTIONS` (`{ longs: String }`) so they arrive
 ### Utilities
 
 ```bash
-npm stop                           # kill Node processes on the app ports (3000-3006, gRPC 5000-5003, 4200, 4300)
+npm stop                           # kill Node processes on the app ports (3000-3007, gRPC 5000-5003, 4200, 4300)
 npm run cache-clean                # reset Nx cache and npm cache
 ```
 
 ## Architecture
 
-Nx monorepo with seven NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
+Nx monorepo with eight NestJS microservices, an Angular frontend, a React frontend (`nexus`, the
 NexusPay pet project), and ten shared libraries.
 
 NexusPay (the wallet/payments learning project being built in this repo) is documented in
@@ -246,6 +248,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 | `wallet`   | 3004 | NexusPay ledger (GraphQL + gRPC server 5003 + PostgreSQL/Drizzle + outbox to Pulsar) |
 | `payments` | 3005 | NexusPay Stripe top-ups (GraphQL + Stripe webhook + PostgreSQL/Drizzle + outbox to Pulsar and RabbitMQ) |
 | `market`   | 3006 | NexusPay fake coin market (GraphQL + price simulator on one leader via Redis + PostgreSQL/Drizzle candles and orders + ticks to RabbitMQ + gRPC client to `wallet`) |
+| `realtime` | 3007 | NexusPay WebSocket gateway (raw `ws` at `/realtime`, cookie auth via `auth` gRPC, per-instance RabbitMQ queue on `realtime`) |
 | `ui-admin` | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
 | `nexus`    | 4300 | React 19 + Vite frontend for NexusPay (`graphql-request`)   |
 
@@ -254,7 +257,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 1. **GraphQL (external)** — clients talk to `auth` and `jobs` via Apollo GraphQL APIs
 2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email, and `GetUser`, for the email worker); other services call `wallet`'s `WalletService` (`Credit`, `GetBalances`, `RunAudit`; `SettleTrade`, `PlaceHold`, `ReleaseHold` for the market); `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
 3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them. NexusPay events too: `payments` → `payment-succeeded` → `wallet`
-4. **RabbitMQ (async)** — work queues and timers: `payment.expire` through the `delay.30m` bucket back into `payments`; `email.topup` from `wallet` to the executor's email worker; `order.expire` through `delay.24h` back into `market`; realtime channels on the `realtime` exchange (`prices.<coin>` from `market`, `user.<id>` from `wallet`)
+4. **RabbitMQ (async)** — work queues and timers: `payment.expire` through the `delay.30m` bucket back into `payments`; `email.topup` from `wallet` to the executor's email worker; `order.expire` through `delay.24h` back into `market`; realtime channels on the `realtime` exchange (`prices.<coin>` from `market`, `user.<id>` from `wallet`), pushed to browsers by `realtime`
 
 ### Job Framework
 
@@ -419,6 +422,37 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
   `testing/fake-wallet.ts`: a real gRPC server on `wallet.proto` with an in-memory ledger
   (idempotent by id, holds, refusals) that can fail a call before or after applying it.
 
+### Realtime gateway (`realtime`)
+
+NexusPay's WebSocket gateway (phase 4 step 5, `apps/realtime`, port 3007, no database;
+`docs/nexuspay/phase-4/05-realtime-gateway.md`).
+
+- **Upgrade** (`gateway/realtime.gateway.ts`): `WebSocketServer({ noServer: true })` on Nest's
+  HTTP server, path `/realtime`. Before `handleUpgrade`: wrong path 404, `Origin` not in
+  `REALTIME_ALLOWED_ORIGINS` 403 (no `Origin` = not a browser, allowed), no/invalid
+  `Authentication` cookie 401 (auth gRPC `Authenticate`, `SocketAuth`), auth unreachable or
+  shutting down 503. Refusals are raw `HTTP/1.1 <status>` on the TCP socket.
+- **Protocol** (`gateway/protocol.ts`): client `{ op: subscribe | unsubscribe, channel }`;
+  server `welcome` (after the user's binding exists), `subscribed`, `unsubscribed`,
+  `message { channel, seq, data }`, `error { code: BAD_REQUEST | FORBIDDEN | UNKNOWN_CHANNEL |
+  TOO_MANY_SUBSCRIPTIONS }`, `resync`. Each socket is joined to its own `user.<id>`; any `user.*`
+  subscribe is FORBIDDEN; public channels are `prices.<coin>`. `seq`: price body's `seq`, or the
+  outbox id from `messageId` `outbox-<service>-<id>` (no seq → not forwarded). Frames over 1 KB
+  close with 1009.
+- **Feed** (`RealtimeFeed`, `TransientQueue` from `libs/rabbitmq`): one exclusive auto-delete
+  queue per instance, `prices.*` always, `user.<id>` while the user has a socket here
+  (`Registry` counts them). After a RabbitMQ reconnect: new queue, same bindings, `resync` to
+  every socket.
+- **Backpressure:** `bufferedAmount` > 1 MB drops price messages for that socket (never user
+  messages); > 4 MB for 10 s closes it with 1013. **Heartbeat:** ping every 25 s, terminated after
+  two missed pongs. **Shutdown:** 503 to new upgrades, every socket closed with 1012.
+  `GatewayOptions` (`GATEWAY_OPTIONS`) holds the numbers; tests lower them.
+- `GET /realtime/stats`: sockets, users, channels, bindings, counters, memory.
+- Tests: `protocol.spec.ts`, `registry.spec.ts`; `gateway.api.spec.ts` runs replicas against
+  Testcontainers RabbitMQ with `ws` clients (auth faked) and reads bindings from the management
+  API. Load: `apps/realtime/load/prices-and-fills.js` (k6 via `scripts/k6.mjs`, which runs any
+  project's `load/<name>.js`).
+
 ### Email worker (`executor`)
 
 `apps/executor/src/app/notifications/`, loaded only when `RABBITMQ_URL` is set
@@ -571,8 +605,9 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 - **`@jobber/money`** (`libs/money`) — amounts as `bigint` minor units: `ASSETS` (USD, scale 2, `kind: 'fiat'`; coins NXC, BLIP, ORB, WISP, scale 8, `kind: 'coin'`), `COINS`, `FIAT`, `isCoin`, `isFiat`, `parseAmount` ("12.34" → `1234n`, never rounds), `formatAmount` (exact, via `Intl.NumberFormat` on a decimal string; coins as `1.50000000 NXC`, since `Intl` refuses non-ISO codes), `toWire`/`fromWire` (canonical decimal strings). No framework imports, so `nexus` can use it too.
 - **`@jobber/idempotency`** (`libs/idempotency`) — `@Idempotent({ operation })` for GraphQL resolvers and HTTP handlers (`IdempotencyInterceptor`), `@IdempotencyKey()` to read the key in the handler, `DrizzleIdempotencyStore` + `idempotencyKeysTable()` (import the table from `@jobber/idempotency/table` in Drizzle schema files: drizzle-kit can't load the decorators), `RedisIdempotencyLock` (no offline queue: fails fast when Redis is down), `IdempotencyCleanup` (hourly expiry). The module provides `IDEMPOTENCY_STORE` and optionally `IDEMPOTENCY_LOCK`; see `apps/wallet/src/app/wallet/wallet.module.ts`.
 - **`@jobber/outbox`** (`libs/outbox`) — transactional outbox. An app writes records in the same DB transaction as its state change (`PrismaOutboxStore.enqueue(tx, records)`, or `DrizzleOutboxStore.enqueue(tx, records)` for Drizzle apps), and `OutboxRelay` publishes them in the background: batches claimed with `FOR UPDATE SKIP LOCKED`, one ordered stream per transport (a RabbitMQ outage only holds back RabbitMQ records, each transport backs off on its own), published in id order, stopping at the first failure; `poke()` after a commit publishes right away. Each app creates the `outbox` table in its own migration (contract in `libs/outbox/src/lib/outbox.types.ts`; `jobs` maps it as the Prisma model `OutboxMessage`). `PulsarOutboxPublisher` uses one producer per topic named `outbox-<service>-<topic>` and the outbox id as `sequenceId`, so run one relay per service. `RabbitOutboxPublisher` (records with `transport: 'rabbitmq'`) publishes to the exchange `destination` with routing key `key` (a delay bucket such as `delay.30m` delays a command) and `messageId = outbox-<service>-<id>`; RabbitMQ doesn't deduplicate, so consumers dedupe on that id. One relay takes both publishers. Delivery is at-least-once.
-- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. Used by `payments` (`commands` exchange, `payments.commands`, delay buckets), `market` (price ticks; `market.commands`, `order.expire`), `wallet` (publishes `email.topup` and realtime `user.<id>` messages) and `executor` (email worker).
+- **`@jobber/rabbitmq`** (`libs/rabbitmq`) — `RabbitModule.forRoot / forRootAsync({ url, topology, connectionName })` registers one `RabbitConnection` and a `RabbitPublisher` app-wide. Used by `payments` (`commands` exchange, `payments.commands`, delay buckets), `market` (price ticks; `market.commands`, `order.expire`), `realtime` (its per-instance queue), `wallet` (publishes `email.topup` and realtime `user.<id>` messages) and `executor` (email worker).
   - Shared notifications contract (`notifications.ts`): `NOTIFICATIONS_EXCHANGE`, `EMAIL_QUEUE` (`notifications.email`, bound to `email.*`), `EMAIL_TOPUP`, `notificationsTopology(retry?)` (declared by publisher and consumer alike, with the same retry, or RabbitMQ refuses the redeclare) and `TopUpEmailMessage` (class-validator).
+  - `TransientQueue` (`transient-queue.ts`): a server-named exclusive, auto-delete queue whose bindings change at runtime (`bind`, `unbind`, in call order) and are re-bound on a new queue after every reconnect (`onReady({ reconnected })`), consumed without acks. Built on `RabbitConnection.onConnect(hook)`, which runs after the topology and consumers on every connect.
   - Commands contract (`commands.ts`): `COMMANDS_EXCHANGE` (`commands`), `DELAY_BUCKETS` (`delay.1m`, `delay.30m`, `delay.24h`, all into `commands`) and `delayBucket(name)`. Every service declares the same buckets (RabbitMQ refuses a redeclare with another TTL), so they live only here.
   - Realtime contract (`realtime.ts`, phase 4): `REALTIME_EXCHANGE` (`realtime`, topic), `userChannel(id)` (`user.<id>`), `priceChannel(coin)` (`prices.<coin>`), `realtimeTopology()`, `RealtimeBalanceMessage`, `RealtimeFillMessage`, `RealtimePriceMessage` (`{ type: 'price', coin, price, seq, at }`). `mergeTopologies(...parts)` combines topologies (the wallet declares notifications + realtime).
   - The connection reconnects in the background (1 s → 30 s backoff) and re-declares the topology (`declareTopology()`: exchanges, quorum queues, `<queue>.retry.<n>` TTL queues, `<queue>.dlq`, delay buckets) on every connect. The app starts while RabbitMQ is down; publishes then reject at once with `RabbitUnavailableError` (the outbox retries them).

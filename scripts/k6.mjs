@@ -1,20 +1,28 @@
-// Runs one of the wallet's k6 load tests (apps/wallet/load/<name>.js) in Docker:
+// Runs one of a project's k6 load tests (<project>/load/<name>.js) in Docker, from the project's
+// directory (the Nx `load-test` target sets it):
 //
 //   npx nx run wallet:load-test overdraft      # or: deadlock, same-key
+//   npx nx run realtime:load-test prices-and-fills
 //
-// auth (3000) and wallet (3004, gRPC 5003) must be running; the container reaches them at
-// host.docker.internal. Extra arguments go to `k6 run`.
+// The services the script talks to must be running; the container reaches them at
+// host.docker.internal. Extra arguments go to `k6 run` (e.g. -e DURATION=1m).
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const K6_IMAGE = 'grafana/k6:1.4.2';
 const root = fileURLToPath(new URL('..', import.meta.url));
+const loadDir = join(process.cwd(), 'load');
 const [name, ...k6Args] = process.argv.slice(2);
-const script = `${root}apps/wallet/load/${name}.js`;
-if (!name || !existsSync(script)) {
+if (!name || !existsSync(join(loadDir, `${name}.js`))) {
+  const scripts = existsSync(loadDir)
+    ? readdirSync(loadDir)
+        .filter((f) => f.endsWith('.js') && f !== 'lib.js')
+        .map((f) => f.slice(0, -3))
+    : [];
   console.error(
-    'Usage: node scripts/k6.mjs <overdraft|deadlock|same-key> [k6 args]',
+    `Usage: node scripts/k6.mjs <${scripts.join('|')}> [k6 args] (from a project directory)`,
   );
   process.exit(2);
 }
@@ -27,7 +35,7 @@ const { status } = spawnSync(
     '-i',
     '--add-host=host.docker.internal:host-gateway',
     '-v',
-    `${root}apps/wallet/load:/load:ro`,
+    `${loadDir}:/load:ro`,
     '-v',
     `${root}libs/grpc/src/lib/proto:/protos:ro`,
     K6_IMAGE,

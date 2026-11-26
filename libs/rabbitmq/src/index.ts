@@ -6,3 +6,4 @@ export * from './lib/rabbit.module';
 export * from './lib/notifications';
 export * from './lib/realtime';
 export * from './lib/commands';
+export * from './lib/transient-queue';

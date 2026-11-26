@@ -18,6 +18,7 @@ import {
 import { RabbitModule } from './rabbit.module';
 import { RabbitPublisher } from './rabbit.publisher';
 import { RabbitTopology } from './topology';
+import { TransientQueue } from './transient-queue';
 
 interface Payload {
   id: string;
@@ -392,6 +393,63 @@ describe('RabbitMQ (Testcontainers)', () => {
       }
     }, 15_000);
     await waitFor(() => work.of('after-reconnect'), 1, 5_000);
+  });
+
+  it('a transient queue binds and unbinds at runtime, and gets every binding back after a reconnect', async () => {
+    const received: string[] = [];
+    const ready: boolean[] = [];
+    const queue = new TransientQueue(connection, {
+      exchange: 'notifications',
+      bindings: ['live.a'],
+      onMessage: (message) =>
+        received.push(JSON.parse(message.content.toString()).id),
+      onReady: ({ reconnected }) => ready.push(reconnected),
+    });
+    await waitUntil(async () => queue.isReady, 5_000);
+    const send = (key: string, id: string) =>
+      publisher.publish('notifications', key, { id }, { messageId: id });
+
+    await send('live.a', 'a1');
+    await queue.bind('live.b');
+    await send('live.b', 'b1');
+    await queue.unbind('live.a');
+    await send('live.a', 'a2');
+    await send('live.b', 'b2');
+    await waitFor(() => received, 3);
+    await sleep(300);
+    expect(received).toEqual(['a1', 'b1', 'b2']);
+    expect(queue.bindings).toEqual(['live.b']);
+    const firstName = queue.name;
+    expect(firstName).toMatch(/^amq.gen-/);
+
+    await container.exec([
+      'rabbitmqctl',
+      'close_all_connections',
+      'test: dropped on purpose',
+    ]);
+    await waitUntil(async () => ready.length === 2, 15_000);
+    expect(ready).toEqual([false, true]);
+    expect(queue.name).not.toBe(firstName);
+    await waitUntil(async () => {
+      try {
+        await send('live.b', 'b3');
+        return true;
+      } catch {
+        return false;
+      }
+    }, 15_000);
+    await send('live.a', 'a3');
+    await waitFor(() => received, 4);
+    await sleep(300);
+    expect(received).toEqual(['a1', 'b1', 'b2', 'b3']);
+    // Exclusive and auto-delete: the old queue went with its connection.
+    await expect(
+      withChannel(url, (channel) => {
+        // A failed check closes the channel with an 'error' event; amqplib throws it unhandled.
+        channel.on('error', () => undefined);
+        return channel.checkQueue(firstName ?? '');
+      }),
+    ).rejects.toThrow(/NOT_FOUND/);
   });
 
   async function waitForDeadLetter(queue: string): Promise<GetMessage> {

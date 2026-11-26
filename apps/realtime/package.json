@@ -1,0 +1,12 @@
+{
+  "name": "@jobber/realtime",
+  "version": "0.0.0",
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@testcontainers/rabbitmq": "^12.2.1",
+    "@types/ws": "^8.18.1",
+    "testcontainers": "^12.2.1"
+  }
+}
