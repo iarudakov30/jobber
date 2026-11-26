@@ -16,8 +16,8 @@ verified, lessons. Work is committed straight to `main`.
 | 4. Market: orders   | Market and limit orders, matching on every tick, cancel, `order.expire` through a delay bucket, `SETTLING` recovery, crash fault flag; tests 3, 5, 6, 7                                             | [04-market-orders.md](04-market-orders.md)       |
 | 5. Realtime gateway | `apps/realtime` (3007): raw `ws` with cookie auth on upgrade, channel protocol, per-instance RabbitMQ queue with per-user bindings, heartbeats, backpressure, shutdown; tests 8, 9, 11, 12          | [05-realtime-gateway.md](05-realtime-gateway.md) |
 | 6. Candle backfill  | `BackfillCandles` job in `jobs` (one item per coin-day) and its consumer in `executor` calling `GenerateCandles`                                                                                    | [06-candle-backfill.md](06-candle-backfill.md)   |
-| 7. React            | `RealtimeClient`, `usePrice`, `useUserFeed`; Markets, Trade and Portfolio screens; the top-up return page on the user feed; Playwright trade and reconnect flows; tests 10, 14                      |                                                  |
+| 7. React            | `RealtimeClient`, `usePrice`, `useUserFeed`; Markets, Trade and Portfolio screens; the top-up return page on the user feed; Playwright trade and reconnect flows; tests 10, 14                      | [07-react.md](07-react.md)                       |
 
-The steps are a proposed order, not part of the spec; adjust as they're built. The spec allows
+All seven steps are done and all 14 acceptance tests pass. The steps are a proposed order, not part of the spec; adjust as they're built. The spec allows
 splitting the phase (market and trading first, realtime second); steps 1 to 4 are that first
 half.

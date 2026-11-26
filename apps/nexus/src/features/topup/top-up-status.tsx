@@ -1,14 +1,20 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
 import { cn } from '../../lib/cn';
 import { errorMessages } from '../../lib/errors';
 import { formatMinorUnits } from '../../lib/money';
+import type { RealtimeMessage } from '../../lib/realtime/realtime-client';
+import {
+  useConnectionStatus,
+  useResynced,
+  useUserMessages,
+} from '../../lib/realtime/realtime';
 import { fetchTopUpEntry, walletKeys } from '../wallet/wallet-api';
 import { fetchPayment, topUpKeys } from './topup-api';
 
-/** Poll once a second for up to 30 s (spec); phase 4's realtime feed replaces this. */
+/** Poll once a second for up to 30 s; the credit is polled only while the realtime feed is down. */
 export const POLL_MS = 1_000;
 export const MAX_POLLS = 30;
 
@@ -17,9 +23,12 @@ type Tone = 'info' | 'success' | 'error';
 /**
  * What became of a top-up, on the wallet page Stripe returns to (`/wallet?topup=<id>`).
  *
- * Two waits, both by polling: `payments` turns the payment SUCCEEDED when Stripe's webhook
- * arrives, and the wallet credits it a moment later (through Pulsar). Balances are refreshed
- * only after the second, so the page never shows SUCCEEDED next to the old balance.
+ * Two waits. `payments` turns the payment SUCCEEDED when Stripe's webhook arrives; it has no
+ * realtime channel, so that is polled. The wallet credits it a moment later (through Pulsar) and
+ * announces the new USD balance on the user feed: the credit is looked up once, then again on
+ * each USD balance message and each resync, for up to the same 30 s. Only while the feed is down
+ * does the page poll for the credit instead. Balances are refreshed only after the credit, so the
+ * page never shows SUCCEEDED next to the old balance.
  */
 export function TopUpStatus({
   paymentId,
@@ -43,16 +52,50 @@ export function TopUpStatus({
         : false,
   });
   const succeeded = payment.data?.status === 'SUCCEEDED';
+  const live = useConnectionStatus() === 'open';
   const credit = useQuery({
     queryKey: topUpKeys.credit(paymentId),
     queryFn: () => fetchTopUpEntry(paymentId),
     enabled: succeeded,
     refetchInterval: (query) =>
-      query.state.data === null && query.state.dataUpdateCount < maxPolls
+      !live &&
+      query.state.data === null &&
+      query.state.dataUpdateCount < maxPolls
         ? pollMs
         : false,
   });
   const credited = !!credit.data;
+  const currency = payment.data?.currency;
+
+  // With the feed: look again when the balance changes or messages may have been missed.
+  const lookAgain = useCallback(() => {
+    if (succeeded && !credited) {
+      void queryClient.invalidateQueries({
+        queryKey: topUpKeys.credit(paymentId),
+      });
+    }
+  }, [succeeded, credited, queryClient, paymentId]);
+  useUserMessages(
+    useCallback(
+      ({ data }: RealtimeMessage) => {
+        const message = data as { type?: string; asset?: string };
+        if (message.type === 'balance' && message.asset === currency) {
+          lookAgain();
+        }
+      },
+      [currency, lookAgain],
+    ),
+  );
+  useResynced(lookAgain);
+  // ...for as long as polling would have.
+  const [waitedOut, setWaitedOut] = useState(false);
+  useEffect(() => {
+    if (!succeeded || credited) {
+      return;
+    }
+    const timer = setTimeout(() => setWaitedOut(true), pollMs * maxPolls);
+    return () => clearTimeout(timer);
+  }, [succeeded, credited, pollMs, maxPolls]);
   // Polling stops after maxPolls answers. The count lives in the query cache, not on the
   // result; `isFetching` (read here) re-renders the page after every poll.
   const gaveUp = (
@@ -119,7 +162,7 @@ export function TopUpStatus({
             message: `${amount} added to your wallet.`,
           };
         }
-        return !gaveUp(credit, topUpKeys.credit(paymentId))
+        return !(live ? waitedOut : gaveUp(credit, topUpKeys.credit(paymentId)))
           ? {
               tone: 'info',
               message: `Payment received. Adding ${amount} to your wallet…`,

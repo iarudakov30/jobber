@@ -2,6 +2,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { join } from 'path';
 
+import { gatewayRunning, startGateway } from './gateway';
 import { E2eUser, E2eUsers, USERS_ENV } from './users';
 
 const AUTH_URL = process.env['AUTH_URL'] ?? 'http://localhost:3000/auth';
@@ -9,18 +10,29 @@ const WALLET_GRPC = process.env['WALLET_GRPC'] ?? 'localhost:5003';
 const PASSWORD = 'Test@1234';
 
 /**
- * Creates two fresh users through auth's GraphQL and gives the sender $100.00 through the
- * wallet's gRPC Credit (from the `seed` system account), so every run starts from known
+ * Creates fresh users through auth's GraphQL and gives the sender and the trader $100.00 through
+ * the wallet's gRPC Credit (from the `seed` system account), so every run starts from known
  * balances whatever earlier runs left behind.
+ *
+ * Starts the realtime gateway too, unless one is already running on 3007: the reconnect test
+ * kills the gateway, which it only does to one it started.
  */
 export default async function globalSetup(): Promise<void> {
   const run = `${Date.now()}`;
   const sender = await createUser(`e2e-${run}-sender@example.com`);
   const recipient = await createUser(`e2e-${run}-recipient@example.com`);
+  const trader = await createUser(`e2e-${run}-trader@example.com`);
   await credit(sender.id, '10000', `e2e-seed:${sender.id}`);
+  await credit(trader.id, '10000', `e2e-seed:${trader.id}`);
+  const ownsGateway = !(await gatewayRunning());
+  if (ownsGateway) {
+    await startGateway();
+  }
   process.env[USERS_ENV] = JSON.stringify({
     sender,
     recipient,
+    trader,
+    ownsGateway,
   } satisfies E2eUsers);
 }
 
@@ -49,7 +61,7 @@ async function createUser(email: string): Promise<E2eUser> {
   return { id, email, password: PASSWORD };
 }
 
-function credit(userId: number, amount: string, externalRef: string) {
+export function credit(userId: number, amount: string, externalRef: string) {
   const definition = protoLoader.loadSync(
     join(__dirname, '../../../libs/grpc/src/lib/proto/wallet.proto'),
     { longs: String },

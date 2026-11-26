@@ -27,8 +27,8 @@ Apps: `auth`, `jobs`, `executor`, `products`, `wallet`, `payments`, `market`, `r
 npx nx test auth --testFile=apps/auth/src/app/auth/auth.service.spec.ts
 npx nx test ui-admin --include=apps/ui-admin/src/app/auth/session.spec.ts   # ui-admin uses Vitest, not Jest
 npx nx test nexus -- src/lib/session.spec.ts                    # nexus runs plain Vitest from apps/nexus
-npx nx run nexus-e2e:e2e           # Playwright against running auth + wallet (starts the nexus dev server)
-npx nx run nexus:codegen           # GraphQL types from apps/{auth,wallet,payments}/schema.gql; CI fails if stale
+npx nx run nexus-e2e:e2e           # Playwright against running auth, wallet, market (+ Pulsar, RabbitMQ); starts the gateway and the nexus dev server
+npx nx run nexus:codegen           # GraphQL types from apps/{auth,wallet,payments,market}/schema.gql; CI fails if stale
 npx nx test wallet                 # real PostgreSQL via Testcontainers: Docker must be running
 npx nx test outbox                 # likewise (DrizzleOutboxStore spec)
 npx nx test payments               # Testcontainers PostgreSQL + RabbitMQ; Stripe faked, signatures real
@@ -578,14 +578,15 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 - **Server errors:** `applyServerErrors()` (`src/lib/errors.ts`) is the React counterpart of
   `serverErrors()`: class-validator messages go on the field they name, the rest on `root.server`.
 - **API:** relative `/api/<service>` URLs; `vite.config.mts` proxies them with `/api` stripped
-  (`/api/auth` → 3000, `/api/wallet` → 3004, `/api/payments` → 3005), keeping the HttpOnly cookie same-origin.
+  (`/api/auth` → 3000, `/api/wallet` → 3004, `/api/payments` → 3005, `/api/market` → 3006,
+  `/api/realtime` → 3007 with `ws: true`), keeping the HttpOnly cookie same-origin.
   `createQueryClient()` (`src/lib/query-client.ts`) clears the session and goes to `/login` on
   any `FORBIDDEN` answer.
 - **GraphQL Codegen** (`apps/nexus/codegen.ts`, `npx nx run nexus:codegen`): client preset, one
-  output per backend (`src/gql/auth`, `src/gql/wallet`, `src/gql/payments`; documents from
-  `features/auth`, `features/wallet`, `features/topup`) from the schema files the backends print
-  on startup (`apps/auth/schema.gql`, `apps/wallet/schema.gql`, `apps/payments/schema.gql`; each has a test that fails when
-  it is stale). Write documents with that output's `graphql()` (see `features/wallet/wallet-api.ts`)
+  output per backend (`src/gql/auth`, `src/gql/wallet`, `src/gql/payments`, `src/gql/market`;
+  documents from `features/auth`, `features/wallet`, `features/topup`, `features/market`) from
+  the schema files the backends print on startup (`apps/{auth,wallet,payments,market}/schema.gql`;
+  each has a test that fails when it is stale). Write documents with that output's `graphql()` (see `features/wallet/wallet-api.ts`)
   and rerun codegen; CI regenerates and fails on any difference. `src/gql` is excluded from
   Prettier and ESLint. `MinorUnits` and `DateTime` are strings; use `@jobber/money` to parse and
   format amounts.
@@ -597,10 +598,29 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
   (`features/topup/top-up-status.tsx`) polls `payment(id)`, then the wallet's `topUp(paymentId)`,
   once a second for up to 30 s each, and invalidates `['wallet']` only after the credit.
   `/` redirects to `/wallet`.
+- **Realtime** (`src/lib/realtime/`, phase 4 step 7): one `RealtimeClient` per tab (`main.tsx`),
+  connected by the shell while signed in, URL `/api/realtime`. Ref-counted `subscribe(channel)`,
+  reconnect 1 s → 30 s ×(0.5–1) jitter (1012: within a second), resubscribe on `welcome`,
+  `onResynced` on every welcome and `resync` (refetch), drops a `seq` that isn't newer (per price
+  channel, per asset for balances, per order for fills). `PriceBook` + `usePrice(coin)`
+  (`useSyncExternalStore`); `useConnectionStatus` (header dot). `useUserFeed`
+  (`features/market/use-user-feed.ts`, mounted in the shell): `balance` → `setQueryData` on
+  `['wallet','balances']`, `fill` → invalidate orders/positions/history + toast, `resynced` →
+  invalidate `['wallet']` and `['market','orders']`. Tests use `fakeRealtime()`
+  (`src/testing/fake-socket.ts`) and `renderPage(Page, { realtime })`.
+- **Market pages** (`src/features/market/`): `/markets` (live prices, 24 h change),
+  `/trade/$coin` (`PriceChart` with `lightweight-charts` 5.2.1, lazy-loaded, live ticks via
+  `applyTick`; `OrderForm`: market orders quote → countdown → re-quote at 0, `Idempotency-Key` =
+  quote id; limit orders one key per side/qty/price; open orders with Cancel), `/portfolio`
+  (`positions` at live prices, P/L). `TopUpStatus` waits for the credit on USD `balance`
+  messages and `resynced`, polling only while the socket isn't open.
 - **Tests:** Vitest + Testing Library; pages that call the API use MSW 3 (`graphql` comes from
   `msw/graphql`) through `src/testing/render-page.tsx` (`mockServer()`, `renderPage()`).
-  `apps/nexus-e2e` runs Playwright (Chromium) against the real `auth` and `wallet`: global setup
-  creates two fresh users and funds one over gRPC. Run `npx playwright install chromium` once.
+  `apps/nexus-e2e` runs Playwright (Chromium) against the real backends: global setup creates
+  fresh users (sender, recipient, trader), funds two over gRPC, and starts the realtime gateway
+  from `dist/apps/realtime` when 3007 is free (`gateway.ts`; teardown stops it). `trade.spec.ts`:
+  trade flows and acceptance test 10 (kills that gateway, credits while it is down, restarts it;
+  skipped if the gateway wasn't ours). Run `npx playwright install chromium` once.
 - **UI components** (`src/components/ui`) are hand-written in shadcn/ui's style, not generated by
   its CLI.
 - **ESLint:** `eslint-plugin-react` 7 crashes on ESLint 10 while auto-detecting the React

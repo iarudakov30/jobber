@@ -2,6 +2,7 @@ import { graphql } from '../../gql/wallet';
 import type {
   BalancesQuery,
   EntriesQuery,
+  PositionsQuery,
   TopUpEntryQuery,
   TransferMutation,
 } from '../../gql/wallet/graphql';
@@ -12,6 +13,7 @@ export type EntryPage = EntriesQuery['entries'];
 export type LedgerEntry = EntryPage['items'][number];
 export type Transfer = TransferMutation['transfer'];
 export type TopUpEntry = NonNullable<TopUpEntryQuery['topUp']>;
+export type Position = PositionsQuery['positions'][number];
 
 const BALANCES = graphql(`
   query Balances {
@@ -59,12 +61,29 @@ const TOP_UP_ENTRY = graphql(`
   }
 `);
 
+const POSITIONS = graphql(`
+  query Positions {
+    positions {
+      coin
+      qty
+      costBasis
+      averagePrice
+    }
+  }
+`);
+
 /** Query keys: invalidate `walletKeys.all` after a transfer to refresh balances and history. */
 export const walletKeys = {
   all: ['wallet'] as const,
   balances: ['wallet', 'balances'] as const,
   entries: ['wallet', 'entries'] as const,
+  positions: ['wallet', 'positions'] as const,
 };
+
+/** Quantity and average cost per coin, from the user's trades (faucet coins aren't counted). */
+export async function fetchPositions(): Promise<Position[]> {
+  return (await walletClient.request(POSITIONS)).positions;
+}
 
 export const HISTORY_PAGE_SIZE = 20;
 

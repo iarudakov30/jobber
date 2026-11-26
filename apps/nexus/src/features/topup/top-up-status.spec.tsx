@@ -1,7 +1,8 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { HttpResponse } from 'msw';
 import { graphql } from 'msw/graphql';
 
+import { fakeRealtime } from '../../testing/fake-socket';
 import {
   PAYMENTS_URL,
   WALLET_URL,
@@ -162,6 +163,78 @@ describe('TopUpStatus', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }));
 
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+});
+
+describe('TopUpStatus with the realtime feed', () => {
+  async function renderLive() {
+    const fake = fakeRealtime();
+    await renderPage(
+      () => (
+        <TopUpStatus
+          paymentId={PAYMENT_ID}
+          onDismiss={() => undefined}
+          pollMs={10}
+          maxPolls={5}
+        />
+      ),
+      { realtime: fake.realtime },
+    );
+    fake.client.start();
+    act(() => fake.latest().welcome(7));
+    return fake;
+  }
+
+  it('looks for the credit again on a USD balance message instead of polling', async () => {
+    paymentStatuses('SUCCEEDED');
+    const credit = creditAfter(1);
+    const { latest } = await renderLive();
+
+    expect(
+      await screen.findByText(
+        'Payment received. Adding $50.00 to your wallet…',
+      ),
+    ).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    // The welcome's resync may have asked once more; a poll every 10 ms would be ten times.
+    expect(credit.count).toBeLessThanOrEqual(2);
+    const before = credit.count;
+
+    act(() =>
+      latest().message('user.7', 90, {
+        type: 'balance',
+        asset: 'NXC',
+        available: '1',
+        held: '0',
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(credit.count).toBe(before);
+
+    act(() =>
+      latest().message('user.7', 91, {
+        type: 'balance',
+        asset: 'USD',
+        available: '5000',
+        held: '0',
+      }),
+    );
+    expect(
+      await screen.findByText('$50.00 added to your wallet.'),
+    ).toBeTruthy();
+    expect(credit.count).toBe(before + 1);
+  });
+
+  it('says so when no balance message came in time', async () => {
+    paymentStatuses('SUCCEEDED');
+    creditAfter(Infinity);
+    await renderLive();
+
+    expect(
+      await screen.findByText(
+        'Payment received. $50.00 will show in your wallet shortly.',
+      ),
+    ).toBeTruthy();
   });
 });
 

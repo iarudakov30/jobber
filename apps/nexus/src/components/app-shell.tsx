@@ -1,11 +1,29 @@
 import { Link, Outlet, useRouter } from '@tanstack/react-router';
 
+import { useUserFeed } from '../features/market/use-user-feed';
+import { cn } from '../lib/cn';
+import {
+  useConnectionStatus,
+  useRealtimeConnection,
+} from '../lib/realtime/realtime';
 import { session, useSession } from '../lib/session';
 import { Button } from './ui/button';
+import { Toaster } from './ui/toaster';
+
+const NAV = [
+  ['/wallet', 'Wallet'],
+  ['/markets', 'Markets'],
+  ['/portfolio', 'Portfolio'],
+  ['/topup', 'Top up'],
+  ['/send', 'Send'],
+] as const;
 
 export function AppShell() {
   const user = useSession();
   const router = useRouter();
+  // The realtime socket is open while someone is signed in, and its messages update the cache.
+  useRealtimeConnection(!!user);
+  useUserFeed();
 
   // `auth` has no logout mutation, so signing out only forgets the user here; the cookie
   // stays until it expires, and the next guarded request would still be authenticated.
@@ -27,32 +45,22 @@ export function AppShell() {
             </Link>
             {user && (
               <nav className="flex gap-4 text-sm">
-                <Link
-                  to="/wallet"
-                  className="text-slate-600 hover:text-slate-900"
-                  activeProps={{ className: 'font-medium text-slate-900' }}
-                >
-                  Wallet
-                </Link>
-                <Link
-                  to="/topup"
-                  className="text-slate-600 hover:text-slate-900"
-                  activeProps={{ className: 'font-medium text-slate-900' }}
-                >
-                  Top up
-                </Link>
-                <Link
-                  to="/send"
-                  className="text-slate-600 hover:text-slate-900"
-                  activeProps={{ className: 'font-medium text-slate-900' }}
-                >
-                  Send
-                </Link>
+                {NAV.map(([to, label]) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    className="text-slate-600 hover:text-slate-900"
+                    activeProps={{ className: 'font-medium text-slate-900' }}
+                  >
+                    {label}
+                  </Link>
+                ))}
               </nav>
             )}
           </div>
           {user && (
             <div className="flex items-center gap-3 text-sm">
+              <ConnectionIndicator />
               <span className="text-slate-600">{user.email}</span>
               <Button variant="ghost" onClick={signOut}>
                 Sign out
@@ -64,6 +72,30 @@ export function AppShell() {
       <main className="mx-auto max-w-5xl px-4 py-10">
         <Outlet />
       </main>
+      <Toaster />
     </div>
+  );
+}
+
+const STATUS = {
+  open: { label: 'Live', dot: 'bg-emerald-500' },
+  connecting: { label: 'Connecting…', dot: 'bg-amber-400' },
+  closed: { label: 'Offline', dot: 'bg-red-500' },
+} as const;
+
+/** Whether live prices and balance updates are flowing. */
+export function ConnectionIndicator() {
+  const status = useConnectionStatus();
+  const { label, dot } = STATUS[status];
+  return (
+    <span
+      className="flex items-center gap-1.5 text-xs text-slate-500"
+      data-testid="connection-status"
+      data-status={status}
+      title="Live prices and balance updates"
+    >
+      <span className={cn('h-2 w-2 rounded-full', dot)} aria-hidden />
+      {label}
+    </span>
   );
 }

@@ -10,6 +10,10 @@ export interface E2eUsers {
   sender: E2eUser;
   /** Starts with $0.00. */
   recipient: E2eUser;
+  /** Starts with $100.00, for the market tests. */
+  trader: E2eUser;
+  /** True when this run started the realtime gateway (and so may kill it). */
+  ownsGateway: boolean;
 }
 
 export const USERS_ENV = 'NEXUS_E2E_USERS';

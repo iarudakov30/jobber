@@ -57,14 +57,15 @@ all 11 acceptance tests pass.
 - **Done when:** a test-card top-up credits once and emails once, replaying the webhook 10× still
   credits once, and an unpaid payment expires.
 
-## Phase 4 — Fake market + realtime (~3 weeks, in progress)
+## Phase 4 — Fake market + realtime (~3 weeks, done)
 
 Progress, step by step: [phase-4/README.md](phase-4/README.md). Steps 1 (contracts), 2
 (wallet trading: holds, `SettleTrade`, market maker inventory, `positions`, realtime balance and
 fill messages), 3 (`apps/market` prices: seeded simulator on one leader, ticks, candles,
 quotes), 4 (orders: market and limit orders, matching, cancel, expiry, recovery) and 5
-(`apps/realtime`: the WebSocket gateway) and 6 (the `BackfillCandles` job and `GenerateCandles`)
-are done.
+(`apps/realtime`: the WebSocket gateway), 6 (the `BackfillCandles` job and `GenerateCandles`)
+and 7 (React: realtime client, Markets, Trade and Portfolio, Playwright) are done: all 14
+acceptance tests pass.
 
 - `apps/market` (3006): seeded random-walk price simulator (one leader via a Redis lock), candles,
   10-second quotes in Redis, market and limit orders, `SettleTrade`, holds, `order.expire`.

@@ -23,6 +23,10 @@ export default defineConfig(() => ({
       '/api/auth': api('http://localhost:3000'),
       '/api/wallet': api('http://localhost:3004'),
       '/api/payments': api('http://localhost:3005'),
+      '/api/market': api('http://localhost:3006'),
+      // The WebSocket gateway: `ws: true` proxies the upgrade too. The browser's Origin
+      // (http://localhost:4300) passes through and must be in REALTIME_ALLOWED_ORIGINS.
+      '/api/realtime': { ...api('http://localhost:3007'), ws: true },
     },
   },
   preview: {

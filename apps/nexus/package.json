@@ -9,6 +9,7 @@
     "@tanstack/react-router": "^1.170.46",
     "graphql": "^16.14.2",
     "graphql-request": "^7.4.0",
+    "lightweight-charts": "5.2.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-hook-form": "^7.91.0",

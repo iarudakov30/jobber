@@ -18,12 +18,14 @@ type Documents = {
     "\n  query Entries($after: ID, $first: Int) {\n    entries(after: $after, first: $first) {\n      items {\n        id\n        transactionId\n        type\n        asset\n        amount\n        createdAt\n      }\n      nextCursor\n    }\n  }\n": typeof types.EntriesDocument,
     "\n  mutation Transfer($input: TransferInput!) {\n    transfer(input: $input) {\n      transactionId\n      amount\n      asset\n    }\n  }\n": typeof types.TransferDocument,
     "\n  query TopUpEntry($paymentId: ID!) {\n    topUp(paymentId: $paymentId) {\n      id\n      amount\n      asset\n    }\n  }\n": typeof types.TopUpEntryDocument,
+    "\n  query Positions {\n    positions {\n      coin\n      qty\n      costBasis\n      averagePrice\n    }\n  }\n": typeof types.PositionsDocument,
 };
 const documents: Documents = {
     "\n  query Balances {\n    balances {\n      asset\n      available\n      held\n    }\n  }\n": types.BalancesDocument,
     "\n  query Entries($after: ID, $first: Int) {\n    entries(after: $after, first: $first) {\n      items {\n        id\n        transactionId\n        type\n        asset\n        amount\n        createdAt\n      }\n      nextCursor\n    }\n  }\n": types.EntriesDocument,
     "\n  mutation Transfer($input: TransferInput!) {\n    transfer(input: $input) {\n      transactionId\n      amount\n      asset\n    }\n  }\n": types.TransferDocument,
     "\n  query TopUpEntry($paymentId: ID!) {\n    topUp(paymentId: $paymentId) {\n      id\n      amount\n      asset\n    }\n  }\n": types.TopUpEntryDocument,
+    "\n  query Positions {\n    positions {\n      coin\n      qty\n      costBasis\n      averagePrice\n    }\n  }\n": types.PositionsDocument,
 };
 
 /**
@@ -56,6 +58,10 @@ export function graphql(source: "\n  mutation Transfer($input: TransferInput!) {
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query TopUpEntry($paymentId: ID!) {\n    topUp(paymentId: $paymentId) {\n      id\n      amount\n      asset\n    }\n  }\n"): (typeof documents)["\n  query TopUpEntry($paymentId: ID!) {\n    topUp(paymentId: $paymentId) {\n      id\n      amount\n      asset\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query Positions {\n    positions {\n      coin\n      qty\n      costBasis\n      averagePrice\n    }\n  }\n"): (typeof documents)["\n  query Positions {\n    positions {\n      coin\n      qty\n      costBasis\n      averagePrice\n    }\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

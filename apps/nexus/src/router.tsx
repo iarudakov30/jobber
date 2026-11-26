@@ -9,6 +9,9 @@ import {
 import { AppShell } from './components/app-shell';
 import { LoginPage } from './features/auth/login-page';
 import { RegisterPage } from './features/auth/register-page';
+import { MarketsPage } from './features/market/markets-page';
+import { PortfolioPage } from './features/market/portfolio-page';
+import { TradePage } from './features/market/trade-page';
 import { TopUpPage } from './features/topup/topup-page';
 import { SendPage } from './features/wallet/send-page';
 import { WalletPage } from './features/wallet/wallet-page';
@@ -80,6 +83,31 @@ const sendRoute = createRoute({
   component: SendPage,
 });
 
+const marketsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/markets',
+  beforeLoad: requireSession,
+  component: MarketsPage,
+});
+
+const tradeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/trade/$coin',
+  beforeLoad: requireSession,
+  component: function TradeRoute() {
+    const { coin } = tradeRoute.useParams();
+    // A new coin is a new page: the order form starts empty.
+    return <TradePage key={coin} coin={coin} />;
+  },
+});
+
+const portfolioRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/portfolio',
+  beforeLoad: requireSession,
+  component: PortfolioPage,
+});
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
@@ -96,7 +124,9 @@ const loginRoute = createRoute({
     const { returnUrl } = loginRoute.useSearch();
     const router = useRouter();
     return (
-      <LoginPage onSuccess={() => router.history.push(safeReturnUrl(returnUrl))} />
+      <LoginPage
+        onSuccess={() => router.history.push(safeReturnUrl(returnUrl))}
+      />
     );
   },
 });
@@ -123,6 +153,9 @@ export const router = createRouter({
     walletRoute,
     topUpRoute,
     sendRoute,
+    marketsRoute,
+    tradeRoute,
+    portfolioRoute,
     loginRoute,
     registerRoute,
   ]),
