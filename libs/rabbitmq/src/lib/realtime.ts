@@ -57,3 +57,21 @@ export interface RealtimeFillMessage {
 }
 
 export type RealtimeUserMessage = RealtimeBalanceMessage | RealtimeFillMessage;
+
+/**
+ * A coin's price, once a second on `prices.<coin>` from the market's simulator leader. Sent
+ * non-persistent with a 5 s expiration: a stale tick is worth nothing.
+ *
+ * `seq` comes from a per-coin counter in Redis (`HINCRBY price:<coin> seq 1`), so it keeps
+ * increasing when another replica takes over the simulator. Clients drop a tick whose `seq`
+ * isn't higher than the one they have.
+ */
+export interface RealtimePriceMessage {
+  type: 'price';
+  coin: string;
+  /** USD cents per whole coin, as a decimal string. */
+  price: string;
+  seq: number;
+  /** Tick time, epoch milliseconds. */
+  at: number;
+}

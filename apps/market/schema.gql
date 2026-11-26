@@ -1,0 +1,101 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+"""One minute of a coin's price, in USD cents per whole coin."""
+type Candle {
+  close: MinorUnits!
+  high: MinorUnits!
+  low: MinorUnits!
+  open: MinorUnits!
+
+  """The start of the minute (UTC)."""
+  start: DateTime!
+}
+
+type Coin {
+  code: String!
+  name: String!
+
+  """
+  The open of the first 1-minute candle in the last 24 hours, for the 24 h change; null without candles.
+  """
+  open24h: MinorUnits
+
+  """The latest price; null until the simulator has ticked once."""
+  tick: PriceTick
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""
+An amount in minor units of its asset, as a decimal string: "1250" is $12.50.
+"""
+scalar MinorUnits
+
+type Mutation {
+  """
+  Prices a market order. The quote holds for 10 s; placing the order with its id (step 4) gets exactly these amounts.
+  """
+  quote(coin: String!, qty: MinorUnits!, side: TradeSide!): Quote!
+}
+
+"""
+A coin's price at one tick. Live ticks arrive on the realtime channel prices.<coin> with the same fields.
+"""
+type PriceTick {
+  at: DateTime!
+
+  """USD cents per whole coin."""
+  price: MinorUnits!
+
+  """
+  Increases with every tick of this coin: drop a live tick whose seq isn't higher.
+  """
+  seq: Int!
+}
+
+type Query {
+  """
+  A coin's 1-minute candles with from <= start < to, oldest first. Defaults: to = now, from = 24 hours before to; at most 24 hours. The minute in progress isn't included: build it from live ticks.
+  """
+  candles(coin: String!, from: DateTime, to: DateTime): [Candle!]!
+
+  """Every coin with its latest price, in a fixed order."""
+  coins: [Coin!]!
+}
+
+"""
+A price for a market order, valid until expiresAt (10 s). Amounts in USD cents; qty in coin minor units (8 decimals).
+"""
+type Quote {
+  coin: String!
+  expiresAt: DateTime!
+
+  """0.5% of usdAmount, rounded up."""
+  fee: MinorUnits!
+  id: ID!
+
+  """
+  USD cents per whole coin: the mid price plus (buy) or minus (sell) 0.2%.
+  """
+  price: MinorUnits!
+  qty: MinorUnits!
+  side: TradeSide!
+
+  """
+  What you pay (buy: usdAmount + fee) or receive (sell: usdAmount − fee).
+  """
+  total: MinorUnits!
+
+  """price × qty, rounded up for a buy and down for a sell."""
+  usdAmount: MinorUnits!
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}

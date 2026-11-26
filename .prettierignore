@@ -4,6 +4,7 @@ charts/**/*.yaml
 apps/wallet/schema.gql
 apps/auth/schema.gql
 apps/payments/schema.gql
+apps/market/schema.gql
 # GraphQL Codegen output (nexus:codegen); CI checks it is up to date
 apps/nexus/src/gql
 /dist

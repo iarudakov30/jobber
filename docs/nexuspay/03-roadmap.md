@@ -59,9 +59,10 @@ all 11 acceptance tests pass.
 
 ## Phase 4 — Fake market + realtime (~3 weeks, in progress)
 
-Progress, step by step: [phase-4/README.md](phase-4/README.md). Steps 1 (contracts) and 2
+Progress, step by step: [phase-4/README.md](phase-4/README.md). Steps 1 (contracts), 2
 (wallet trading: holds, `SettleTrade`, market maker inventory, `positions`, realtime balance and
-fill messages) are done.
+fill messages) and 3 (`apps/market` prices: seeded simulator on one leader, ticks, candles,
+quotes) are done.
 
 - `apps/market` (3006): seeded random-walk price simulator (one leader via a Redis lock), candles,
   10-second quotes in Redis, market and limit orders, `SettleTrade`, holds, `order.expire`.
