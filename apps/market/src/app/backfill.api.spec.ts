@@ -148,7 +148,12 @@ it('leaves a live candle alone and fills the minutes around it', async () => {
 it('answers INVALID_ARGUMENT for a bad coin or day, writing nothing', async () => {
   const today = new Date().toISOString().slice(0, 10);
   for (const [coin, day, message] of [
-    ['DOGE', '2026-11-01', 'coin must be one of: NXC, BLIP, ORB, WISP'],
+    ['DOGE', '2026-11-01', 'coin must be one of: NXC, BLIP, ORB, WISP, BTC, ETH, HYPE, ZEC'],
+    [
+      'BTC',
+      '2026-11-01',
+      "coin BTC is priced by the exchanges: its history isn't generated",
+    ],
     ['NXC', '2026-13-01', 'day must be a date: YYYY-MM-DD'],
     ['NXC', '2019-06-01', 'day must be 2020-01-01 or later'],
     [

@@ -1,5 +1,4 @@
-import { COINS } from '@jobber/money';
-import { COIN_SPECS } from './coins';
+import { SIMULATED_COINS, simulated } from './coins';
 import { PriceSimulator, PriceWalk, toCents } from './price-walk';
 import { gaussian, mulberry32, seedFor } from './random';
 
@@ -23,9 +22,9 @@ describe('PriceSimulator', () => {
     expect(run(43, 10)).not.toEqual(run(42, 10));
   });
 
-  it('ticks every coin once, in COINS order', () => {
+  it('ticks every simulated coin once, in COINS order', () => {
     const [ticks] = run(1, 1);
-    expect(ticks.map((t) => t.coin)).toEqual(COINS);
+    expect(ticks.map((t) => t.coin)).toEqual(SIMULATED_COINS);
     for (const tick of ticks) {
       expect(tick.price).toBe(toCents(tick.mid));
     }
@@ -33,8 +32,8 @@ describe('PriceSimulator', () => {
 
   it("gives each coin its own stream: one coin's ticks don't depend on the others", () => {
     const alone = new PriceWalk(
-      COIN_SPECS.ORB.initialPrice,
-      COIN_SPECS.ORB,
+      simulated('ORB').initialPrice,
+      simulated('ORB'),
       mulberry32(seedFor(7, 'ORB')),
     );
     const expected = Array.from({ length: 100 }, () => alone.step().mid);
@@ -57,7 +56,7 @@ describe('PriceSimulator', () => {
   it('starts every coin at its configured price', () => {
     const [ticks] = run(9, 1);
     for (const tick of ticks) {
-      const start = COIN_SPECS[tick.coin].initialPrice;
+      const start = simulated(tick.coin as 'NXC').initialPrice;
       // One second of a walk moves the price by a fraction of a percent, unless a shock hit.
       if (tick.shock === 0) {
         expect(Math.abs(tick.mid / start - 1)).toBeLessThan(0.01);

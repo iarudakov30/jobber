@@ -43,6 +43,13 @@
       "when": 1795633142267,
       "tag": "0005_holds",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795717498537,
+      "tag": "0006_live_coin_assets",
+      "breakpoints": true
     }
   ]
 }

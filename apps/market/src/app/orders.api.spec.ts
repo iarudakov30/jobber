@@ -318,7 +318,10 @@ const untilStatus = (id: string, status: string, timeoutMs = 8_000) =>
 async function setPrice(coin: 'NXC' | 'BLIP' | 'ORB' | 'WISP', price: bigint) {
   await replicas[0].app
     .get(PriceStore)
-    .record([{ coin, price, mid: Number(price) }], Date.now());
+    .record(
+      [{ coin, price, mid: Number(price), source: 'simulator' }],
+      Date.now(),
+    );
 }
 
 async function quote(
@@ -592,7 +595,7 @@ describe('market orders (acceptance test 3)', () => {
       ],
       [
         { type: 'LIMIT', coin: 'DOGE', side: 'BUY', qty: '1', limitPrice: '1' },
-        'coin must be one of: NXC, BLIP, ORB, WISP',
+        'coin must be one of: NXC, BLIP, ORB, WISP, BTC, ETH, HYPE, ZEC',
       ],
       [
         { type: 'LIMIT', coin: 'NXC', qty: '1', limitPrice: '1' },

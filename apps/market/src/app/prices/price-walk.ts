@@ -1,5 +1,10 @@
-import { COINS, CoinCode } from '@jobber/money';
-import { COIN_SPECS, CoinSpec } from './coins';
+import { CoinCode } from '@jobber/money';
+import {
+  SIMULATED_COINS,
+  SimulatedCoin,
+  SimulatedSource,
+  simulated,
+} from './coins';
 import { Random, gaussian, mulberry32, seedFor } from './random';
 
 /** One step of the walk is one second of market time; `mu` and `sigma` are per day. */
@@ -26,7 +31,7 @@ export class PriceWalk {
 
   constructor(
     private mid: number,
-    spec: Pick<CoinSpec, 'mu' | 'sigma' | 'shockChance'>,
+    spec: Pick<SimulatedSource, 'mu' | 'sigma' | 'shockChance'>,
     private readonly random: Random,
   ) {
     this.drift = (spec.mu - (spec.sigma * spec.sigma) / 2) * DT;
@@ -72,22 +77,22 @@ export interface Tick {
 }
 
 /**
- * Every coin's walk. Each coin draws from its own seeded stream, so a given seed produces the
- * same ticks every run.
+ * Every simulated coin's walk (the live coins follow the exchanges instead). Each coin draws from
+ * its own seeded stream, so a given seed produces the same ticks every run.
  */
 export class PriceSimulator {
   private readonly walks: Map<CoinCode, PriceWalk>;
 
   constructor(
     readonly seed: number,
-    specs: Record<CoinCode, CoinSpec> = COIN_SPECS,
+    sourceOf: (coin: SimulatedCoin) => SimulatedSource = simulated,
   ) {
     this.walks = new Map(
-      COINS.map((coin) => [
+      SIMULATED_COINS.map((coin) => [
         coin,
         new PriceWalk(
-          specs[coin].initialPrice,
-          specs[coin],
+          sourceOf(coin).initialPrice,
+          sourceOf(coin),
           mulberry32(seedFor(seed, coin)),
         ),
       ]),
@@ -101,7 +106,7 @@ export class PriceSimulator {
     }
   }
 
-  /** One second: one tick per coin, in `COINS` order. */
+  /** One second: one tick per simulated coin, in `COINS` order. */
   next(): Tick[] {
     return [...this.walks].map(([coin, walk]) => {
       const { mid, shock } = walk.step();

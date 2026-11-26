@@ -25,6 +25,10 @@ describe('parseClientMessage', () => {
       'prices.BLIP',
       'prices.ORB',
       'prices.WISP',
+      'prices.BTC',
+      'prices.ETH',
+      'prices.HYPE',
+      'prices.ZEC',
     ]);
     for (const channel of PUBLIC_CHANNELS) {
       for (const op of ['subscribe', 'unsubscribe'] as const) {

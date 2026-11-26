@@ -1,10 +1,10 @@
-import { CoinCode } from '@jobber/money';
+
 import { Candle, MINUTE_MS } from './candle-builder';
-import { COIN_SPECS } from './coins';
+import { SimulatedCoin, simulated } from './coins';
 import { gaussian, mulberry32, seedFor } from './random';
 
 /**
- * Generated history: one day of 1-minute candles per coin, for the `BackfillCandles` job
+ * Generated history: one day of 1-minute candles per simulated coin, for the `BackfillCandles` job
  * (`GenerateCandles`). The live simulator only knows the days it ran; this fills the charts'
  * past with prices that look like the same market.
  *
@@ -61,11 +61,11 @@ export function backfillDayIndex(day: string, now = Date.now()): number {
 }
 
 /** Log prices of each coin's daily anchors, extended as later days are asked for. */
-const anchorCache = new Map<CoinCode, number[]>();
+const anchorCache = new Map<SimulatedCoin, number[]>();
 
 /** The log price at 00:00 UTC of day `index` (days since the epoch). */
-export function anchorLogPrice(coin: CoinCode, index: number): number {
-  const { initialPrice, sigma } = COIN_SPECS[coin];
+export function anchorLogPrice(coin: SimulatedCoin, index: number): number {
+  const { initialPrice, sigma } = simulated(coin);
   const home = Math.log(initialPrice);
   let anchors = anchorCache.get(coin);
   if (!anchors) {
@@ -92,7 +92,7 @@ export function anchorLogPrice(coin: CoinCode, index: number): number {
 
 /** 1,440 candles for `coin` on `day` (`YYYY-MM-DD`, UTC), oldest first. */
 export function generateDay(
-  coin: CoinCode,
+  coin: SimulatedCoin,
   day: string,
   now = Date.now(),
 ): Candle[] {
@@ -100,7 +100,7 @@ export function generateDay(
   const from = anchorLogPrice(coin, index);
   const to = anchorLogPrice(coin, index + 1);
   const random = mulberry32(seedFor(BACKFILL_SEED, `${coin}:${day}`));
-  const vol = COIN_SPECS[coin].sigma / Math.sqrt(SECONDS_PER_DAY);
+  const vol = simulated(coin).sigma / Math.sqrt(SECONDS_PER_DAY);
 
   // A free walk W, then the bridge X_t = W_t − (t/T)·W_T + (t/T)·(to − from): it starts at 0,
   // ends at the next anchor, and moves like W in between.

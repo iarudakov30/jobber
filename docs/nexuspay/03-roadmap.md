@@ -77,6 +77,20 @@ acceptance tests pass.
 - **Done when:** a limit order holds, then fills, cancels or expires with correct balances, and
   clients survive a realtime replica being killed.
 
+## Phase 4.5 — Real prices (~3–5 days, in progress)
+
+Progress, step by step: [phase-4.5/README.md](phase-4.5/README.md). Step 1 (contracts: the four
+real coins as assets, a price source per coin, `source` on ticks) is done.
+
+- Four real coins, BTC, ETH, HYPE and ZEC, priced from Coinbase Exchange (USD pairs), with Binance
+  (USDT pairs) as a per-coin fallback and a failback once Coinbase is steadily healthy; the four
+  simulated coins stay.
+- A bad print guard holds back a jump over 10% until it is confirmed; with no provider healthy a
+  coin has no price and can't be traded.
+- Real 1-minute history from the exchanges through `BackfillCandles`.
+- **Done when:** the four real coins tick live in the app, survive one provider failing, and trade
+  end to end like the simulated ones.
+
 ## Phase 5 — Hardening (~1 week)
 
 - Refunds (hold first), disputes (shortfall to `dispute_losses`, wallet frozen), `Reconcile` and

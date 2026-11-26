@@ -58,6 +58,10 @@ export interface RealtimeFillMessage {
 
 export type RealtimeUserMessage = RealtimeBalanceMessage | RealtimeFillMessage;
 
+/** Where a tick's price came from: the walk, or an exchange (phase 4.5). */
+export const PRICE_TICK_SOURCES = ['simulator', 'coinbase', 'binance'] as const;
+export type PriceTickSource = (typeof PRICE_TICK_SOURCES)[number];
+
 /**
  * A coin's price, once a second on `prices.<coin>` from the market's simulator leader. Sent
  * non-persistent with a 5 s expiration: a stale tick is worth nothing.
@@ -74,4 +78,6 @@ export interface RealtimePriceMessage {
   seq: number;
   /** Tick time, epoch milliseconds. */
   at: number;
+  /** The simulator for the invented coins; Coinbase or, as the fallback, Binance for real ones. */
+  source: PriceTickSource;
 }

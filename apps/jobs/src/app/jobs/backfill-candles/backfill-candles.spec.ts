@@ -70,14 +70,18 @@ describe('BackfillCandlesJob', () => {
     const now = Date.UTC(2026, 10, 26, 9, 0, 0);
     const items = expandRange({ from: '2026-11-24' }, now);
     expect(items.map((i) => i.day)).toEqual([
-      ...Array(4).fill('2026-11-24'),
-      ...Array(4).fill('2026-11-25'),
+      ...Array(8).fill('2026-11-24'),
+      ...Array(8).fill('2026-11-25'),
     ]);
-    expect(items.slice(0, 4).map((i) => i.coin)).toEqual([
+    expect(items.slice(0, 8).map((i) => i.coin)).toEqual([
       'NXC',
       'BLIP',
       'ORB',
       'WISP',
+      'BTC',
+      'ETH',
+      'HYPE',
+      'ZEC',
     ]);
   });
 
@@ -103,9 +107,9 @@ describe('BackfillCandlesJob', () => {
     expect(await refusal({ from: '2026-11-01', coins: [] })).toEqual([
       'coins must be a non-empty list',
     ]);
-    // 2020-01-01 to 2026-11-25 is 2,521 days: 10,084 coin-days.
+    // 2020-01-01 to 2026-11-25 is 2,521 days: 20,168 coin-days for eight coins.
     expect(await refusal({ from: '2020-01-01', to: '2026-11-25' })).toEqual([
-      'A range can cover at most 10000 coin-days; this one is 10084.',
+      'A range can cover at most 10000 coin-days; this one is 20168.',
     ]);
     expect(await refusal({ from: '2019-12-31', to: '2020-01-02' })).toEqual([
       'from must be 2020-01-01 or later',
@@ -125,7 +129,7 @@ describe('BackfillCandlesJob', () => {
         { coin: 'nxc', day: '01.11.2026' },
       ]),
     ).toEqual([
-      'data[0]: coin must be one of: NXC, BLIP, ORB, WISP',
+      'data[0]: coin must be one of: NXC, BLIP, ORB, WISP, BTC, ETH, HYPE, ZEC',
       'data[1]: day must be 2020-01-01 or later',
       'data[2]: day must be before today (UTC): today belongs to the live simulator',
       'data[3]: day must be a date: YYYY-MM-DD',

@@ -5,11 +5,17 @@
  */
 export const ASSETS = {
   USD: { scale: 2, kind: 'fiat' },
-  // Invented coins for the fake market (phase 4): not real tickers, never real prices.
+  // Invented coins for the fake market (phase 4): not real tickers, simulated prices.
   NXC: { scale: 8, kind: 'coin' },
   BLIP: { scale: 8, kind: 'coin' },
   ORB: { scale: 8, kind: 'coin' },
   WISP: { scale: 8, kind: 'coin' },
+  // Real coins (phase 4.5): real prices from public exchange data, still traded with paper
+  // money. 8 decimals like the others: Bitcoin's own, and enough for paper ETH.
+  BTC: { scale: 8, kind: 'coin' },
+  ETH: { scale: 8, kind: 'coin' },
+  HYPE: { scale: 8, kind: 'coin' },
+  ZEC: { scale: 8, kind: 'coin' },
 } as const satisfies Record<string, { scale: number; kind: 'fiat' | 'coin' }>;
 
 export type AssetCode = keyof typeof ASSETS;
@@ -21,7 +27,10 @@ type AssetsOfKind<Kind> = {
 export type CoinCode = AssetsOfKind<'coin'>;
 export type FiatCode = AssetsOfKind<'fiat'>;
 
-/** Coins in `ASSETS` order: `['NXC', 'BLIP', 'ORB', 'WISP']`. Users get them only by trading. */
+/**
+ * Coins in `ASSETS` order: `['NXC', 'BLIP', 'ORB', 'WISP', 'BTC', 'ETH', 'HYPE', 'ZEC']`. Users
+ * get them only by trading. Which are simulated and which priced live is the market's business.
+ */
 export const COINS = (Object.keys(ASSETS) as AssetCode[]).filter(isCoin);
 
 /** Fiat currencies: every user has accounts in them; they are topped up and transferred. */

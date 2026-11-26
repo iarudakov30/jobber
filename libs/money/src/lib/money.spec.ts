@@ -106,12 +106,23 @@ describe('formatAmount for coins', () => {
 
 describe('asset kinds', () => {
   it('lists the coins and the fiat currencies', () => {
-    expect(COINS).toEqual(['NXC', 'BLIP', 'ORB', 'WISP']);
+    expect(COINS).toEqual([
+      'NXC',
+      'BLIP',
+      'ORB',
+      'WISP',
+      'BTC',
+      'ETH',
+      'HYPE',
+      'ZEC',
+    ]);
     expect(FIAT).toEqual(['USD']);
   });
 
   it('gives every coin 8 decimals', () => {
-    expect(COINS.map((coin) => ASSETS[coin].scale)).toEqual([8, 8, 8, 8]);
+    expect(COINS.map((coin) => ASSETS[coin].scale)).toEqual(
+      COINS.map(() => 8),
+    );
   });
 
   it('tells coins from fiat', () => {

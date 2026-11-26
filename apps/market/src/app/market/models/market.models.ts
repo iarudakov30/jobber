@@ -24,6 +24,12 @@ export class PriceTick {
 
   @Field()
   at: Date;
+
+  @Field(() => String, {
+    description:
+      'Where the price came from: simulator (the invented coins), coinbase, or binance (the fallback for real coins).',
+  })
+  source: string;
 }
 
 @ObjectType()
@@ -34,9 +40,16 @@ export class Coin {
   @Field()
   name: string;
 
+  @Field({
+    description:
+      'True for a real coin priced from public exchange data; false for a simulated one. Both are traded with paper money.',
+  })
+  live: boolean;
+
   @Field(() => PriceTick, {
     nullable: true,
-    description: 'The latest price; null until the simulator has ticked once.',
+    description:
+      'The latest price; null until the coin has ticked once (for a real coin, while no exchange answers).',
   })
   tick: PriceTick | null;
 

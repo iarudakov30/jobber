@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 import { COINS, CoinCode } from '@jobber/money';
+import { PRICE_TICK_SOURCES, PriceTickSource } from '@jobber/rabbitmq';
 import { REDIS } from '../redis/redis.module';
 
 /**
@@ -9,7 +10,7 @@ import { REDIS } from '../redis/redis.module';
  */
 const RECORD = `
 local seq = redis.call('HINCRBY', KEYS[1], 'seq', 1)
-redis.call('HSET', KEYS[1], 'price', ARGV[1], 'mid', ARGV[2], 'at', ARGV[3])
+redis.call('HSET', KEYS[1], 'price', ARGV[1], 'mid', ARGV[2], 'at', ARGV[3], 'source', ARGV[4])
 return seq`;
 
 export interface PriceSnapshot {
@@ -21,6 +22,7 @@ export interface PriceSnapshot {
   seq: number;
   /** Epoch milliseconds. */
   at: number;
+  source: PriceTickSource;
 }
 
 export function priceKey(coin: string): string {
@@ -34,7 +36,12 @@ export class PriceStore {
 
   /** Stores one tick per coin; returns each one's `seq`, in the same order. */
   async record(
-    ticks: { coin: CoinCode; price: bigint; mid: number }[],
+    ticks: {
+      coin: CoinCode;
+      price: bigint;
+      mid: number;
+      source: PriceTickSource;
+    }[],
     at: number,
   ): Promise<number[]> {
     const pipeline = this.redis.pipeline();
@@ -46,6 +53,7 @@ export class PriceStore {
         tick.price.toString(),
         String(tick.mid),
         String(at),
+        tick.source,
       );
     }
     return results(await pipeline.exec()).map(Number);
@@ -59,7 +67,7 @@ export class PriceStore {
     }
     const hashes = results(await pipeline.exec()) as Record<string, string>[];
     return COINS.flatMap((coin, i) => {
-      const { price, mid, seq, at } = hashes[i];
+      const { price, mid, seq, at, source } = hashes[i];
       return price && mid && seq && at
         ? [
             {
@@ -68,6 +76,8 @@ export class PriceStore {
               mid: Number(mid),
               seq: Number(seq),
               at: Number(at),
+              // Prices stored before phase 4.5 have no source: they came from the walk.
+              source: isSource(source) ? source : 'simulator',
             },
           ]
         : [];
@@ -77,6 +87,10 @@ export class PriceStore {
   async get(coin: CoinCode): Promise<PriceSnapshot | undefined> {
     return (await this.latest()).find((p) => p.coin === coin);
   }
+}
+
+function isSource(value: string | undefined): value is PriceTickSource {
+  return (PRICE_TICK_SOURCES as readonly string[]).includes(value ?? '');
 }
 
 /** A pipeline's results, or its first error. */

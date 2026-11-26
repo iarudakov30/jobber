@@ -10,6 +10,7 @@ import {
 } from '@jobber/grpc';
 import { COINS, isCoin } from '@jobber/money';
 import { BackfillDayError, generateDay } from '../prices/backfill';
+import { isSimulated } from '../prices/coins';
 import { CandleStore } from '../prices/candle.store';
 
 /**
@@ -30,6 +31,12 @@ export class MarketController implements MarketServiceController {
   }: GenerateCandlesRequest): Promise<GenerateCandlesResult> {
     if (!isCoin(coin)) {
       throw invalid(`coin must be one of: ${COINS.join(', ')}`);
+    }
+    if (!isSimulated(coin)) {
+      // Phase 4.5 step 4 loads their real candles from the exchanges.
+      throw invalid(
+        `coin ${coin} is priced by the exchanges: its history isn't generated`,
+      );
     }
     let generated;
     try {

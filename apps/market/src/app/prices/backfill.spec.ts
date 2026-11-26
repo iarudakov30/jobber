@@ -1,4 +1,3 @@
-import { COINS } from '@jobber/money';
 import {
   BACKFILL_EPOCH,
   BackfillDayError,
@@ -6,7 +5,7 @@ import {
   backfillDayIndex,
   generateDay,
 } from './backfill';
-import { COIN_SPECS } from './coins';
+import { SIMULATED_COINS, simulated } from './coins';
 
 const NOW = Date.UTC(2026, 10, 26, 15, 0, 0);
 
@@ -34,7 +33,7 @@ describe('generateDay', () => {
   });
 
   it('makes real candles that move, for every coin', () => {
-    for (const coin of COINS) {
+    for (const coin of SIMULATED_COINS) {
       const day = generateDay(coin, '2025-06-01', NOW);
       for (const { open, high, low, close } of day) {
         expect(low).toBeGreaterThan(0n);
@@ -46,7 +45,7 @@ describe('generateDay', () => {
   });
 
   it('joins one day to the next: the last minute closes where the next day opens', () => {
-    for (const coin of COINS) {
+    for (const coin of SIMULATED_COINS) {
       const today = generateDay(coin, '2026-03-10', NOW);
       const tomorrow = generateDay(coin, '2026-03-11', NOW);
       const close = Number(today[1_439].close);
@@ -75,16 +74,16 @@ describe('generateDay', () => {
       const sd = Math.sqrt(
         changes.reduce((a, b) => a + (b - mean) ** 2, 0) / (changes.length - 1),
       );
-      expect(sd).toBeGreaterThan(COIN_SPECS[coin].sigma * 0.75);
-      expect(sd).toBeLessThan(COIN_SPECS[coin].sigma * 1.25);
+      expect(sd).toBeGreaterThan(simulated(coin).sigma * 0.75);
+      expect(sd).toBeLessThan(simulated(coin).sigma * 1.25);
     }
   });
 });
 
 describe('daily anchors', () => {
   it('stay within the range the live market starts from, over years', () => {
-    for (const coin of COINS) {
-      const { initialPrice, sigma } = COIN_SPECS[coin];
+    for (const coin of SIMULATED_COINS) {
+      const { initialPrice, sigma } = simulated(coin);
       // Stationary spread of the anchor's log price: sigma / sqrt(2θ − θ²), θ = 0.05.
       const spread = sigma / Math.sqrt(2 * 0.05 - 0.05 ** 2);
       for (let day = 0; day < 2_500; day += 7) {

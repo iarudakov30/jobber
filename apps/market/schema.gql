@@ -15,6 +15,11 @@ type Candle {
 
 type Coin {
   code: String!
+
+  """
+  True for a real coin priced from public exchange data; false for a simulated one. Both are traded with paper money.
+  """
+  live: Boolean!
   name: String!
 
   """
@@ -22,7 +27,9 @@ type Coin {
   """
   open24h: MinorUnits
 
-  """The latest price; null until the simulator has ticked once."""
+  """
+  The latest price; null until the coin has ticked once (for a real coin, while no exchange answers).
+  """
   tick: PriceTick
 }
 
@@ -142,6 +149,11 @@ type PriceTick {
   Increases with every tick of this coin: drop a live tick whose seq isn't higher.
   """
   seq: Int!
+
+  """
+  Where the price came from: simulator (the invented coins), coinbase, or binance (the fallback for real coins).
+  """
+  source: String!
 }
 
 type Query {

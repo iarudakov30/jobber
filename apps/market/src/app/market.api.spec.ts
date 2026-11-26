@@ -20,6 +20,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Observable, of, throwError } from 'rxjs';
 import { COINS } from '@jobber/money';
+import { LIVE_COINS, SIMULATED_COINS } from './prices/coins';
 import { GRPC_LOADER_OPTIONS, Packages, User } from '@jobber/grpc';
 import {
   REALTIME_EXCHANGE,
@@ -282,7 +283,7 @@ describe('the simulator', () => {
     const since = Date.now();
     await sleep(4_000);
     expect(leaders()).toHaveLength(1);
-    for (const coin of COINS) {
+    for (const coin of SIMULATED_COINS) {
       const ticks = ticksOf(coin, since);
       // One a second, not two: the other replica isn't ticking.
       expect(ticks.length).toBeGreaterThanOrEqual(3);
@@ -302,21 +303,23 @@ describe('the simulator', () => {
       price: expect.stringMatching(/^[1-9]\d*$/),
       seq: expect.any(Number),
       at: expect.any(Number),
+      source: 'simulator',
     });
     expect(tick.properties.expiration).toBe('5000');
     expect(tick.properties.deliveryMode).not.toBe(2);
     expect(tick.properties.messageId).toBe(`price-NXC-${tick.message.seq}`);
-    // All coins of one tick share its time.
+    // All simulated coins of one tick share its time; the live ones aren't the simulator's.
     const sameTick = received.filter((r) => r.message.at === tick.message.at);
     expect(sameTick.map((r) => r.message.coin).sort()).toEqual(
-      [...COINS].sort(),
+      [...SIMULATED_COINS].sort(),
     );
   });
 
   it('keeps the latest price of each coin in Redis', async () => {
     const latest = await replicas[0].app.get(PriceStore).latest();
-    expect(latest.map((p) => p.coin)).toEqual(COINS);
+    expect(latest.map((p) => p.coin)).toEqual(SIMULATED_COINS);
     for (const price of latest) {
+      expect(price.source).toBe('simulator');
       expect(price.price).toBe(BigInt(Math.round(price.mid)));
       expect(Date.now() - price.at).toBeLessThan(3_000);
     }
@@ -420,13 +423,13 @@ describe('candles from ticks', () => {
 
 // ---- queries -------------------------------------------------------------------------------
 
-const COINS_QUERY = `{ coins { code name tick { price seq at } open24h } }`;
+const COINS_QUERY = `{ coins { code name live tick { price seq at source } open24h } }`;
 const CANDLES_QUERY = `query ($coin: String!, $from: DateTime, $to: DateTime) {
   candles(coin: $coin, from: $from, to: $to) { start open high low close }
 }`;
 
 describe('coins', () => {
-  it('lists every coin with its latest tick and the open 24 hours ago', async () => {
+  it('lists every coin with its latest tick and the open 24 hours ago; live coins without a provider have none', async () => {
     const now = Date.now();
     const dayAgo = new Date(now - 24 * 60 * 60_000 + 5 * 60_000);
     const minuteStart = new Date(
@@ -455,7 +458,13 @@ describe('coins', () => {
       coins: {
         code: string;
         name: string;
-        tick: { price: string; seq: number; at: string } | null;
+        live: boolean;
+        tick: {
+          price: string;
+          seq: number;
+          at: string;
+          source: string;
+        } | null;
         open24h: string | null;
       }[];
     }>(null, COINS_QUERY);
@@ -467,10 +476,20 @@ describe('coins', () => {
       'Blip',
       'Orb',
       'Wisp',
+      'Bitcoin',
+      'Ethereum',
+      'Hyperliquid',
+      'Zcash',
     ]);
+    expect(coins.filter((c) => c.live).map((c) => c.code)).toEqual(LIVE_COINS);
+    // No provider runs yet (phase 4.5 step 3): the real coins have no price.
+    for (const coin of coins.filter((c) => c.live)) {
+      expect(coin.tick).toBeNull();
+    }
     const latest = await replicas[0].app.get(PriceStore).latest();
-    for (const coin of coins) {
+    for (const coin of coins.filter((c) => !c.live)) {
       const tick = must(coin.tick);
+      expect(tick.source).toBe('simulator');
       expect(tick.price).toMatch(/^[1-9]\d*$/);
       // Read a moment apart, so within a tick or two of each other.
       const stored = must(latest.find((p) => p.coin === coin.code));
@@ -537,7 +556,7 @@ describe('candles', () => {
   });
 
   it.each([
-    [{ coin: 'USD' }, 'coin must be one of: NXC, BLIP, ORB, WISP'],
+    [{ coin: 'USD' }, 'coin must be one of: NXC, BLIP, ORB, WISP, BTC, ETH, HYPE, ZEC'],
     [
       { coin: 'NXC', from: '2021-01-02T00:00:00Z', to: '2021-01-01T00:00:00Z' },
       'from must be before to',
@@ -648,7 +667,7 @@ describe('quote', () => {
   it.each([
     [
       { coin: 'USD', side: 'BUY', qty: '100' },
-      'coin must be one of: NXC, BLIP, ORB, WISP',
+      'coin must be one of: NXC, BLIP, ORB, WISP, BTC, ETH, HYPE, ZEC',
     ],
     [{ coin: 'NXC', side: 'BUY', qty: '0' }, 'qty must be positive'],
     [{ coin: 'NXC', side: 'BUY', qty: '-5' }, 'qty must be positive'],
@@ -705,7 +724,10 @@ describe('leader failover', () => {
 
   function lastSeqs() {
     return new Map(
-      COINS.map((coin) => [coin, ticksOf(coin).slice(-1)[0]?.message.seq ?? 0]),
+      SIMULATED_COINS.map((coin) => [
+        coin,
+        ticksOf(coin).slice(-1)[0]?.message.seq ?? 0,
+      ]),
     );
   }
 

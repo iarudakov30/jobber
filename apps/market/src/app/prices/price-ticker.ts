@@ -89,13 +89,17 @@ export class PriceTicker {
         );
       }
     }
-    const seqs = await this.prices.record(ticks, at);
+    const seqs = await this.prices.record(
+      ticks.map((tick) => ({ ...tick, source: 'simulator' as const })),
+      at,
+    );
     const messages = ticks.map((tick, i): RealtimePriceMessage => ({
       type: 'price',
       coin: tick.coin,
       price: tick.price.toString(),
       seq: seqs[i],
       at,
+      source: 'simulator',
     }));
     for (const tick of ticks) {
       const finished = this.candles.add(tick.coin, tick.price, at);

@@ -4,7 +4,8 @@ import Redis from 'ioredis';
 import { COINS, CoinCode, isCoin } from '@jobber/money';
 import { Candle } from '../prices/candle-builder';
 import { CandleStore } from '../prices/candle.store';
-import { COIN_SPECS } from '../prices/coins';
+import { COIN_SPECS, isLive } from '../prices/coins';
+import { PriceTickSource } from '@jobber/rabbitmq';
 import { PriceStore } from '../prices/price.store';
 import { REDIS } from '../redis/redis.module';
 import { MarketInputError, PricesUnavailableError } from './market.errors';
@@ -23,11 +24,14 @@ export interface PriceTickView {
   price: bigint;
   seq: number;
   at: Date;
+  source: PriceTickSource;
 }
 
 export interface CoinView {
   code: CoinCode;
   name: string;
+  /** Priced from real exchanges (phase 4.5), not the simulator. */
+  live: boolean;
   tick: PriceTickView | null;
   open24h: bigint | null;
 }
@@ -104,11 +108,13 @@ export class MarketService {
       return {
         code,
         name: COIN_SPECS[code].name,
+        live: isLive(code),
         tick: snapshot
           ? {
               price: snapshot.price,
               seq: snapshot.seq,
               at: new Date(snapshot.at),
+              source: snapshot.source,
             }
           : null,
         open24h: opens.get(code) ?? null,
