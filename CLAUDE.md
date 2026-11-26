@@ -224,7 +224,7 @@ server passes `loader: GRPC_LOADER_OPTIONS` (`{ longs: String }`) so they arrive
 ### Utilities
 
 ```bash
-npm stop                           # kill Node processes on the app ports (3000-3007, gRPC 5000-5003, 4200, 4300)
+npm stop                           # kill Node processes on the app ports (3000-3007, gRPC 5000-5004, 4200, 4300)
 npm run cache-clean                # reset Nx cache and npm cache
 ```
 
@@ -243,11 +243,11 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 | ---------- | ---- | ----------------------------------------------------------- |
 | `auth`     | 3000 | User auth (GraphQL + PostgreSQL/Prisma + gRPC server)       |
 | `jobs`     | 3001 | Job management (GraphQL + outbox to Pulsar + gRPC client)   |
-| `executor` | 3002 | Job execution (Pulsar consumer + gRPC clients to `jobs`, `products`, `wallet`, `auth`) and the NexusPay email worker (RabbitMQ → SMTP) |
+| `executor` | 3002 | Job execution (Pulsar consumer + gRPC clients to `jobs`, `products`, `wallet`, `market`, `auth`) and the NexusPay email worker (RabbitMQ → SMTP) |
 | `products` | 3003 | Product persistence (gRPC server + PostgreSQL/Drizzle)      |
 | `wallet`   | 3004 | NexusPay ledger (GraphQL + gRPC server 5003 + PostgreSQL/Drizzle + outbox to Pulsar) |
 | `payments` | 3005 | NexusPay Stripe top-ups (GraphQL + Stripe webhook + PostgreSQL/Drizzle + outbox to Pulsar and RabbitMQ) |
-| `market`   | 3006 | NexusPay fake coin market (GraphQL + price simulator on one leader via Redis + PostgreSQL/Drizzle candles and orders + ticks to RabbitMQ + gRPC client to `wallet`) |
+| `market`   | 3006 | NexusPay fake coin market (GraphQL + gRPC server 5004 + price simulator on one leader via Redis + PostgreSQL/Drizzle candles and orders + ticks to RabbitMQ + gRPC client to `wallet`) |
 | `realtime` | 3007 | NexusPay WebSocket gateway (raw `ws` at `/realtime`, cookie auth via `auth` gRPC, per-instance RabbitMQ queue on `realtime`) |
 | `ui-admin` | 4200 | Angular 22 frontend (Apollo Client against `auth` + `jobs`) |
 | `nexus`    | 4300 | React 19 + Vite frontend for NexusPay (`graphql-request`)   |
@@ -255,7 +255,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 ### Communication Patterns
 
 1. **GraphQL (external)** — clients talk to `auth` and `jobs` via Apollo GraphQL APIs
-2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email, and `GetUser`, for the email worker); other services call `wallet`'s `WalletService` (`Credit`, `GetBalances`, `RunAudit`; `SettleTrade`, `PlaceHold`, `ReleaseHold` for the market); `executor` calls `products` to persist job results; contracts in `libs/grpc/src/lib/proto/*.proto`
+2. **gRPC (internal)** — `jobs` calls `auth` to validate JWT tokens on every incoming request (`auth` also serves `FindUserByEmail`, for wallet transfers by email, and `GetUser`, for the email worker); other services call `wallet`'s `WalletService` (`Credit`, `GetBalances`, `RunAudit`; `SettleTrade`, `PlaceHold`, `ReleaseHold` for the market); `executor` calls `products` to persist job results and `market`'s `GenerateCandles` for candle backfill; contracts in `libs/grpc/src/lib/proto/*.proto`
 3. **Apache Pulsar (async)** — `jobs` publishes job messages to Pulsar topics; `executor` subscribes and processes them. NexusPay events too: `payments` → `payment-succeeded` → `wallet`
 4. **RabbitMQ (async)** — work queues and timers: `payment.expire` through the `delay.30m` bucket back into `payments`; `email.topup` from `wallet` to the executor's email worker; `order.expire` through `delay.24h` back into `market`; realtime channels on the `realtime` exchange (`prices.<coin>` from `market`, `user.<id>` from `wallet`), pushed to browsers by `realtime`
 
@@ -265,7 +265,7 @@ was built and why (`docs/nexuspay/README.md` is the entry point).
 
 - Decorate a class with `@Job()` to register a new job type
 - `JobsService` uses `@golevelup/nestjs-discovery` to auto-discover all `@Job()` decorated classes
-- The discovered job class validates the payload (at most `MAX_JOB_ITEMS`, 10,000 items), then in one transaction creates the `Job` row and writes one outbox record per item; the outbox relay publishes them to a Pulsar topic named after the job type. A crash can therefore never leave a job whose messages weren't sent.
+- The discovered job class validates the payload (at most `MAX_JOB_ITEMS`, 10,000 items; per item its class-validator decorators plus `itemErrors(item)`, a hook for checks they can't express), then in one transaction creates the `Job` row and writes one outbox record per item; the outbox relay publishes them to a Pulsar topic named after the job type. A crash can therefore never leave a job whose messages weren't sent.
 - `executor` defines a corresponding `PulsarConsumer<T>` subclass that processes messages from that topic
 - Each message carries `jobId` and its item `index`. After `execute`, the executor calls `Acknowledge({ jobId, index })`; `JobsService.acknowledge` inserts a `JobItem (jobId, index)` row and bumps `completed` in one statement, so a redelivered message is counted once. `execute` must be safe to repeat too: `LoadProducts` sends `sourceRef = job:<jobId>:<index>` and `products` ignores a second insert with the same `source_ref`.
 - Test hook: start the executor with `FAULT_ACK_FAILURES=<n>` (ignored when `NODE_ENV=production`) and its first n messages fail after `execute`, forcing redeliveries.
@@ -277,6 +277,12 @@ The `LedgerAudit` job (`apps/jobs/src/app/jobs/ledger-audit/`) is started nightl
 cron expression, `off` disables it) or by hand with `executeJob(name: "LedgerAudit", data: {})`.
 Its consumer (`apps/executor/src/app/jobs/ledger-audit/`) calls the wallet's gRPC `RunAudit` and
 logs "no issues" or one ERROR line per issue; issues don't fail the job.
+
+The `BackfillCandles` job (`apps/jobs/src/app/jobs/backfill-candles/`, phase 4 step 6) takes a range
+`{ from, to?, coins? }` (default: every coin, up to yesterday), expanded to one item per coin-day, or
+a list of `{ coin, day }`; days from 2020-01-01 to yesterday (UTC). Its consumer
+(`apps/executor/src/app/jobs/backfill-candles/`) calls the market's gRPC `GenerateCandles`
+(`MARKET_GRPC_SERVICE_URL`, default `localhost:5004`); `INVALID_ARGUMENT` is dead-lettered at once.
 
 The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) follows the same pattern but its consumer (`apps/executor/src/app/jobs/products/load-products.consumer.ts`) additionally calls the `products` service over gRPC to persist the enriched product data via Drizzle.
 
@@ -388,6 +394,12 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
   `quote(coin, side, qty)` (signed in; `PRICES_UNAVAILABLE` if the price is older than 10 s;
   stores `{ userId, coin, side, qty, price, usdAmount, fee }` at `quote:<id>` for 10 s).
   Schema printed to `apps/market/schema.gql` (a test fails when stale).
+- **Generated history** (`prices/backfill.ts`, gRPC `GenerateCandles` on `MARKET_GRPC_SERVICE_URL`
+  5004, `backfill/market.controller.ts`): a day's 1,440 candles from a fixed seed, the coin and the
+  day only (not `MARKET_SEED`), so every replica and repeat gives the same: daily anchors from a
+  mean-reverting walk around the coin's start price (2020-01-01 on), a one-second Brownian bridge
+  between consecutive anchors. `CandleStore.insertMissing` (`ON CONFLICT DO NOTHING`): live
+  candles win, a repeat writes 0. Today and later are refused (`INVALID_ARGUMENT`).
 - **Pricing** (`market/pricing.ts`, `bigint`): price = mid ± 0.2% (buy rounds up, sell down);
   `usdAmount = price · qty / 10^8` (buy up, sell down); fee = 0.5% rounded up. A property test
   checks the house never loses on rounding. Limit orders (`limitAmounts`) trade at the limit,
@@ -599,7 +611,7 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
 
 - **`@jobber/graphql`** (`libs/graphql`) — `AbstractModel` (GraphQL base type), `GqlContext`, `GqlAuthGuard`
 - **`@jobber/nestjs`** (`libs/nestjs`) — `init()` bootstrap helper used by all apps, `Jobs` enum
-- **`@jobber/grpc`** (`libs/grpc`) — gRPC proto files and generated TypeScript types for `AuthService`, `ProductsService`, `JobsService`, `WalletService` and `MarketService` (`GenerateCandles`; served by `apps/market` from phase 4 step 6), plus the `Packages` enum, `GRPC_LOADER_OPTIONS` and `GrpcStatus` (status codes for `RpcException`)
+- **`@jobber/grpc`** (`libs/grpc`) — gRPC proto files and generated TypeScript types for `AuthService`, `ProductsService`, `JobsService`, `WalletService` and `MarketService` (`GenerateCandles`, served by `apps/market` on 5004), plus the `Packages` enum, `GRPC_LOADER_OPTIONS` and `GrpcStatus` (status codes for `RpcException`)
 - **`@jobber/prisma`** (`libs/prisma`) — Prisma client used by `auth`
 - **`@jobber/tracing`** (`libs/tracing`) — `startTracing(serviceName)`: OpenTelemetry SDK with http, express, Nest, GraphQL, gRPC and pg (only inside a traced request) instrumentation, exporting over OTLP/HTTP. Call it on the line right after `require('module-alias/register')` in `main.ts`, before anything loads NestJS: instrumentations patch modules when they are first required. Pulsar isn't instrumented; `send()` and the outbox write `traceparent` into message properties and `PulsarConsumer` continues the trace from them.
 - **`@jobber/money`** (`libs/money`) — amounts as `bigint` minor units: `ASSETS` (USD, scale 2, `kind: 'fiat'`; coins NXC, BLIP, ORB, WISP, scale 8, `kind: 'coin'`), `COINS`, `FIAT`, `isCoin`, `isFiat`, `parseAmount` ("12.34" → `1234n`, never rounds), `formatAmount` (exact, via `Intl.NumberFormat` on a decimal string; coins as `1.50000000 NXC`, since `Intl` refuses non-ISO codes), `toWire`/`fromWire` (canonical decimal strings). No framework imports, so `nexus` can use it too.
@@ -615,7 +627,7 @@ inferred by `@nx/vite/plugin`, `@nx/vitest` and `@nx/js/typescript`, which `nx.j
   - `RabbitConsumer<T>` (extend it, inject `RabbitConnection`, name the queue; default prefetch 10): `onMessage(data, meta)` gets `messageId`, `routingKey` (the original, kept through retries and delay buckets in `x-original-routing-key`), string `headers` and `attempt`. A throw copies the message to the next retry queue (`x-attempt` + 1, default delays 5 s / 30 s / 5 min, 5 attempts) and acks the original; after the last attempt, or at once for `NonRetryableError` or non-JSON, the copy goes to `<queue>.dlq` with `x-dead-letter-reason`.
   - Delay bucket: publish to the fanout exchange (e.g. `delay.30m`) with the command's routing key; after the TTL the message reaches the bucket's `target` exchange with that key. Never publish to the bucket queue through the default exchange (that replaces the key).
   - amqplib is pinned to 2.2.1 (it bundles its own types).
-- **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, a `send()` helper (key, properties, `sequenceId`), job message DTOs (`FibonacciMessage`, `LoadProductsMessage`), `PaymentSucceededMessage` (topic `payment-succeeded`: `{ paymentId, userId, amount, currency }`, amount as a minor-units string, keyed by `userId`), `TradeExecutedMessage` (topic `trade-executed`: `{ tradeId, transactionId, userId, coin, side, qty, usdAmount, fee }`, written by the wallet when it settles a trade, from phase 4 step 2), and `validateMessage(cls, data)`, which throws `NonRetryableError` (dead-letter, no retry) for an invalid payload
+- **`@jobber/pulsar`** (`libs/pulsar`) — `PulsarModule`, `PulsarClient` (producer/consumer management), abstract `PulsarConsumer<T>` base class with JSON serialization, a `send()` helper (key, properties, `sequenceId`), job message DTOs (`FibonacciMessage`, `LoadProductsMessage`), `PaymentSucceededMessage` (topic `payment-succeeded`: `{ paymentId, userId, amount, currency }`, amount as a minor-units string, keyed by `userId`), `BackfillCandlesMessage` (`{ coin, day }`, checked by shape only; `BACKFILL_FIRST_DAY`), `TradeExecutedMessage` (topic `trade-executed`: `{ tradeId, transactionId, userId, coin, side, qty, usdAmount, fee }`, written by the wallet when it settles a trade, from phase 4 step 2), and `validateMessage(cls, data)`, which throws `NonRetryableError` (dead-letter, no retry) for an invalid payload
   - Consumers take `ConsumerOptions`: subscription (default `jobber`, which job consumers keep), type (default `Shared`), redelivery delay (5 s) and max redeliveries (5) before Pulsar moves the message to `<topic>-<subscription>-DLQ`. Give each service that consumes the same topic its own subscription, or they split the messages instead of each getting all of them.
   - `onMessage(data, meta)` gets the message id, partition key, properties and redelivery count. Throwing `NonRetryableError` (or sending unparseable JSON) dead-letters the message at once; any other error nacks it for redelivery. Only a failed handler nacks, never a failed ack, so handlers must tolerate the occasional repeat.
   - Consumers run in the executor's single event loop, so CPU-heavy work stalls every other consumer: `FibonacciMessage` caps `iterations` at `MAX_FIBONACCI_ITERATIONS` (1,000) for that reason.

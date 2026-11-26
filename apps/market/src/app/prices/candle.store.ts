@@ -33,6 +33,24 @@ export class CandleStore {
       });
   }
 
+  /**
+   * Inserts the candles whose minute has none yet and leaves the others alone; returns how many
+   * it inserted. For generated history: a live candle always wins over a generated one.
+   */
+  async insertMissing(rows: Candle[]): Promise<number> {
+    if (rows.length === 0) {
+      return 0;
+    }
+    const inserted = await this.db
+      .insert(candles)
+      .values(rows.map((row) => ({ ...row, interval: ONE_MINUTE })))
+      .onConflictDoNothing({
+        target: [candles.coin, candles.interval, candles.start],
+      })
+      .returning({ start: candles.start });
+    return inserted.length;
+  }
+
   /** A coin's 1-minute candles with `from <= start < to`, oldest first. */
   async range(coin: string, from: Date, to: Date): Promise<Candle[]> {
     return this.db

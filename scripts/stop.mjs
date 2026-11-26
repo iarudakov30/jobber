@@ -15,6 +15,7 @@ const PORTS = {
   5001: 'products gRPC',
   5002: 'jobs gRPC',
   5003: 'wallet gRPC',
+  5004: 'market gRPC',
   4200: 'ui-admin',
   4300: 'nexus',
 };

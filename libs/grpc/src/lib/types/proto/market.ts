@@ -10,12 +10,12 @@ import { Observable } from 'rxjs';
 
 export interface GenerateCandlesRequest {
   coin: string;
-  /** A UTC date, YYYY-MM-DD, before today. */
+  /** A UTC date, YYYY-MM-DD, from 2020-01-01 to yesterday. */
   day: string;
 }
 
 export interface GenerateCandlesResult {
-  /** Candles written: 1440 for a full day. */
+  /** Candles written: 1440 for a day that had none, 0 for a repeat. */
   written: number;
 }
 
@@ -26,9 +26,10 @@ export interface GenerateCandlesResult {
 
 export interface MarketServiceClient {
   /**
-   * Writes one day of 1-minute candles for a coin from the simulator's seeded random walk, for
-   * the BackfillCandles job (one call per coin-day). Upserts by (coin, interval, start), so a
-   * repeat writes the same candles again instead of adding rows.
+   * Writes one day of 1-minute candles for a coin, for the BackfillCandles job (one call per
+   * coin-day). The candles come from a random walk seeded by the coin and the day only, so every
+   * replica and every repeat generates the same ones. Only minutes without a candle are written:
+   * live candles win, and a repeat writes nothing.
    */
 
   generateCandles(
@@ -43,9 +44,10 @@ export interface MarketServiceClient {
 
 export interface MarketServiceController {
   /**
-   * Writes one day of 1-minute candles for a coin from the simulator's seeded random walk, for
-   * the BackfillCandles job (one call per coin-day). Upserts by (coin, interval, start), so a
-   * repeat writes the same candles again instead of adding rows.
+   * Writes one day of 1-minute candles for a coin, for the BackfillCandles job (one call per
+   * coin-day). The candles come from a random walk seeded by the coin and the day only, so every
+   * replica and every repeat generates the same ones. Only minutes without a candle are written:
+   * live candles win, and a repeat writes nothing.
    */
 
   generateCandles(

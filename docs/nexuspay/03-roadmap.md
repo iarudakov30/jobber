@@ -63,7 +63,8 @@ Progress, step by step: [phase-4/README.md](phase-4/README.md). Steps 1 (contrac
 (wallet trading: holds, `SettleTrade`, market maker inventory, `positions`, realtime balance and
 fill messages), 3 (`apps/market` prices: seeded simulator on one leader, ticks, candles,
 quotes), 4 (orders: market and limit orders, matching, cancel, expiry, recovery) and 5
-(`apps/realtime`: the WebSocket gateway) are done.
+(`apps/realtime`: the WebSocket gateway) and 6 (the `BackfillCandles` job and `GenerateCandles`)
+are done.
 
 - `apps/market` (3006): seeded random-walk price simulator (one leader via a Redis lock), candles,
   10-second quotes in Redis, market and limit orders, `SettleTrade`, holds, `order.expire`.

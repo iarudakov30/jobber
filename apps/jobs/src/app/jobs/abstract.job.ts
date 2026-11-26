@@ -54,6 +54,16 @@ export abstract class AbstractJob<T extends object> {
     return job;
   }
 
+  /**
+   * Checks the class-validator decorators can't express (a value against a list another library
+   * owns, a date against today). Runs for every item after its decorators; messages get the
+   * same `data[i]: ` prefix.
+   */
+  protected itemErrors(item: T): string[] {
+    void item;
+    return [];
+  }
+
   private async validateData(items: T[], isArray: boolean) {
     if (!items.length) {
       throw new BadRequestException('Job data must not be empty.');
@@ -69,8 +79,8 @@ export abstract class AbstractJob<T extends object> {
           const errors = await validate(
             plainToInstance(this.messageClass, item),
           );
-          return constraintMessages(errors).map((message) =>
-            isArray ? `data[${index}]: ${message}` : message,
+          return [...constraintMessages(errors), ...this.itemErrors(item)].map(
+            (message) => (isArray ? `data[${index}]: ${message}` : message),
           );
         }),
       )

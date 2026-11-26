@@ -14,6 +14,11 @@ export const WALLET_PROTO = join(
   __dirname,
   '../../../../libs/grpc/src/lib/proto/wallet.proto',
 );
+/** And market.proto, for the GenerateCandles tests. */
+export const MARKET_PROTO = join(
+  __dirname,
+  '../../../../libs/grpc/src/lib/proto/market.proto',
+);
 
 export type Method = 'SettleTrade' | 'PlaceHold' | 'ReleaseHold';
 

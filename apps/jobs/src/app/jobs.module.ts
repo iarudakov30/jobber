@@ -19,6 +19,7 @@ import { JobsService } from './jobs.service';
 import { JobsResolver } from './jobs.resolver';
 import { LoadProductsJob } from './jobs/products/load-products.job';
 import { LedgerAuditJob } from './jobs/ledger-audit/ledger-audit.job';
+import { BackfillCandlesJob } from './jobs/backfill-candles/backfill-candles.job';
 import { LedgerAuditScheduler } from './jobs/ledger-audit/ledger-audit.scheduler';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
@@ -53,6 +54,7 @@ import { JobsController } from './jobs.controller';
     LoadProductsJob,
     LedgerAuditJob,
     LedgerAuditScheduler,
+    BackfillCandlesJob,
     {
       provide: PrismaOutboxStore,
       useFactory: (prisma: PrismaService) => new PrismaOutboxStore(prisma),

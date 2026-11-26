@@ -5,6 +5,7 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'path';
 import { LoggerModule } from '@jobber/nestjs';
 import { RabbitModule } from '@jobber/rabbitmq';
+import { BackfillModule } from './backfill/backfill.module';
 import { DatabaseModule } from './database/database.module';
 import { graphQLOptions } from './graphql.options';
 import { MarketModule } from './market/market.module';
@@ -28,6 +29,7 @@ import { marketTopology } from './topology';
     }),
     MarketModule,
     OrdersModule,
+    BackfillModule,
     // Nx runs the app from the workspace root.
     GraphQLModule.forRoot<ApolloDriverConfig>(
       graphQLOptions(join(process.cwd(), 'apps/market/schema.gql')),
