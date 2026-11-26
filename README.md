@@ -2,7 +2,9 @@
 
 ## Purpose
 
-**Jobber** is a microservices-based application for **user authentication, background job management, and product data processing**. It's built as a distributed system using an **Nx monorepo** with four independent backend services communicating over GraphQL, gRPC, and Apache Pulsar, plus an **Angular web UI** for signing in and running jobs.
+**Jobber** is a microservices-based application for **user authentication, background job management, and product data processing**. It's built as a distributed system using an **Nx monorepo** with independent backend services communicating over GraphQL, gRPC, Apache Pulsar and RabbitMQ, plus an **Angular web UI** for signing in and running jobs.
+
+The same repo hosts **NexusPay**, a wallet and payments learning project: a double-entry ledger (`wallet`), Stripe top-ups (`payments`), a simulated coin market (`market`), a WebSocket gateway (`realtime`) and a **React app** (`nexus`). It is documented in [docs/nexuspay](docs/nexuspay/README.md).
 
 ---
 
@@ -80,22 +82,59 @@
 
 ```
 apps/
-├── auth/       ← GraphQL auth service (users, JWT, Prisma) + gRPC server        (port 3000)
-├── jobs/       ← Job registration, GraphQL API, Pulsar producer, gRPC client    (port 3001)
-├── executor/   ← Pulsar consumer, executes jobs, gRPC client to products       (port 3002)
-├── products/   ← gRPC service, Drizzle ORM, PostgreSQL persistence             (port 3003)
-├── ui/         ← Angular web UI, Apollo Client against auth + jobs              (port 4200)
-├── auth-e2e/
-└── jobs-e2e/
+├── auth/       ← GraphQL auth service (users, JWT, Prisma) + gRPC server        (port 3000, gRPC 5000)
+├── jobs/       ← Job registration, GraphQL API, outbox to Pulsar, gRPC server   (port 3001, gRPC 5002)
+├── executor/   ← Pulsar consumers that run jobs; NexusPay email worker         (port 3002)
+├── products/   ← gRPC service, Drizzle ORM, PostgreSQL persistence             (port 3003, gRPC 5001)
+├── wallet/     ← NexusPay ledger: balances, transfers, holds, trades           (port 3004, gRPC 5003)
+├── payments/   ← NexusPay Stripe Checkout top-ups and webhooks                 (port 3005)
+├── market/     ← NexusPay price simulator, candles, quotes, orders             (port 3006, gRPC 5004)
+├── realtime/   ← NexusPay WebSocket gateway: live prices, balances, fills     (port 3007)
+├── ui-admin/   ← Angular web UI, Apollo Client against auth + jobs              (port 4200)
+├── nexus/      ← React app for NexusPay (Vite)                                 (port 4300)
+└── nexus-e2e/  ← Playwright tests of the React app against the real backends
 libs/
 ├── graphql/    ← Shared: AbstractModel, GqlContext, GqlAuthGuard
 ├── nestjs/     ← Shared: init() bootstrap helper, Jobs enum
-├── grpc/       ← gRPC proto files + generated TypeScript types (auth, products)
+├── grpc/       ← gRPC proto files + generated TypeScript types
 ├── prisma/     ← Prisma client (used by auth)
-└── pulsar/     ← PulsarModule, PulsarClient, PulsarConsumer base class, job messages
+├── pulsar/     ← PulsarModule, PulsarClient, PulsarConsumer base class, messages
+├── rabbitmq/   ← RabbitMQ connection, publisher, consumers with retries and DLQ
+├── outbox/     ← Transactional outbox and its relay (Pulsar, RabbitMQ)
+├── idempotency/← @Idempotent() for GraphQL and HTTP handlers
+├── money/      ← Amounts as bigint minor units (USD and the market's coins)
+└── tracing/    ← OpenTelemetry setup (traces to Jaeger)
 ```
 
 Each service is independently buildable and deployable. Shared libraries provide common contracts (GraphQL base types, gRPC stubs, Pulsar messaging) so services stay decoupled.
+
+---
+
+## Run it locally
+
+```sh
+docker compose up -d   # PostgreSQL, Pulsar, RabbitMQ, Redis, Mailpit, Jaeger
+npm start              # every app in watch mode: the backends and both UIs
+```
+
+On a fresh database, run the migrations once first: `npx nx run auth:migrate-prisma`,
+`npx nx run jobs:migrate-prisma`, `npx nx run products:migrate-drizzle`,
+`npx nx run wallet:migrate-drizzle`, `npx nx run payments:migrate-drizzle` and
+`npx nx run market:migrate-drizzle`. With `auth` and `wallet` running, `npx nx run wallet:seed`
+creates `alice@example.com` and `bob@example.com` (password `Test@1234`) with $100 each.
+
+| What                                               | URL                                                                                |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| NexusPay (React)                                   | http://localhost:4300                                                              |
+| ui-admin (Angular)                                 | http://localhost:4200                                                              |
+| GraphiQL: auth / jobs / wallet / payments / market | http://localhost:3000/auth, :3001/jobs, :3004/wallet, :3005/payments, :3006/market |
+| Realtime gateway stats                             | http://localhost:3007/realtime/stats                                               |
+| RabbitMQ UI                                        | http://localhost:15672 (guest / guest)                                             |
+| Mailpit                                            | http://localhost:8025                                                              |
+| Jaeger                                             | http://localhost:16686                                                             |
+
+Stop everything with `npm stop` and `docker compose down`. More (single apps, tests, low-memory
+runs, gotchas) in [docs/nexuspay/02-repo-guide.md](docs/nexuspay/02-repo-guide.md).
 
 ---
 
@@ -150,11 +189,11 @@ The `ui-admin` app is an Angular 22 frontend for the `auth` and `jobs` GraphQL A
 ### Run it
 
 ```sh
-docker compose up -d   # PostgreSQL + Apache Pulsar
-npm start              # all four services + the UI
+docker compose up -d   # all infrastructure (see "Run it locally")
+npm start              # every app, this UI included
 ```
 
-On a fresh database, run the migrations once before `npm start`: `npx nx run auth:migrate-db`, `npx nx run jobs:migrate-prisma` and `npx nx run products:migrate-drizzle`.
+On a fresh database, run the migrations once before `npm start` (the full list is under "Run it locally").
 
 Then open <http://localhost:4200>, create an account and run a **Fibonacci** or **LoadProducts** job.
 
@@ -231,7 +270,7 @@ A **NestJS microservices backend** demonstrating GraphQL-first APIs, JWT cookie 
 
 ## Infrastructure
 
-Start PostgreSQL and Apache Pulsar:
+Start PostgreSQL, Pulsar, RabbitMQ, Redis, Mailpit and Jaeger:
 
 ```sh
 docker compose up -d
@@ -250,7 +289,7 @@ docker compose down
 ### Serve
 
 ```sh
-npx nx serve auth                 # Serve a single app (auth, jobs, executor, products, ui-admin, nexus)
+npx nx serve auth                 # Serve a single app (auth, jobs, executor, products, wallet, payments, market, realtime, ui-admin, nexus)
 npx nx run-many -t serve          # Serve all apps in parallel
 
 --skip-nx-cache                   # Run without cache

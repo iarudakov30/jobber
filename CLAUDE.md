@@ -8,7 +8,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm start                          # serves auth, jobs, executor, products, wallet, payments, market, realtime, ui-admin and nexus concurrently
+npm stop                           # and stops them
 ```
+
+Needs the infrastructure first (`docker compose up -d`, below) and migrated databases (Database,
+below). Once running:
+
+| What                                               | URL                                                                                |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| NexusPay (React)                                   | http://localhost:4300                                                              |
+| ui-admin (Angular)                                 | http://localhost:4200                                                              |
+| GraphiQL: auth / jobs / wallet / payments / market | http://localhost:3000/auth, :3001/jobs, :3004/wallet, :3005/payments, :3006/market |
+| Realtime gateway stats                             | http://localhost:3007/realtime/stats                                               |
+| RabbitMQ UI                                        | http://localhost:15672 (guest / guest)                                             |
+| Mailpit                                            | http://localhost:8025                                                              |
+| Jaeger                                             | http://localhost:16686                                                             |
+
+Sign in as `alice@example.com` or `bob@example.com` (password `Test@1234`, created by
+`npx nx run wallet:seed`).
 
 ### Individual app commands
 
@@ -191,8 +208,8 @@ helm uninstall jobber -n jobber
 ### Database
 
 ```bash
-npx nx run auth:migrate-db  # run Prisma migrations
-npx nx run auth:generate    # regenerate Prisma client
+npx nx run auth:migrate-prisma   # run Prisma migrations
+npx nx run auth:generate-prisma  # regenerate Prisma client
 
 npx nx run products:generate-drizzle  # generate Drizzle migrations from schema
 npx nx run products:migrate-drizzle   # run Drizzle migrations

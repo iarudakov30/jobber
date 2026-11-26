@@ -58,8 +58,10 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 | products | 3003                                                         | 5001 | `products` (Drizzle)   | `products.source_ref` is unique                                                                                                                                                                                                                         |
 | wallet   | 3004 (`/wallet` GraphQL)                                     | 5003 | `wallet` (Drizzle)     | Ledger; triggers keep postings balanced and entries append-only; `outbox`, `idempotency_keys`; Redis for the idempotency fast path; consumes `payment-succeeded` (subscription `wallet`, Key_Shared) and queues `email.topup`; `npx nx run wallet:seed` |
 | payments | 3005 (`/payments` GraphQL, `POST /payments/webhooks/stripe`) | —    | `payments` (Drizzle)   | `payments`, `stripe_events`, `recon_issues`, `outbox`, `idempotency_keys`; RabbitMQ `payments.commands` + delay buckets; Stripe keys in `apps/payments/.env.local` (gitignored)                                                                         |
+| market   | 3006 (`/market` GraphQL)                                     | 5004 | `market` (Drizzle)     | Price simulator on one leader (Redis lock `market:simulator`), candles, quotes in Redis, orders; ticks to RabbitMQ `realtime`; `order.expire` through `delay.24h`; gRPC `GenerateCandles` for `BackfillCandles`                                         |
+| realtime | 3007 (WebSocket `/realtime`, `GET /realtime/stats`)          | —    | —                      | WebSocket gateway: cookie auth on the upgrade, per-instance RabbitMQ queue on `realtime`; `REALTIME_ALLOWED_ORIGINS`                                                                                                                                    |
 | ui-admin | 4200                                                         | —    | —                      | Angular; proxies `/api/*` to 3000/3001                                                                                                                                                                                                                  |
-| nexus    | 4300                                                         | —    | —                      | React; Vite proxies `/api/auth` to 3000, `/api/wallet` to 3004 and `/api/payments` to 3005                                                                                                                                                                                      |
+| nexus    | 4300                                                         | —    | —                      | React; Vite proxies `/api/auth` to 3000, `/api/wallet` to 3004, `/api/payments` to 3005, `/api/market` to 3006 and `/api/realtime` to 3007 (WebSocket)                                                                                                  |
 
 | Infrastructure (docker compose)      | Port(s)          | UI                                     |
 | ------------------------------------ | ---------------- | -------------------------------------- |
@@ -73,12 +75,14 @@ built separately to `dist/libs/<name>` and loaded at runtime through `module-ali
 ## Running it
 
 ```bash
-docker compose up -d                      # all infrastructure
+docker compose up -d                      # all infrastructure: PostgreSQL, Pulsar, RabbitMQ, Redis, Mailpit, Jaeger
 # or, when memory is tight:
 docker compose up -d postgres pulsar jaeger
 
-npm start                                 # nx serve for every app (watch mode)
+npm start                                 # nx serve for all ten apps (watch mode)
 npx nx serve jobs                         # a single app
+npm stop                                  # kill the Node processes on the app ports
+docker compose down                       # stop the infrastructure
 ```
 
 Migrations:
@@ -89,8 +93,25 @@ cd apps/jobs && npx prisma migrate dev    # jobs (Prisma): Job, JobItem, outbox
 npx nx run products:migrate-drizzle       # products (Drizzle)
 npx nx run wallet:migrate-drizzle         # wallet (Drizzle); creates the database first
 npx nx run payments:migrate-drizzle       # payments (Drizzle); likewise
+npx nx run market:migrate-drizzle         # market (Drizzle); likewise
 npx nx run wallet:seed                    # with auth + wallet running: alice@/bob@example.com, $100 each
 ```
+
+Once it runs:
+
+| What                                               | URL                                                                                |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| NexusPay (React)                                   | http://localhost:4300                                                              |
+| ui-admin (Angular)                                 | http://localhost:4200                                                              |
+| GraphiQL: auth / jobs / wallet / payments / market | http://localhost:3000/auth, :3001/jobs, :3004/wallet, :3005/payments, :3006/market |
+| Realtime gateway stats                             | http://localhost:3007/realtime/stats                                               |
+| RabbitMQ UI                                        | http://localhost:15672 (guest / guest)                                             |
+| Mailpit                                            | http://localhost:8025                                                              |
+| Jaeger                                             | http://localhost:16686                                                             |
+
+Sign in as `alice@example.com` or `bob@example.com`, password `Test@1234` (after
+`wallet:seed`). Markets, Trade and Portfolio show live prices; the dot in the header says Live
+while the realtime gateway is connected.
 
 **Low-memory alternative.** `npm start` runs a webpack watcher per app. On a machine with little
 free RAM, build once and run the bundles with plain Node instead. `--env-file` is needed because
@@ -102,7 +123,12 @@ node --env-file=apps/auth/.env     dist/apps/auth/main.js
 node --env-file=apps/jobs/.env     dist/apps/jobs/main.js
 node --env-file=apps/products/.env dist/apps/products/main.js
 node --env-file=apps/executor/.env dist/apps/executor/main.js
+# NexusPay: wallet, payments, market, realtime the same way, then `npx nx serve nexus`
 ```
+
+Pulsar standalone takes about 2.7 GB with its default heap. For a local run it works with much
+less: start it with `PULSAR_MEM='-Xms256m -Xmx256m -XX:MaxDirectMemorySize=256m'` in its
+environment (an override file next to `docker-compose.yaml`) and it stays under 1 GB.
 
 Then log in and run a job (see the API examples in `CLAUDE.md`), or open
 http://localhost:4300 for the React app.
@@ -199,17 +225,17 @@ event for a real `createTopUp` with `stripe.webhooks.generateTestHeaderString` a
 
 ## Environment variables added by NexusPay
 
-| Variable                      | Where                       | Purpose                                                                                                  |
-| ----------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | every backend `apps/*/.env` | Where traces go (Jaeger, `http://localhost:4318`); unset = tracing off                                   |
-| `OTEL_SDK_DISABLED`           | optional                    | `true` turns tracing off                                                                                 |
-| `FAULT_ACK_FAILURES`          | executor, tests only        | Fail the first n messages after `execute`                                                                |
-| `RABBITMQ_URL`                | payments, wallet, executor  | `amqp://localhost:5672`; without it the executor starts without the email worker                         |
-| `STRIPE_SECRET_KEY`           | `apps/payments/.env.local`  | Stripe test-mode secret key (`sk_test_…`); never in a committed file                                     |
+| Variable                      | Where                       | Purpose                                                                                                               |
+| ----------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | every backend `apps/*/.env` | Where traces go (Jaeger, `http://localhost:4318`); unset = tracing off                                                |
+| `OTEL_SDK_DISABLED`           | optional                    | `true` turns tracing off                                                                                              |
+| `FAULT_ACK_FAILURES`          | executor, tests only        | Fail the first n messages after `execute`                                                                             |
+| `RABBITMQ_URL`                | payments, wallet, executor  | `amqp://localhost:5672`; without it the executor starts without the email worker                                      |
+| `STRIPE_SECRET_KEY`           | `apps/payments/.env.local`  | Stripe test-mode secret key (`sk_test_…`); never in a committed file                                                  |
 | `STRIPE_WEBHOOK_SECRET`       | `apps/payments/.env.local`  | `whsec_…` from `stripe listen --print-secret`; stays the same for one `stripe login`, restart payments after a change |
-| `APP_URL`                     | payments                    | Where Checkout returns the browser (`http://localhost:4300`)                                             |
-| `PAYMENT_EXPIRY_BUCKET`       | payments                    | `delay.30m` (default) or `delay.1m` to watch an unpaid top-up expire after a minute                      |
-| `REDIS_URL`                   | wallet, payments, executor  | Idempotency fast path; the email worker's sent marks                                                     |
-| `SMTP_URL`                    | executor                    | `smtp://localhost:1025` (Mailpit)                                                                        |
-| `EMAIL_FROM`                  | executor                    | Sender of NexusPay emails                                                                                |
-| `FAULT_CRASH_AFTER_CREDIT`    | wallet, tests only          | `1`: exit after a top-up credit commits, before the ack                                                  |
+| `APP_URL`                     | payments                    | Where Checkout returns the browser (`http://localhost:4300`)                                                          |
+| `PAYMENT_EXPIRY_BUCKET`       | payments                    | `delay.30m` (default) or `delay.1m` to watch an unpaid top-up expire after a minute                                   |
+| `REDIS_URL`                   | wallet, payments, executor  | Idempotency fast path; the email worker's sent marks                                                                  |
+| `SMTP_URL`                    | executor                    | `smtp://localhost:1025` (Mailpit)                                                                                     |
+| `EMAIL_FROM`                  | executor                    | Sender of NexusPay emails                                                                                             |
+| `FAULT_CRASH_AFTER_CREDIT`    | wallet, tests only          | `1`: exit after a top-up credit commits, before the ack                                                               |
