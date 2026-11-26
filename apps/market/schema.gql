@@ -38,9 +38,95 @@ scalar MinorUnits
 
 type Mutation {
   """
-  Prices a market order. The quote holds for 10 s; placing the order with its id (step 4) gets exactly these amounts.
+  Cancels an open limit order and releases its funds. Cancelling it again returns it; any other status gives ORDER_NOT_OPEN.
+  """
+  cancelOrder(id: ID!): Order!
+
+  """
+  Places a market order (from a quote) or a limit order (funds held until it fills, is cancelled or expires after 24 h). Requires an Idempotency-Key header: a retry with the same key and input returns the first result. Lack of funds gives a REJECTED order; a used or expired quote gives QUOTE_EXPIRED.
+  """
+  placeOrder(input: PlaceOrderInput!): Order!
+
+  """
+  Prices a market order. The quote holds for 10 s; placeOrder with its id gets exactly these amounts, once.
   """
   quote(coin: String!, qty: MinorUnits!, side: TradeSide!): Quote!
+}
+
+"""
+A market or limit order. Amounts in USD cents; qty in coin minor units (8 decimals).
+"""
+type Order {
+  coin: String!
+  createdAt: DateTime!
+
+  """When an open limit order expires."""
+  expiresAt: DateTime
+  fee: MinorUnits!
+
+  """
+  USD cents per whole coin the order trades at: the quote price, or the limit price once matched.
+  """
+  fillPrice: MinorUnits
+  id: ID!
+  limitPrice: MinorUnits
+  qty: MinorUnits!
+  reason: String
+  side: TradeSide!
+  status: OrderStatus!
+
+  """
+  What the trade costs (buy: usdAmount + fee) or pays (sell: usdAmount − fee).
+  """
+  total: MinorUnits!
+  type: OrderType!
+  updatedAt: DateTime!
+
+  """price × qty, before the fee."""
+  usdAmount: MinorUnits!
+}
+
+enum OrderStatus {
+  CANCELLED
+
+  """A limit order that stayed open for 24 hours."""
+  EXPIRED
+  FILLED
+
+  """A limit order waiting for its price."""
+  OPEN
+
+  """A limit order whose funds the wallet hasn't held yet."""
+  PLACING
+
+  """Refused by the wallet; see reason."""
+  REJECTED
+
+  """Being settled with the wallet; becomes FILLED."""
+  SETTLING
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+}
+
+"""
+A market order needs only quoteId. A limit order needs coin, side, qty and limitPrice.
+"""
+input PlaceOrderInput {
+  coin: String
+
+  """USD cents per whole coin."""
+  limitPrice: MinorUnits
+
+  """Coin minor units (8 decimals)."""
+  qty: MinorUnits
+
+  """Market orders: the quote to trade at (valid for 10 s, once)."""
+  quoteId: ID
+  side: TradeSide
+  type: OrderType!
 }
 
 """
@@ -66,6 +152,11 @@ type Query {
 
   """Every coin with its latest price, in a fixed order."""
   coins: [Coin!]!
+
+  """
+  The signed-in user's orders, newest first; only those in status if given.
+  """
+  orders(first: Int! = 50, status: [OrderStatus!]): [Order!]!
 }
 
 """

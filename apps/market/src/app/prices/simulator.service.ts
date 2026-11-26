@@ -8,7 +8,7 @@ import {
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import { hostname } from 'os';
-import { errorText } from '@jobber/rabbitmq';
+import { RealtimePriceMessage, errorText } from '@jobber/rabbitmq';
 import { REDIS } from '../redis/redis.module';
 import { LeaderLock } from './leader-lock';
 import { PriceTicker } from './price-ticker';
@@ -32,6 +32,9 @@ export const DEFAULT_SIMULATOR_OPTIONS: SimulatorOptions = {
   renewMs: 2_000,
   tickMs: 1_000,
 };
+
+/** Called with every tick the leader stored and sent (one message per coin). */
+export type TickListener = (ticks: RealtimePriceMessage[]) => void;
 
 /** Followers retry this long after the leader's key expires, so they don't hit it early. */
 const TAKEOVER_MARGIN_MS = 20;
@@ -59,6 +62,7 @@ export class SimulatorService
   private ticking = false;
   private stopped = false;
   private redisDown = false;
+  private readonly tickListeners: TickListener[] = [];
 
   constructor(
     @Inject(REDIS) private readonly redis: Redis,
@@ -79,6 +83,11 @@ export class SimulatorService
    */
   get isLeader(): boolean {
     return this.leading && this.lock.held;
+  }
+
+  /** Runs `listener` after each tick of this replica while it leads (the order matcher). */
+  onTick(listener: TickListener): void {
+    this.tickListeners.push(listener);
   }
 
   onApplicationBootstrap(): void {
@@ -178,12 +187,17 @@ export class SimulatorService
       return;
     }
     this.ticking = true;
+    let ticks: RealtimePriceMessage[];
     try {
-      await this.ticker.tick(Date.now());
+      ticks = await this.ticker.tick(Date.now());
     } catch {
       // Redis didn't store the tick, so nothing was sent; the election loop reports Redis.
+      return;
     } finally {
       this.ticking = false;
+    }
+    for (const listener of this.tickListeners) {
+      listener(ticks);
     }
   }
 }

@@ -61,8 +61,8 @@ all 11 acceptance tests pass.
 
 Progress, step by step: [phase-4/README.md](phase-4/README.md). Steps 1 (contracts), 2
 (wallet trading: holds, `SettleTrade`, market maker inventory, `positions`, realtime balance and
-fill messages) and 3 (`apps/market` prices: seeded simulator on one leader, ticks, candles,
-quotes) are done.
+fill messages), 3 (`apps/market` prices: seeded simulator on one leader, ticks, candles,
+quotes) and 4 (orders: market and limit orders, matching, cancel, expiry, recovery) are done.
 
 - `apps/market` (3006): seeded random-walk price simulator (one leader via a Redis lock), candles,
   10-second quotes in Redis, market and limit orders, `SettleTrade`, holds, `order.expire`.

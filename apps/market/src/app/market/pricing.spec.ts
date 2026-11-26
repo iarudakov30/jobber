@@ -6,6 +6,8 @@ import {
   TRADE_SIDES,
   TradeSide,
   feeFor,
+  holdFor,
+  limitAmounts,
   quoteAmounts,
   quotePrice,
   usdAmount,
@@ -155,5 +157,43 @@ describe('pricing examples', () => {
     expect(quotePrice(10_000n, 'BUY')).toBe(10_020n);
     expect(quotePrice(10_000n, 'SELL')).toBe(9_980n);
     expect(quotePrice(1n, 'SELL')).toBe(0n);
+  });
+});
+
+describe('limit orders', () => {
+  it('trade at the limit price, with the quote rounding and fee, and a buy holds exactly its cost', () => {
+    for (const { mid: limit, qty, side } of cases(5_000)) {
+      const terms = limitAmounts(limit, side, qty);
+      const context = `${side} ${qty} at limit ${limit}`;
+      holds(terms.price === limit, context);
+      holds(terms.usdAmount === usdAmount(limit, qty, side), context);
+      holds(terms.fee === feeFor(terms.usdAmount), context);
+      const hold = holdFor('NXC', side, qty, terms);
+      // What the hold covers is what settling takes from it: nothing comes back for a buy.
+      holds(
+        side === 'BUY'
+          ? hold.asset === 'USD' && hold.amount === terms.total
+          : hold.asset === 'NXC' && hold.amount === qty,
+        context,
+      );
+    }
+  });
+
+  it("holds the spec's qty · limit · 1.005 for a buy of 2 coins at $40.00", () => {
+    const terms = limitAmounts(4_000n, 'BUY', 2n * COIN_UNIT);
+    expect(terms).toEqual({
+      price: 4_000n,
+      usdAmount: 8_000n,
+      fee: 40n,
+      total: 8_040n,
+    });
+    expect(holdFor('NXC', 'BUY', 2n * COIN_UNIT, terms)).toEqual({
+      asset: 'USD',
+      amount: 8_040n,
+    });
+    expect(holdFor('ORB', 'SELL', 3n, terms)).toEqual({
+      asset: 'ORB',
+      amount: 3n,
+    });
   });
 });

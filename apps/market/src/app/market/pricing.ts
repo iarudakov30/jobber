@@ -64,3 +64,38 @@ export function quoteAmounts(
     total: side === 'BUY' ? usd + fee : usd - fee,
   };
 }
+
+/**
+ * A limit order's terms, fixed when it is placed: it fills at its limit price, without the
+ * spread (the limit already sits on the house's side of the price when it fills), with the same
+ * rounding and fee as a quote.
+ */
+export function limitAmounts(
+  limitPrice: bigint,
+  side: TradeSide,
+  qty: bigint,
+): TradeAmounts {
+  const usd = usdAmount(limitPrice, qty, side);
+  const fee = feeFor(usd);
+  return {
+    price: limitPrice,
+    usdAmount: usd,
+    fee,
+    total: side === 'BUY' ? usd + fee : usd - fee,
+  };
+}
+
+/**
+ * What a limit order reserves in the wallet until it fills: a buy holds everything it may pay
+ * (`usdAmount + fee`, the spec's `qty · limit · 1.005` rounded up), a sell holds its coins.
+ */
+export function holdFor(
+  coin: string,
+  side: TradeSide,
+  qty: bigint,
+  amounts: Pick<TradeAmounts, 'usdAmount' | 'fee'>,
+): { asset: string; amount: bigint } {
+  return side === 'BUY'
+    ? { asset: 'USD', amount: amounts.usdAmount + amounts.fee }
+    : { asset: coin, amount: qty };
+}

@@ -15,7 +15,7 @@ import { Candle, Coin, Quote, TradeSideEnum } from './models/market.models';
 import { MinorUnits } from './models/minor-units.scalar';
 import { TradeSide } from './pricing';
 
-/** Market data is public; quotes (and, from step 4, orders) need a signed-in user. */
+/** Market data is public; quotes (and orders, in OrdersResolver) need a signed-in user. */
 @Resolver()
 export class MarketResolver {
   constructor(private readonly service: MarketService) {}
@@ -43,7 +43,7 @@ export class MarketResolver {
 
   @Mutation(() => Quote, {
     description:
-      'Prices a market order. The quote holds for 10 s; placing the order with its id (step 4) gets exactly these amounts.',
+      'Prices a market order. The quote holds for 10 s; placeOrder with its id gets exactly these amounts, once.',
   })
   @UseGuards(GqlAuthGuard)
   quote(

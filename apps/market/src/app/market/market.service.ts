@@ -41,7 +41,7 @@ export interface QuoteView extends TradeAmounts {
 }
 
 /**
- * What `placeOrder` (step 4) will consume from `quote:<id>` with GETDEL. Amounts are
+ * What `placeOrder` consumes from `quote:<id>` (`takeQuote`). Amounts are
  * minor-units strings.
  */
 export interface StoredQuote {
@@ -56,6 +56,33 @@ export interface StoredQuote {
 
 export function quoteKey(id: string): string {
   return `quote:${id}`;
+}
+
+/**
+ * GETDEL for the quote's owner only: another user's attempt neither gets the quote nor uses it
+ * up. Two attempts by the owner: one gets it, the other nothing.
+ */
+const TAKE_QUOTE = `
+local value = redis.call('GET', KEYS[1])
+if not value then return false end
+local ok, quote = pcall(cjson.decode, value)
+if not ok or tostring(quote.userId) ~= ARGV[1] then return false end
+redis.call('DEL', KEYS[1])
+return value`;
+
+/** Uses up the user's quote: its terms, or null if it expired, was used, or isn't theirs. */
+export async function takeQuote(
+  redis: Redis,
+  userId: number,
+  quoteId: string,
+): Promise<StoredQuote | null> {
+  const value = (await redis.eval(
+    TAKE_QUOTE,
+    1,
+    quoteKey(quoteId),
+    String(userId),
+  )) as string | null;
+  return value ? (JSON.parse(value) as StoredQuote) : null;
 }
 
 @Injectable()

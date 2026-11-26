@@ -5,3 +5,4 @@ export * from './lib/rabbit.consumer';
 export * from './lib/rabbit.module';
 export * from './lib/notifications';
 export * from './lib/realtime';
+export * from './lib/commands';

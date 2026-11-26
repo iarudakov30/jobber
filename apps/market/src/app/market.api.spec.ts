@@ -2,6 +2,11 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ApolloDriverConfig } from '@nestjs/apollo';
 import { GraphQLModule } from '@nestjs/graphql';
+import {
+  ClientGrpcProxy,
+  ClientProxyFactory,
+  Transport,
+} from '@nestjs/microservices';
 import { Test } from '@nestjs/testing';
 import {
   RabbitMQContainer,
@@ -15,20 +20,21 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Observable, of, throwError } from 'rxjs';
 import { COINS } from '@jobber/money';
-import { Packages, User } from '@jobber/grpc';
+import { GRPC_LOADER_OPTIONS, Packages, User } from '@jobber/grpc';
 import {
   REALTIME_EXCHANGE,
   RabbitModule,
   RabbitPublisher,
   RealtimePriceMessage,
-  realtimeTopology,
 } from '@jobber/rabbitmq';
+import { WALLET_PROTO } from '../testing/fake-wallet';
 import { TestDatabase, startTestDatabase } from '../testing/test-database';
 import { TestRedis, startTestRedis } from '../testing/test-redis';
 import { DatabaseModule } from './database/database.module';
 import { graphQLOptions } from './graphql.options';
 import { PricesUnavailableError } from './market/market.errors';
 import { MarketModule } from './market/market.module';
+import { OrdersModule } from './orders/orders.module';
 import { MarketService, quoteKey } from './market/market.service';
 import { COIN_UNIT, quoteAmounts } from './market/pricing';
 import { CandleStore } from './prices/candle.store';
@@ -42,10 +48,12 @@ import {
 } from './prices/simulator.service';
 import { SIMULATOR_SEED } from './prices/price-ticker';
 import { REDIS, RedisModule } from './redis/redis.module';
+import { marketTopology } from './topology';
 
 // The market service end to end: replicas of the real app against Testcontainers PostgreSQL,
 // Redis and RabbitMQ, competing for the simulator lock with the production timings (5 s TTL,
-// 2 s renewal, 1 s ticks). Only `auth` (gRPC) is faked. A test queue bound to `prices.#`
+// 2 s renewal, 1 s ticks). Only `auth` (gRPC) is faked; the wallet is never called here
+// (orders are in orders.api.spec.ts). A test queue bound to `prices.#`
 // receives what the realtime gateway will.
 
 const schemaFile = join(tmpdir(), `market-schema-${process.pid}.gql`);
@@ -121,10 +129,11 @@ async function startReplica(
       RedisModule,
       RabbitModule.forRoot({
         url: rabbit.getAmqpUrl(),
-        topology: realtimeTopology(),
+        topology: marketTopology(),
         minReconnectDelayMs: 100,
       }),
       MarketModule,
+      OrdersModule,
       GraphQLModule.forRoot<ApolloDriverConfig>(
         graphQLOptions(printSchema ? schemaFile : true),
       ),
@@ -132,6 +141,9 @@ async function startReplica(
   })
     .overrideProvider(Packages.AUTH)
     .useValue({ getService: () => fakeAuth })
+    // The real client needs the proto from the source tree (the build copies it elsewhere).
+    .overrideProvider(Packages.WALLET)
+    .useValue(walletClient())
     .overrideProvider(SIMULATOR_SEED)
     .useValue(42)
     .overrideProvider(SIMULATOR_OPTIONS)
@@ -154,6 +166,21 @@ async function startReplica(
   return replica;
 }
 
+const walletClients: ClientGrpcProxy[] = [];
+function walletClient(): ClientGrpcProxy {
+  const client = ClientProxyFactory.create({
+    transport: Transport.GRPC,
+    options: {
+      url: 'localhost:1',
+      package: Packages.WALLET,
+      protoPath: WALLET_PROTO,
+      loader: GRPC_LOADER_OPTIONS,
+    },
+  }) as ClientGrpcProxy;
+  walletClients.push(client);
+  return client;
+}
+
 const leaders = () => replicas.filter((r) => r.simulator.isLeader);
 
 beforeAll(async () => {
@@ -170,6 +197,7 @@ beforeAll(async () => {
     REDIS_URL: redis.url,
     RABBITMQ_URL: rabbit.getAmqpUrl(),
     AUTH_GRPC_SERVICE_URL: 'localhost:1',
+    WALLET_GRPC_SERVICE_URL: 'localhost:1',
   });
 
   amqp = await connect(rabbit.getAmqpUrl());
@@ -200,6 +228,7 @@ afterAll(async () => {
   for (const replica of replicas) {
     await replica.app.close().catch(() => undefined);
   }
+  walletClients.forEach((client) => client.close());
   await amqp?.close();
   redis?.client.disconnect();
   await testDb?.pool.end();
