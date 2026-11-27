@@ -31,6 +31,7 @@ import {
 import { WALLET_PROTO } from '../testing/fake-wallet';
 import { TestDatabase, startTestDatabase } from '../testing/test-database';
 import { TestRedis, startTestRedis } from '../testing/test-redis';
+import { sleep, waitFor } from '../testing/wait-for';
 import { DatabaseModule } from './database/database.module';
 import { graphQLOptions } from './graphql.options';
 import { PricesUnavailableError } from './market/market.errors';
@@ -88,26 +89,6 @@ const received: Received[] = [];
 
 const ticksOf = (coin: string, since = 0) =>
   received.filter((r) => r.message.coin === coin && r.receivedAt >= since);
-
-async function waitFor<T>(
-  probe: () => T | undefined | false,
-  timeoutMs: number,
-  what: string,
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const value = probe();
-    if (value) {
-      return value;
-    }
-    if (Date.now() > deadline) {
-      throw new Error(`Timed out after ${timeoutMs} ms waiting for ${what}`);
-    }
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---- replicas ------------------------------------------------------------------------------
 
@@ -556,7 +537,10 @@ describe('candles', () => {
   });
 
   it.each([
-    [{ coin: 'USD' }, 'coin must be one of: NXC, BLIP, ORB, WISP, BTC, ETH, HYPE, ZEC'],
+    [
+      { coin: 'USD' },
+      'coin must be one of: NXC, BLIP, ORB, WISP, BTC, ETH, HYPE, ZEC',
+    ],
     [
       { coin: 'NXC', from: '2021-01-02T00:00:00Z', to: '2021-01-01T00:00:00Z' },
       'from must be before to',

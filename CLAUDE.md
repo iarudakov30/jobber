@@ -392,7 +392,15 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
   price, `mu`, `sigma` per day, shock chance per minute) or `live` (BTC, ETH, HYPE, ZEC: Coinbase
   `BTC-USD` and Binance `BTCUSDT` pairs; phase 4.5, `docs/nexuspay/phase-4.5/`).
   `SIMULATED_COINS`, `LIVE_COINS`, `simulated(coin)`, `liveSymbols(coin)`. Live coins have no price
-  until the providers exist (phase 4.5 steps 2–3); `GenerateCandles` refuses them until step 4.
+  until step 3 connects the providers; `GenerateCandles` refuses them until step 4.
+- **Price providers** (`prices/providers/`, phase 4.5 step 2): `PriceProvider` with
+  `CoinbaseProvider` (`ticker` + `heartbeat` on `ws-feed.exchange.coinbase.com`, candles 300 per
+  request) and `BinanceProvider` (combined `miniTicker` stream and `klines` on the
+  `*.binance.vision` market-data hosts). Prices leave a provider as unrounded cents (`floatCentsOf`
+  moves the decimal point in the text), candles as `bigint` cents (`centsOf`). Both share
+  `ReconnectingSocket` (1 s → 30 s jitter backoff, `alive` = a message in the last 5 s, a silent
+  connection replaced after 30 s). Tests use `src/testing/fake-exchanges.ts` (`FakeCoinbase`,
+  `FakeBinance`: silence, mute, drop, refuse, REST failures) on localhost.
 - **Simulator** (`src/app/prices/`): each simulated coin follows a geometric random walk, one step per second, from its own
   mulberry32 stream seeded by `MARKET_SEED` (unset: random, logged) and the coin code. Same seed,
   same ticks (`PriceSimulator`). Prices are published in whole USD cents per coin (`bigint`, at
