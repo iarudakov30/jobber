@@ -8,6 +8,7 @@ import {
   DEFAULT_BACKOFF,
   DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_STALL_TIMEOUT_MS,
+  OnHeartbeat,
   OnPrice,
   PriceProvider,
   ProviderError,
@@ -47,7 +48,11 @@ export class CoinbaseProvider implements PriceProvider {
     return this.socket.alive;
   }
 
-  connect(coins: readonly LiveCoin[], onPrice: OnPrice): void {
+  connect(
+    coins: readonly LiveCoin[],
+    onPrice: OnPrice,
+    onHeartbeat?: OnHeartbeat,
+  ): void {
     const byProduct = new Map(
       coins.map((coin) => [liveSymbols(coin).coinbase, coin]),
     );
@@ -59,7 +64,7 @@ export class CoinbaseProvider implements PriceProvider {
           product_ids: [...byProduct.keys()],
           channels: ['ticker', 'heartbeat'],
         }),
-      onMessage: (text) => this.handle(text, byProduct, onPrice),
+      onMessage: (text) => this.handle(text, byProduct, onPrice, onHeartbeat),
     });
   }
 
@@ -114,6 +119,7 @@ export class CoinbaseProvider implements PriceProvider {
     text: string,
     byProduct: Map<string, LiveCoin>,
     onPrice: OnPrice,
+    onHeartbeat?: OnHeartbeat,
   ): void {
     let message: Record<string, unknown>;
     try {
@@ -140,8 +146,14 @@ export class CoinbaseProvider implements PriceProvider {
           `Coinbase error: ${message['message']}${message['reason'] ? ` (${message['reason']})` : ''}`,
         );
         return;
+      case 'heartbeat': {
+        // No trade since the last ticker, but the product's stream works: its price holds.
+        const coin = byProduct.get(String(message['product_id']));
+        if (coin) onHeartbeat?.(coin);
+        return;
+      }
       default:
-        // `heartbeat` and `subscriptions` only keep the connection alive.
+        // `subscriptions` only keeps the connection alive.
         return;
     }
   }

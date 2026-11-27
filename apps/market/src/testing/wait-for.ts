@@ -1,12 +1,15 @@
-/** Polls `probe` every 20 ms until it returns something truthy, and returns that. */
+/**
+ * Polls `probe` (sync or async) every 20 ms until it returns something truthy, and returns
+ * that.
+ */
 export async function waitFor<T>(
-  probe: () => T | undefined | false,
+  probe: () => T | undefined | false | Promise<T | undefined | false>,
   timeoutMs: number,
   what: string,
 ): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const value = probe();
+    const value = await probe();
     if (value) {
       return value;
     }

@@ -42,6 +42,7 @@ import { COIN_UNIT, quoteAmounts } from './market/pricing';
 import { CandleStore } from './prices/candle.store';
 import { PriceStore } from './prices/price.store';
 import { PriceTicker } from './prices/price-ticker';
+import { LivePrices } from './prices/live/live-prices';
 import {
   DEFAULT_SIMULATOR_OPTIONS,
   LEADER_KEY,
@@ -320,7 +321,8 @@ describe('candles from ticks', () => {
     const publisher = {
       publish: async () => undefined,
     } as unknown as RabbitPublisher;
-    return new PriceTicker(7, prices, candleStore, publisher);
+    const live = { pick: () => [] } as unknown as LivePrices;
+    return new PriceTicker(7, prices, candleStore, publisher, live);
   }
 
   async function candleRows(coin: string, from: Date) {

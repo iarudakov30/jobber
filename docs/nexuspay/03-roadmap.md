@@ -80,8 +80,9 @@ acceptance tests pass.
 ## Phase 4.5 — Real prices (~3–5 days, in progress)
 
 Progress, step by step: [phase-4.5/README.md](phase-4.5/README.md). Step 1 (contracts: the four
-real coins as assets, a price source per coin, `source` on ticks) and step 2 (Coinbase and
-Binance adapters with fake exchanges for tests) are done.
+real coins as assets, a price source per coin, `source` on ticks) step 2 (Coinbase and
+Binance adapters with fake exchanges for tests) and step 3 (per-coin failover and failback, the
+bad print guard, live ticks on the leader) are done.
 
 - Four real coins, BTC, ETH, HYPE and ZEC, priced from Coinbase Exchange (USD pairs), with Binance
   (USDT pairs) as a per-coin fallback and a failback once Coinbase is steadily healthy; the four

@@ -11,6 +11,9 @@ export type ProviderName = (typeof PROVIDER_NAMES)[number];
  */
 export type OnPrice = (coin: LiveCoin, price: number, at: number) => void;
 
+/** The exchange says a coin's stream is working, with no new price (no trade since). */
+export type OnHeartbeat = (coin: LiveCoin) => void;
+
 /**
  * One exchange's public market data: a live price stream over WebSocket and 1-minute candles
  * over REST. A provider reconnects on its own; whoever uses it only reads `alive` and the
@@ -19,7 +22,11 @@ export type OnPrice = (coin: LiveCoin, price: number, at: number) => void;
 export interface PriceProvider {
   readonly name: ProviderName;
   /** Opens the stream for `coins` and keeps it open (reconnecting) until `disconnect`. */
-  connect(coins: readonly LiveCoin[], onPrice: OnPrice): void;
+  connect(
+    coins: readonly LiveCoin[],
+    onPrice: OnPrice,
+    onHeartbeat?: OnHeartbeat,
+  ): void;
   /** Closes the stream and stops reconnecting. */
   disconnect(): Promise<void>;
   /** The connection is open and something (a price or a heartbeat) arrived in the last 5 s. */

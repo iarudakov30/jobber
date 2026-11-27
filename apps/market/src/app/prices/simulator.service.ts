@@ -163,6 +163,7 @@ export class SimulatorService
       return;
     }
     this.leading = true;
+    this.ticker.startLive();
     this.logger.log(`Leading the price simulator (${this.instanceId})`);
     this.tickTimer = setInterval(() => void this.tick(), this.options.tickMs);
     await this.tick();
@@ -175,7 +176,7 @@ export class SimulatorService
     this.leading = false;
     clearInterval(this.tickTimer);
     this.logger.warn(`Stopped leading the price simulator: ${reason}`);
-    await this.ticker.flush();
+    await Promise.all([this.ticker.stopLive(), this.ticker.flush()]);
   }
 
   private async tick(): Promise<void> {

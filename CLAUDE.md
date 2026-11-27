@@ -391,8 +391,8 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
 - **Coins** (`prices/coins.ts`): each has a `source`, `simulated` (NXC, BLIP, ORB, WISP: start
   price, `mu`, `sigma` per day, shock chance per minute) or `live` (BTC, ETH, HYPE, ZEC: Coinbase
   `BTC-USD` and Binance `BTCUSDT` pairs; phase 4.5, `docs/nexuspay/phase-4.5/`).
-  `SIMULATED_COINS`, `LIVE_COINS`, `simulated(coin)`, `liveSymbols(coin)`. Live coins have no price
-  until step 3 connects the providers; `GenerateCandles` refuses them until step 4.
+  `SIMULATED_COINS`, `LIVE_COINS`, `simulated(coin)`, `liveSymbols(coin)`. `GenerateCandles` refuses
+  live coins until step 4.
 - **Price providers** (`prices/providers/`, phase 4.5 step 2): `PriceProvider` with
   `CoinbaseProvider` (`ticker` + `heartbeat` on `ws-feed.exchange.coinbase.com`, candles 300 per
   request) and `BinanceProvider` (combined `miniTicker` stream and `klines` on the
@@ -401,6 +401,18 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
   `ReconnectingSocket` (1 s → 30 s jitter backoff, `alive` = a message in the last 5 s, a silent
   connection replaced after 30 s). Tests use `src/testing/fake-exchanges.ts` (`FakeCoinbase`,
   `FakeBinance`: silence, mute, drop, refuse, REST failures) on localhost.
+- **Live prices** (`prices/live/`, phase 4.5 step 3; `docs/nexuspay/phase-4.5/03-live-ticks.md`):
+  `MARKET_LIVE_PRICES=on` (unset = off: nothing reaches the internet; `.env` has `on`),
+  `MARKET_PRICE_PROVIDERS` (preference order, default `coinbase,binance`), `COINBASE_WS_URL`,
+  `COINBASE_REST_URL`, `BINANCE_WS_URL`, `BINANCE_REST_URL`. Only the simulator leader connects
+  (`LivePrices.start` on leading, `stop` on stepping down). `RatePicker` (pure: given the time and
+  which connections are alive) picks per coin each tick: healthy = connection alive + a price or
+  heartbeat for the coin within 10 s; failover at once to the next healthy provider; failback
+  after 30 s of steady health (a provider never healthy yet takes the coin at once); nobody
+  healthy = no tick; a price >10% from the last published one is held until the same provider
+  repeats it within 5 s (±2%) or another confirms it; >1% divergence logged. `PriceTicker.tick`
+  appends the live picks to the simulated ticks (same Redis `seq`, RabbitMQ, candles, matcher).
+  `live-prices.api.spec.ts` runs acceptance tests 2–6 against the fake exchanges.
 - **Simulator** (`src/app/prices/`): each simulated coin follows a geometric random walk, one step per second, from its own
   mulberry32 stream seeded by `MARKET_SEED` (unset: random, logged) and the coin code. Same seed,
   same ticks (`PriceSimulator`). Prices are published in whole USD cents per coin (`bigint`, at

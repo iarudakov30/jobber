@@ -58,12 +58,20 @@ describe('CoinbaseProvider', () => {
       expect(prices.map((p) => p.coin)).toEqual(['BTC', 'ZEC']);
     });
 
-    it('stays alive on heartbeats with no trades; a connection gone quiet is not alive, then replaced', async () => {
-      connect();
+    it('stays alive on heartbeats with no trades, reporting them per coin; a connection gone quiet is not alive, then replaced', async () => {
+      const beats: LiveCoin[] = [];
+      provider.connect(
+        LIVE_COINS,
+        (coin, price, at) => prices.push({ coin, price, at }),
+        (coin) => beats.push(coin),
+      );
       await waitFor(() => provider.alive, 2_000, 'alive');
+      fake.silence('ZEC-USD');
       await sleep(700); // longer than the alive window: heartbeats alone keep it alive
       expect(provider.alive).toBe(true);
       expect(prices).toEqual([]);
+      const recent = beats.slice(-6);
+      expect(new Set(recent)).toEqual(new Set(['BTC', 'ETH', 'HYPE']));
 
       fake.mute();
       await waitFor(() => !provider.alive, 1_000, 'not alive');

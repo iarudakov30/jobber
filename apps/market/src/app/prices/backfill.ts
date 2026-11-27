@@ -1,4 +1,3 @@
-
 import { Candle, MINUTE_MS } from './candle-builder';
 import { SimulatedCoin, simulated } from './coins';
 import { gaussian, mulberry32, seedFor } from './random';

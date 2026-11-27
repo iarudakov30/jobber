@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CandleStore } from './candle.store';
+import {
+  LIVE_PRICES_OPTIONS,
+  LivePrices,
+  livePricesOptionsFromEnv,
+} from './live/live-prices';
 import { PriceStore } from './price.store';
 import { PriceTicker, SIMULATOR_SEED } from './price-ticker';
 import { randomSeed } from './random';
@@ -21,6 +26,13 @@ import {
     CandleStore,
     PriceTicker,
     SimulatorService,
+    LivePrices,
+    {
+      provide: LIVE_PRICES_OPTIONS,
+      useFactory: (config: ConfigService) =>
+        livePricesOptionsFromEnv((name) => config.get<string>(name)),
+      inject: [ConfigService],
+    },
     {
       provide: SIMULATOR_SEED,
       useFactory: (config: ConfigService) => {
@@ -44,6 +56,6 @@ import {
       inject: [ConfigService],
     },
   ],
-  exports: [PriceStore, CandleStore, SimulatorService],
+  exports: [PriceStore, CandleStore, SimulatorService, LivePrices],
 })
 export class PricesModule {}

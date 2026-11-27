@@ -37,7 +37,7 @@ actually built, and the spec describes the plan.
 | 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **Done**                  |
 | 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | **Done** (5 steps)        |
 | 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | **Done** (7 steps)        |
-| 4.5 Real prices      | BTC, ETH, HYPE, ZEC from Coinbase with Binance fallback, next to the simulated coins; paper trading             | In progress (step 2 of 5) |
+| 4.5 Real prices      | BTC, ETH, HYPE, ZEC from Coinbase with Binance fallback, next to the simulated coins; paper trading             | In progress (step 3 of 5) |
 | 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned                   |
 
 ## Branches (phase 1)
