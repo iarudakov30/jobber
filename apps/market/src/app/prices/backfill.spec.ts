@@ -3,6 +3,7 @@ import {
   BackfillDayError,
   anchorLogPrice,
   backfillDayIndex,
+  backfillDayStart,
   generateDay,
 } from './backfill';
 import { SIMULATED_COINS, simulated } from './coins';
@@ -133,6 +134,27 @@ describe('backfillDayIndex', () => {
     ],
   ])('refuses %p', (day, message) => {
     expect(() => backfillDayIndex(day, NOW)).toThrow(
+      new BackfillDayError(message),
+    );
+  });
+});
+
+describe('backfillDayStart with today allowed (live coins)', () => {
+  it('takes today and earlier days', () => {
+    expect(backfillDayStart('2026-11-26', NOW, true)).toBe(
+      Date.UTC(2026, 10, 26),
+    );
+    expect(backfillDayStart('2026-11-25', NOW, true)).toBe(
+      Date.UTC(2026, 10, 25),
+    );
+  });
+
+  it.each([
+    ['2026-11-27', 'day must not be after today (UTC)'],
+    ['2019-12-31', 'day must be 2020-01-01 or later'],
+    ['2026-02-30', 'day must be a date: YYYY-MM-DD'],
+  ])('refuses %p', (day, message) => {
+    expect(() => backfillDayStart(day, NOW, true)).toThrow(
       new BackfillDayError(message),
     );
   });

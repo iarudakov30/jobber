@@ -299,7 +299,9 @@ The `BackfillCandles` job (`apps/jobs/src/app/jobs/backfill-candles/`, phase 4 s
 `{ from, to?, coins? }` (default: every coin, up to yesterday), expanded to one item per coin-day, or
 a list of `{ coin, day }`; days from 2020-01-01 to yesterday (UTC). Its consumer
 (`apps/executor/src/app/jobs/backfill-candles/`) calls the market's gRPC `GenerateCandles`
-(`MARKET_GRPC_SERVICE_URL`, default `localhost:5004`); `INVALID_ARGUMENT` is dead-lettered at once.
+(`MARKET_GRPC_SERVICE_URL`, default `localhost:5004`); `INVALID_ARGUMENT` and `FAILED_PRECONDITION`
+(a live coin while the market has live prices off) are dead-lettered at once, `UNAVAILABLE` (every
+exchange refused) is retried.
 
 The `LoadProducts` job (`apps/jobs/src/app/jobs/products/load-products.job.ts`) follows the same pattern but its consumer (`apps/executor/src/app/jobs/products/load-products.consumer.ts`) additionally calls the `products` service over gRPC to persist the enriched product data via Drizzle.
 
@@ -391,8 +393,7 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
 - **Coins** (`prices/coins.ts`): each has a `source`, `simulated` (NXC, BLIP, ORB, WISP: start
   price, `mu`, `sigma` per day, shock chance per minute) or `live` (BTC, ETH, HYPE, ZEC: Coinbase
   `BTC-USD` and Binance `BTCUSDT` pairs; phase 4.5, `docs/nexuspay/phase-4.5/`).
-  `SIMULATED_COINS`, `LIVE_COINS`, `simulated(coin)`, `liveSymbols(coin)`. `GenerateCandles` refuses
-  live coins until step 4.
+  `SIMULATED_COINS`, `LIVE_COINS`, `simulated(coin)`, `liveSymbols(coin)`.
 - **Price providers** (`prices/providers/`, phase 4.5 step 2): `PriceProvider` with
   `CoinbaseProvider` (`ticker` + `heartbeat` on `ws-feed.exchange.coinbase.com`, candles 300 per
   request) and `BinanceProvider` (combined `miniTicker` stream and `klines` on the
@@ -413,6 +414,16 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
   repeats it within 5 s (±2%) or another confirms it; >1% divergence logged. `PriceTicker.tick`
   appends the live picks to the simulated ticks (same Redis `seq`, RabbitMQ, candles, matcher).
   `live-prices.api.spec.ts` runs acceptance tests 2–6 against the fake exchanges.
+- **Live history** (`prices/live/live-history.ts`, phase 4.5 step 4; `04-history.md`): `LiveHistory`
+  asks the providers' REST candles in preference order (the next on any error) and writes with
+  `insertMissing` (ticked minutes win). `loadDay` serves `GenerateCandles` for a live coin (day
+  2020-01-01 to today, today up to the last completed minute; `FAILED_PRECONDITION` while live
+  prices are off, `UNAVAILABLE` when every exchange refuses); `fillRecent` runs in the background
+  when a replica starts leading: per coin, the range from the first to the last missing minute of
+  the 24 h before the current one. `LiveModule` holds `LivePrices`, `LiveHistory` and the options,
+  shared by `PricesModule` and `BackfillModule`. Jest's `setupFiles` (`src/testing/offline.ts`)
+  deletes `MARKET_LIVE_PRICES` and the endpoint variables: Nx loads `apps/market/.env` into test
+  tasks, and no test may reach the exchanges.
 - **Simulator** (`src/app/prices/`): each simulated coin follows a geometric random walk, one step per second, from its own
   mulberry32 stream seeded by `MARKET_SEED` (unset: random, logged) and the coin code. Same seed,
   same ticks (`PriceSimulator`). Prices are published in whole USD cents per coin (`bigint`, at
@@ -441,7 +452,8 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
   day only (not `MARKET_SEED`), so every replica and repeat gives the same: daily anchors from a
   mean-reverting walk around the coin's start price (2020-01-01 on), a one-second Brownian bridge
   between consecutive anchors. `CandleStore.insertMissing` (`ON CONFLICT DO NOTHING`): live
-  candles win, a repeat writes 0. Today and later are refused (`INVALID_ARGUMENT`).
+  candles win, a repeat writes 0. Today and later are refused (`INVALID_ARGUMENT`). Live coins'
+  days come from the exchanges instead (Live history, above).
 - **Pricing** (`market/pricing.ts`, `bigint`): price = mid ± 0.2% (buy rounds up, sell down);
   `usdAmount = price · qty / 10^8` (buy up, sell down); fee = 0.5% rounded up. A property test
   checks the house never loses on rounding. Limit orders (`limitAmounts`) trade at the limit,

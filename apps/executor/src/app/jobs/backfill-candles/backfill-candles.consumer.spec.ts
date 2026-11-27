@@ -66,6 +66,21 @@ describe('BackfillCandlesConsumer', () => {
     );
   });
 
+  it('dead-letters a live coin while the market has live prices off', async () => {
+    const { execute } = consumer(() =>
+      throwError(() => ({
+        code: GrpcStatus.FAILED_PRECONDITION,
+        details: 'live prices are off (MARKET_LIVE_PRICES)',
+      })),
+    );
+
+    await expect(execute({ coin: 'BTC' })).rejects.toThrow(
+      new NonRetryableError(
+        'The market refused BTC 2026-11-01: live prices are off (MARKET_LIVE_PRICES)',
+      ),
+    );
+  });
+
   it('fails (so Pulsar redelivers) when the market is unreachable', async () => {
     const error = Object.assign(new Error('14 UNAVAILABLE'), {
       code: GrpcStatus.UNAVAILABLE,

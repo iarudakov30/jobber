@@ -11,6 +11,7 @@ import { hostname } from 'os';
 import { RealtimePriceMessage, errorText } from '@jobber/rabbitmq';
 import { REDIS } from '../redis/redis.module';
 import { LeaderLock } from './leader-lock';
+import { LiveHistory } from './live/live-history';
 import { PriceTicker } from './price-ticker';
 
 export const SIMULATOR_OPTIONS = Symbol('SIMULATOR_OPTIONS');
@@ -67,6 +68,7 @@ export class SimulatorService
   constructor(
     @Inject(REDIS) private readonly redis: Redis,
     private readonly ticker: PriceTicker,
+    private readonly history: LiveHistory,
     @Inject(SIMULATOR_OPTIONS) private readonly options: SimulatorOptions,
   ) {
     this.lock = new LeaderLock(
@@ -165,6 +167,8 @@ export class SimulatorService
     this.leading = true;
     this.ticker.startLive();
     this.logger.log(`Leading the price simulator (${this.instanceId})`);
+    // In the background: the ticks don't wait for the exchanges' REST.
+    void this.history.fillRecent();
     this.tickTimer = setInterval(() => void this.tick(), this.options.tickMs);
     await this.tick();
   }

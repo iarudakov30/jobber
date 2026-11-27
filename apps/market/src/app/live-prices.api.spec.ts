@@ -15,7 +15,7 @@ import {
 import { ChannelModel, connect } from 'amqplib';
 import cookieParser from 'cookie-parser';
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq, gte, lt } from 'drizzle-orm';
 import Redis from 'ioredis';
 import { Observable, of, throwError } from 'rxjs';
 import { GRPC_LOADER_OPTIONS, Packages, User } from '@jobber/grpc';
@@ -24,7 +24,12 @@ import {
   REALTIME_EXCHANGE,
   RealtimePriceMessage,
 } from '@jobber/rabbitmq';
-import { FakeBinance, FakeCoinbase } from '../testing/fake-exchanges';
+import {
+  FakeBinance,
+  FakeCandle,
+  FakeCoinbase,
+  fakeCandles,
+} from '../testing/fake-exchanges';
 import { FakeWallet, WALLET_PROTO } from '../testing/fake-wallet';
 import { TestDatabase, startTestDatabase } from '../testing/test-database';
 import { TestRedis, startTestRedis } from '../testing/test-redis';
@@ -42,6 +47,7 @@ import {
   LivePricesOptions,
 } from './prices/live/live-prices';
 import { SIMULATOR_SEED } from './prices/price-ticker';
+import { ONE_MINUTE, candles } from './prices/schema';
 import {
   DEFAULT_SIMULATOR_OPTIONS,
   SIMULATOR_OPTIONS,
@@ -54,10 +60,18 @@ import { marketTopology } from './topology';
 // Coinbase and Binance (testing/fake-exchanges.ts) and orders settled by the fake wallet.
 // Nothing reaches the internet. The windows are shortened: a price is stale after 2 s (10 s in
 // production), failback waits 4 s (30 s), a connection is not alive after 1 s without a message
-// (5 s). A test queue bound to `prices.#` receives what the realtime gateway would.
+// (5 s). A test queue bound to `prices.#` receives what the realtime gateway would. Before the
+// replica starts, the fakes get a day of BTC candles, for the fill a new leader does.
 
 const STALE_MS = 2_000;
 const FAILBACK_MS = 4_000;
+const MINUTE_MS = 60_000;
+const DAY_MS = 86_400_000;
+
+/** When the replica was started: it leads within a second or two. */
+let startedAt: number;
+/** The fake Coinbase's BTC candles, from 24 h 10 min before the start to 20 min after it. */
+let coinbaseBtc: FakeCandle[];
 
 let testDb: TestDatabase;
 let redis: TestRedis;
@@ -239,6 +253,24 @@ beforeAll(async () => {
   );
 
   healExchanges();
+  startedAt = Date.now();
+  const firstMinute = Math.floor(startedAt / MINUTE_MS) * MINUTE_MS - DAY_MS;
+  coinbaseBtc = fakeCandles(firstMinute - 10 * MINUTE_MS, 1_470, 61_000);
+  coinbase.setCandles('BTC-USD', coinbaseBtc);
+  binance.setCandles(
+    'BTCUSDT',
+    fakeCandles(firstMinute - 10 * MINUTE_MS, 1_470, 62_000),
+  );
+  // A minute an earlier leader built from its own ticks: the fill must leave it alone.
+  await testDb.db.insert(candles).values({
+    coin: 'BTC',
+    interval: ONE_MINUTE,
+    start: new Date(firstMinute + DAY_MS - 60 * MINUTE_MS),
+    open: 1n,
+    high: 3n,
+    low: 1n,
+    close: 2n,
+  });
   await startReplica();
 }, 180_000);
 
@@ -345,6 +377,55 @@ async function orderStatus(id: string): Promise<OrderRow> {
 // ---- tests -----------------------------------------------------------------------------------
 
 describe('live prices', () => {
+  it('fills the last 24 h of missing live candles on becoming leader, from the preferred exchange (test 8)', async () => {
+    // Every minute of the 24 h before the start (the one the leader started in is its own).
+    const to = Math.floor(startedAt / MINUTE_MS) * MINUTE_MS;
+    const from = to - DAY_MS + MINUTE_MS;
+    const btc = () =>
+      testDb.db
+        .select()
+        .from(candles)
+        .where(
+          and(
+            eq(candles.coin, 'BTC'),
+            gte(candles.start, new Date(from)),
+            lt(candles.start, new Date(to)),
+          ),
+        )
+        .orderBy(asc(candles.start));
+
+    const stored = await waitFor(
+      async () => {
+        const rows = await btc();
+        return rows.length === 1_439 && rows;
+      },
+      10_000,
+      'the last 24 h of BTC candles',
+    );
+
+    const ticked = to - 60 * MINUTE_MS;
+    const cents = (usd: string) => BigInt(Math.round(Number(usd) * 100));
+    for (const row of stored) {
+      const start = row.start.getTime();
+      if (start === ticked) {
+        expect([row.open, row.high, row.low, row.close]).toEqual([
+          1n,
+          3n,
+          1n,
+          2n,
+        ]);
+        continue;
+      }
+      const fake = coinbaseBtc.find((c) => c.start === start);
+      expect(fake).toBeDefined();
+      expect([row.open, row.high, row.low, row.close]).toEqual(
+        [fake?.open, fake?.high, fake?.low, fake?.close].map((usd) =>
+          cents(usd ?? '0'),
+        ),
+      );
+    }
+  });
+
   it('ticks the live coins once a second from Coinbase, in cents, next to the simulated ones', async () => {
     const since = Date.now();
     await sleep(3_200);

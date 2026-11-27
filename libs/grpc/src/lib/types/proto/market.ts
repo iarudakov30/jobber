@@ -10,12 +10,15 @@ import { Observable } from 'rxjs';
 
 export interface GenerateCandlesRequest {
   coin: string;
-  /** A UTC date, YYYY-MM-DD, from 2020-01-01 to yesterday. */
+  /**
+   * A UTC date, YYYY-MM-DD, from 2020-01-01 to yesterday; for a live coin, up to today (its
+   * completed minutes).
+   */
   day: string;
 }
 
 export interface GenerateCandlesResult {
-  /** Candles written: 1440 for a day that had none, 0 for a repeat. */
+  /** Candles written: 1440 for a past day that had none, 0 for a repeat. */
   written: number;
 }
 
@@ -27,9 +30,12 @@ export interface GenerateCandlesResult {
 export interface MarketServiceClient {
   /**
    * Writes one day of 1-minute candles for a coin, for the BackfillCandles job (one call per
-   * coin-day). The candles come from a random walk seeded by the coin and the day only, so every
-   * replica and every repeat generates the same ones. Only minutes without a candle are written:
-   * live candles win, and a repeat writes nothing.
+   * coin-day). A simulated coin's candles come from a random walk seeded by the coin and the day
+   * only, so every replica and every repeat generates the same ones; a live coin's (phase 4.5)
+   * are the exchanges' own, in MARKET_PRICE_PROVIDERS order. Only minutes without a candle are
+   * written: live candles win, and a repeat writes nothing. INVALID_ARGUMENT for a bad coin or
+   * day, FAILED_PRECONDITION for a live coin while live prices are off, UNAVAILABLE when every
+   * exchange refuses.
    */
 
   generateCandles(
@@ -45,9 +51,12 @@ export interface MarketServiceClient {
 export interface MarketServiceController {
   /**
    * Writes one day of 1-minute candles for a coin, for the BackfillCandles job (one call per
-   * coin-day). The candles come from a random walk seeded by the coin and the day only, so every
-   * replica and every repeat generates the same ones. Only minutes without a candle are written:
-   * live candles win, and a repeat writes nothing.
+   * coin-day). A simulated coin's candles come from a random walk seeded by the coin and the day
+   * only, so every replica and every repeat generates the same ones; a live coin's (phase 4.5)
+   * are the exchanges' own, in MARKET_PRICE_PROVIDERS order. Only minutes without a candle are
+   * written: live candles win, and a repeat writes nothing. INVALID_ARGUMENT for a bad coin or
+   * day, FAILED_PRECONDITION for a live coin while live prices are off, UNAVAILABLE when every
+   * exchange refuses.
    */
 
   generateCandles(

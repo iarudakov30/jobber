@@ -80,16 +80,18 @@ acceptance tests pass.
 ## Phase 4.5 — Real prices (~3–5 days, in progress)
 
 Progress, step by step: [phase-4.5/README.md](phase-4.5/README.md). Step 1 (contracts: the four
-real coins as assets, a price source per coin, `source` on ticks) step 2 (Coinbase and
-Binance adapters with fake exchanges for tests) and step 3 (per-coin failover and failback, the
-bad print guard, live ticks on the leader) are done.
+real coins as assets, a price source per coin, `source` on ticks), step 2 (Coinbase and
+Binance adapters with fake exchanges for tests), step 3 (per-coin failover and failback, the
+bad print guard, live ticks on the leader) and step 4 (history from the exchanges' candles, the
+last 24 h filled on leadership) are done.
 
 - Four real coins, BTC, ETH, HYPE and ZEC, priced from Binance (USDT pairs), with Coinbase Exchange
   (USD pairs) as a per-coin fallback and a failback once Binance is steadily healthy; the four
   simulated coins stay.
 - A bad print guard holds back a jump over 10% until it is confirmed; with no provider healthy a
   coin has no price and can't be traded.
-- Real 1-minute history from the exchanges through `BackfillCandles`.
+- Real 1-minute history from the exchanges through `BackfillCandles`, and the last 24 h filled
+  when a replica starts leading.
 - **Done when:** the four real coins tick live in the app, survive one provider failing, and trade
   end to end like the simulated ones.
 

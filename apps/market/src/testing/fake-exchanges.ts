@@ -16,8 +16,19 @@ export interface FakeCandle {
  * little different, so a test can tell the minutes apart.
  */
 export function fakeDay(day: string, price: number): FakeCandle[] {
-  const start = Date.parse(`${day}T00:00:00Z`);
-  return Array.from({ length: 1440 }, (_, i) => {
+  return fakeCandles(Date.parse(`${day}T00:00:00Z`), 1440, price);
+}
+
+/**
+ * `count` made-up 1-minute candles from `start` (ms, a whole minute): minute `i` opens at
+ * `price + i/100` and closes 50 cents higher.
+ */
+export function fakeCandles(
+  start: number,
+  count: number,
+  price: number,
+): FakeCandle[] {
+  return Array.from({ length: count }, (_, i) => {
     const open = price + i / 100;
     const close = open + 0.5;
     return {

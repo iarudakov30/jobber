@@ -37,10 +37,14 @@ export class BackfillDayError extends Error {
 }
 
 /**
- * The day's index since `BACKFILL_EPOCH`, after checking `day` is a real UTC date from the epoch
- * to yesterday. Today and later are the live simulator's.
+ * The start (epoch ms) of `day`, after checking it is a real UTC date from the epoch on and
+ * before today, or with `allowToday` (a live coin's completed minutes) up to today.
  */
-export function backfillDayIndex(day: string, now = Date.now()): number {
+export function backfillDayStart(
+  day: string,
+  now = Date.now(),
+  allowToday = false,
+): number {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
   const ms = match
     ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
@@ -51,12 +55,24 @@ export function backfillDayIndex(day: string, now = Date.now()): number {
   if (ms < EPOCH_MS) {
     throw new BackfillDayError(`day must be ${BACKFILL_EPOCH} or later`);
   }
-  if (ms >= Math.floor(now / DAY_MS) * DAY_MS) {
+  const today = Math.floor(now / DAY_MS) * DAY_MS;
+  if (allowToday && ms > today) {
+    throw new BackfillDayError('day must not be after today (UTC)');
+  }
+  if (!allowToday && ms >= today) {
     throw new BackfillDayError(
       'day must be before today (UTC): today belongs to the live simulator',
     );
   }
-  return (ms - EPOCH_MS) / DAY_MS;
+  return ms;
+}
+
+/**
+ * The day's index since `BACKFILL_EPOCH`, after checking `day` is a real UTC date from the epoch
+ * to yesterday. Today and later are the live simulator's.
+ */
+export function backfillDayIndex(day: string, now = Date.now()): number {
+  return (backfillDayStart(day, now) - EPOCH_MS) / DAY_MS;
 }
 
 /** Log prices of each coin's daily anchors, extended as later days are asked for. */

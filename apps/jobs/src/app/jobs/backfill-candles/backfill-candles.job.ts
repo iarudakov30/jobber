@@ -21,7 +21,8 @@ type Item = Pick<BackfillCandlesMessage, 'coin' | 'day'>;
 
 /**
  * Fills the charts' past: one item per coin-day, each a `GenerateCandles` call to the market from
- * the executor. `data` is either a range, `{ from: "2026-11-01", to?: "2026-11-25", coins?:
+ * the executor (generated candles for a simulated coin, the exchanges' own for BTC, ETH, HYPE and
+ * ZEC; the market's 24 h fill on leadership covers their today). `data` is either a range, `{ from: "2026-11-01", to?: "2026-11-25", coins?:
  * ["NXC"] }`, which becomes one item per coin per day, or the items themselves,
  * `[{ coin: "NXC", day: "2026-11-01" }, ...]`. Days run from 2020-01-01 to yesterday (UTC); today
  * belongs to the live simulator.
@@ -29,7 +30,7 @@ type Item = Pick<BackfillCandlesMessage, 'coin' | 'day'>;
 @Job({
   name: Jobs.BACKFILL_CANDLES,
   description:
-    'Generates 1-minute candles for past days, one item per coin-day. data: { from: "YYYY-MM-DD", to?: "YYYY-MM-DD" (default yesterday), coins?: ["NXC", ...] (default all) }, or [{ coin, day }, ...].',
+    'Writes 1-minute candles for past days, one item per coin-day: generated for simulated coins, from the exchanges for live ones. data: { from: "YYYY-MM-DD", to?: "YYYY-MM-DD" (default yesterday), coins?: ["NXC", ...] (default all) }, or [{ coin, day }, ...].',
 })
 export class BackfillCandlesJob extends AbstractJob<BackfillCandlesMessage> {
   protected messageClass = BackfillCandlesMessage;

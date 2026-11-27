@@ -16,10 +16,12 @@ import {
 import { JobsConsumer } from '../jobs.consumer';
 
 /**
- * Generates one coin-day of 1-minute candles: the market's gRPC `GenerateCandles`. The market
- * writes only minutes without a candle, so a redelivered message writes nothing. A day the
- * market refuses (`INVALID_ARGUMENT`) is dead-lettered at once; an unreachable market is
- * retried by Pulsar's redelivery.
+ * Writes one coin-day of 1-minute candles: the market's gRPC `GenerateCandles` (generated for a
+ * simulated coin, from the exchanges for a live one). The market writes only minutes without a
+ * candle, so a redelivered message writes nothing. A day the market refuses
+ * (`INVALID_ARGUMENT`) or can't load as configured (`FAILED_PRECONDITION`: live prices off) is
+ * dead-lettered at once; an unreachable market, or exchanges that all refuse (`UNAVAILABLE`),
+ * are retried by Pulsar's redelivery.
  */
 @Injectable()
 export class BackfillCandlesConsumer
@@ -55,7 +57,11 @@ export class BackfillCandlesConsumer
         `Backfill (job ${jobId}) ${coin} ${day}: ${written} candle(s) written`,
       );
     } catch (error) {
-      if ((error as { code?: unknown }).code === GrpcStatus.INVALID_ARGUMENT) {
+      const code = (error as { code?: unknown }).code;
+      if (
+        code === GrpcStatus.INVALID_ARGUMENT ||
+        code === GrpcStatus.FAILED_PRECONDITION
+      ) {
         throw new NonRetryableError(
           `The market refused ${coin} ${day}: ${(error as { details?: string }).details}`,
         );

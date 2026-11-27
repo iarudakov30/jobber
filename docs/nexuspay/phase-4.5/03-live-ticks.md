@@ -124,15 +124,17 @@ Coinbase first: the rules don't depend on which exchange is which.
     stays `OPEN`; a 12% fall on both exchanges is published within 2.5 s and fills it at its
     limit.
 - `npx nx test market --runInBand`: 13 suites, 150 tests (phase 4's included, same seed, same
-  ticks), with `MARKET_LIVE_PRICES` unset: nothing reaches the internet.
+  ticks), with `MARKET_LIVE_PRICES` unset: nothing reaches the internet. Not guaranteed, it
+  turned out: Nx loads `apps/market/.env` (`on`) into the test task. Step 4 fixed it
+  ([04-history.md](04-history.md#tests-no-longer-read-the-live-switch)).
 - `npx nx run-many -t lint build -p market` green (webpack compiled successfully).
 - By hand against the real exchanges (the built bundle with `apps/market/.env`, ~30 s): both
   providers connected, the four coins `priced by coinbase` within a second of leading, no
   divergence warning; `coins` returned the four prices in cents with `source: coinbase`. After
   the switch to Binance first, the same run (~25 s): Coinbase happened to connect half a second
-  earlier and priced the first second, then each coin moved `coinbase → binance (binance
-  connected)` within 2 s and stayed there. Acceptance test
-  1's comparison with the exchange's REST ticker is step 5's.
+  earlier and priced the first second, then each coin moved
+  `coinbase → binance (binance connected)` within 2 s and stayed there. Acceptance test 1's
+  comparison with the exchange's REST ticker is step 5's.
 
 ## Lessons
 
