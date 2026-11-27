@@ -403,7 +403,7 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
   `FakeBinance`: silence, mute, drop, refuse, REST failures) on localhost.
 - **Live prices** (`prices/live/`, phase 4.5 step 3; `docs/nexuspay/phase-4.5/03-live-ticks.md`):
   `MARKET_LIVE_PRICES=on` (unset = off: nothing reaches the internet; `.env` has `on`),
-  `MARKET_PRICE_PROVIDERS` (preference order, default `coinbase,binance`), `COINBASE_WS_URL`,
+  `MARKET_PRICE_PROVIDERS` (preference order, default `binance,coinbase`: Coinbase's market data terms are stricter, `02-providers.md`), `COINBASE_WS_URL`,
   `COINBASE_REST_URL`, `BINANCE_WS_URL`, `BINANCE_REST_URL`. Only the simulator leader connects
   (`LivePrices.start` on leading, `stop` on stepping down). `RatePicker` (pure: given the time and
   which connections are alive) picks per coin each tick: healthy = connection alive + a price or

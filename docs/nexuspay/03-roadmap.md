@@ -84,8 +84,8 @@ real coins as assets, a price source per coin, `source` on ticks) step 2 (Coinba
 Binance adapters with fake exchanges for tests) and step 3 (per-coin failover and failback, the
 bad print guard, live ticks on the leader) are done.
 
-- Four real coins, BTC, ETH, HYPE and ZEC, priced from Coinbase Exchange (USD pairs), with Binance
-  (USDT pairs) as a per-coin fallback and a failback once Coinbase is steadily healthy; the four
+- Four real coins, BTC, ETH, HYPE and ZEC, priced from Binance (USDT pairs), with Coinbase Exchange
+  (USD pairs) as a per-coin fallback and a failback once Binance is steadily healthy; the four
   simulated coins stay.
 - A bad print guard holds back a jump over 10% until it is confirmed; with no provider healthy a
   coin has no price and can't be traded.

@@ -23,7 +23,7 @@ publishes it like any simulated price:
 | `prices/live/live-prices.ts`                     | `LivePrices`: builds the providers from config, connects them while leading, feeds the picker; `livePricesOptionsFromEnv`                              |
 | `prices/price-ticker.ts`, `simulator.service.ts` | Each tick adds the live coins' picks after the simulated coins; the leader connects the providers when it starts leading and disconnects when it stops |
 | `prices/providers/*`                             | `connect(coins, onPrice, onHeartbeat)`: Coinbase reports its per-product heartbeats                                                                    |
-| `apps/market/.env`                               | `MARKET_LIVE_PRICES=on`, `MARKET_PRICE_PROVIDERS=coinbase,binance`, the four endpoint URLs (commented, defaults)                                       |
+| `apps/market/.env`                               | `MARKET_LIVE_PRICES=on`, `MARKET_PRICE_PROVIDERS=binance,coinbase`, the four endpoint URLs (commented, defaults)                                       |
 | `live-prices.api.spec.ts`, `rate-picker.spec.ts` | Acceptance tests 2–6 end to end against the fake exchanges; the picker's rules with a hand-driven clock                                                |
 
 ## How it works
@@ -36,7 +36,7 @@ Once a second, the ticker asks the picker for each live coin's price and publish
 the simulated ones:
 
 ```json
-{ "type": "price", "coin": "BTC", "price": "5993302", "seq": 6, "at": 1795796515109, "source": "coinbase" }
+{ "type": "price", "coin": "BTC", "price": "6000000", "seq": 6, "at": 1795796515109, "source": "binance" }
 ```
 
 Exchange messages arriving faster (Coinbase sends a ticker per trade) only update the picker,
@@ -85,12 +85,18 @@ the first price after a handover is checked.
 | Variable                                                                     | Default            |                                                               |
 | ---------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------- |
 | `MARKET_LIVE_PRICES`                                                         | off when unset     | `on` in `apps/market/.env`; off, the live coins have no price |
-| `MARKET_PRICE_PROVIDERS`                                                     | `coinbase,binance` | Order of preference; each at most once                        |
+| `MARKET_PRICE_PROVIDERS`                                                     | `binance,coinbase` | Order of preference; each at most once                        |
 | `COINBASE_WS_URL`, `COINBASE_REST_URL`, `BINANCE_WS_URL`, `BINANCE_REST_URL` | the public ones    | Tests point them at the fake exchanges                        |
 
 Unset means off (the plan had `on`) so that nothing, a test included, reaches the internet
 unless it asks to; the committed `.env` turns it on for `npm start`. Only the simulator leader
 connects: `MARKET_SIMULATOR=off` replicas never do.
+
+**Binance first, also a change from the plan:** the plan preferred Coinbase. Its market data
+terms turned out to be the stricter of the two (no valuations, no showing the data to anyone
+else), so Binance prices the coins and Coinbase is the fallback; see
+[02-providers.md, Terms of use](02-providers.md#terms-of-use). The tests below still run with
+Coinbase first: the rules don't depend on which exchange is which.
 
 ## How it was verified
 
@@ -122,8 +128,11 @@ connects: `MARKET_SIMULATOR=off` replicas never do.
 - `npx nx run-many -t lint build -p market` green (webpack compiled successfully).
 - By hand against the real exchanges (the built bundle with `apps/market/.env`, ~30 s): both
   providers connected, the four coins `priced by coinbase` within a second of leading, no
-  divergence warning; `coins` returned BTC $59,933.02, ETH $1,669.39, HYPE $64.51, ZEC $741.06,
-  `source: coinbase`. Acceptance test 1's comparison with Coinbase's REST ticker is step 5's.
+  divergence warning; `coins` returned the four prices in cents with `source: coinbase`. After
+  the switch to Binance first, the same run (~25 s): Coinbase happened to connect half a second
+  earlier and priced the first second, then each coin moved `coinbase → binance (binance
+  connected)` within 2 s and stayed there. Acceptance test
+  1's comparison with the exchange's REST ticker is step 5's.
 
 ## Lessons
 

@@ -2,8 +2,9 @@
 
 Phase 4.5 adds four real coins, BTC, ETH, HYPE and ZEC, priced from public exchange data next to
 the four simulated ones. Trading doesn't change: paper money against the simulated market maker,
-with the same quotes, fees, holds and orders. Prices come from Coinbase Exchange, with Binance as
-the fallback per coin. The plan is the "4.5 Real prices" tab of the
+with the same quotes, fees, holds and orders. Prices come from Binance, with Coinbase Exchange as
+the fallback per coin (the plan had them the other way round; Coinbase's terms are the stricter,
+see [02-providers.md](02-providers.md#terms-of-use)). The plan is the "4.5 Real prices" tab of the
 [spec](https://claude.ai/artifact/4YUyyamSZtgiVJcjZYsBko). Work is committed straight to `main`.
 
 | Step                         | Delivers                                                                                                                      | Doc                                  |

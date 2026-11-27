@@ -34,7 +34,7 @@ Nothing runs the providers yet: step 3 connects them on the simulator leader.
 
 ### The two exchanges
 
-|                | Coinbase Exchange (primary)                                                                                       | Binance (fallback)                                                                                                      |
+|                | Coinbase Exchange                                                                                                 | Binance                                                                                                                 |
 | -------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Stream         | `wss://ws-feed.exchange.coinbase.com`, subscribe message                                                          | `wss://data-stream.binance.vision/stream?streams=btcusdt@miniTicker/…`                                                  |
 | Price messages | `ticker` on every trade (and once after subscribing)                                                              | `24hrMiniTicker` every second: last price `c`, event time `E`                                                           |
@@ -100,6 +100,28 @@ internet; run twice):
 
 Formats and limits were checked against the exchanges' API documentation, and the four pairs were
 confirmed to be trading on both (Coinbase `online`, Binance `TRADING`).
+
+## Terms of use
+
+Both exchanges' public market data needs no key, but it comes with terms. Read on 2026-11-27:
+
+|                  | Binance                                                                                                            | Coinbase                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Document         | Terms of Use (ADGM entities, effective 27 October 2026); APIs are "subject to separate API terms", not yet read    | Market Data Terms of Use (last updated 7 August 2026)                                                                            |
+| Licence          | Non-commercial personal or internal business use                                                                   | Personal or research use only; not for an application with end users other than you                                             |
+| Showing it       | Within that licence                                                                                                | Not to anyone outside your organisation without written consent: neither the data nor anything derived from it (charts, candles) |
+| Also prohibited  | Getting around the List of Prohibited Countries (a VPN, for example)                                               | "Generic or fair value prices" and valuations of digital currencies, "whether for internal use or otherwise"; any use for AI     |
+
+What follows for NexusPay:
+
+- **Binance is the preferred provider** (`MARKET_PRICE_PROVIDERS=binance,coinbase`, also the
+  default). Coinbase prices a coin only while Binance can't: settling trades and valuing
+  portfolios at its price is close to the valuation clause, so it is kept to the fallback.
+- **Live prices are for running NexusPay locally, for yourself.** No deployment, demo or
+  screenshot with them: the market is in neither the Helm chart nor `docker-compose.apps.yaml`,
+  `MARKET_LIVE_PRICES` unset is off, and these docs quote no real prices.
+- Anything more (other users, a public demo) needs Binance's API terms read and Coinbase's
+  written consent (marketdata@coinbase.com), or another source.
 
 ## Lessons
 

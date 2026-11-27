@@ -40,11 +40,12 @@ type Env = (name: string) => string | undefined;
 
 /**
  * `MARKET_LIVE_PRICES` (`on` to connect; unset or anything else is off, so nothing reaches the
- * internet unless asked), `MARKET_PRICE_PROVIDERS` (default `coinbase,binance`), and the four
+ * internet unless asked), `MARKET_PRICE_PROVIDERS` (default `binance,coinbase`: Coinbase's
+ * market data terms are the stricter, so it only prices a coin Binance can't), and the four
  * endpoint URLs (default the public ones).
  */
 export function livePricesOptionsFromEnv(env: Env): LivePricesOptions {
-  const listed = (env('MARKET_PRICE_PROVIDERS') ?? 'coinbase,binance')
+  const listed = (env('MARKET_PRICE_PROVIDERS') ?? 'binance,coinbase')
     .split(',')
     .map((name) => name.trim())
     .filter(Boolean);
