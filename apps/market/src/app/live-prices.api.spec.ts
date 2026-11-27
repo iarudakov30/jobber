@@ -447,15 +447,18 @@ describe('live prices', () => {
         coins: {
           code: string;
           live: boolean;
+          providers: string[];
           tick: { price: string; source: string } | null;
         }[];
-      }>(null, '{ coins { code live tick { price source } } }'),
+      }>(null, '{ coins { code live providers tick { price source } } }'),
     );
     expect(coins.find((c) => c.code === 'ETH')).toEqual({
       code: 'ETH',
       live: true,
+      providers: ['coinbase', 'binance'],
       tick: { price: '300000', source: 'coinbase' },
     });
+    expect(coins.find((c) => c.code === 'NXC')?.providers).toEqual([]);
   });
 
   it('moves one silent coin to Binance, alone, with no repeated seq (test 2)', async () => {

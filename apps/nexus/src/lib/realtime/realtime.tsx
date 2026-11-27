@@ -12,11 +12,15 @@ import {
   type RealtimeMessage,
 } from './realtime-client';
 
-/** A coin's latest price: USD cents per coin (a decimal string), its `seq`, epoch ms. */
+/**
+ * A coin's latest price: USD cents per coin (a decimal string), its `seq`, epoch ms, and where it
+ * came from (`simulator`, `binance`, `coinbase`).
+ */
 export interface PriceTick {
   price: string;
   seq: number;
   at: number;
+  source?: string;
 }
 
 /**
@@ -115,8 +119,12 @@ export function usePrice(coin: string): PriceTick | undefined {
   useEffect(
     () =>
       client.subscribe(`prices.${coin}`, ({ seq, data }) => {
-        const { price, at } = data as { price: string; at: number };
-        prices.set(coin, { price, seq, at });
+        const { price, at, source } = data as {
+          price: string;
+          at: number;
+          source?: string;
+        };
+        prices.set(coin, { price, seq, at, source });
       }),
     [client, prices, coin],
   );

@@ -27,7 +27,7 @@ export class PriceTick {
 
   @Field(() => String, {
     description:
-      'Where the price came from: simulator (the invented coins), coinbase, or binance (the fallback for real coins).',
+      'Where the price came from: simulator (the invented coins), or the exchange that priced a real coin (binance or coinbase; see Coin.providers).',
   })
   source: string;
 }
@@ -45,6 +45,12 @@ export class Coin {
       'True for a real coin priced from public exchange data; false for a simulated one. Both are traded with paper money.',
   })
   live: boolean;
+
+  @Field(() => [String], {
+    description:
+      'For a real coin, the exchanges its price can come from, in order of preference: a tick from any but the first is a fallback. Empty for a simulated coin.',
+  })
+  providers: string[];
 
   @Field(() => PriceTick, {
     nullable: true,

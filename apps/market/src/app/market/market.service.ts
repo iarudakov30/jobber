@@ -6,6 +6,7 @@ import { Candle } from '../prices/candle-builder';
 import { CandleStore } from '../prices/candle.store';
 import { COIN_SPECS, isLive } from '../prices/coins';
 import { PriceTickSource } from '@jobber/rabbitmq';
+import { LivePrices } from '../prices/live/live-prices';
 import { PriceStore } from '../prices/price.store';
 import { REDIS } from '../redis/redis.module';
 import { MarketInputError, PricesUnavailableError } from './market.errors';
@@ -32,6 +33,8 @@ export interface CoinView {
   name: string;
   /** Priced from real exchanges (phase 4.5), not the simulator. */
   live: boolean;
+  /** A live coin's exchanges in order of preference; empty for a simulated coin. */
+  providers: string[];
   tick: PriceTickView | null;
   open24h: bigint | null;
 }
@@ -95,6 +98,7 @@ export class MarketService {
     private readonly prices: PriceStore,
     private readonly candleStore: CandleStore,
     @Inject(REDIS) private readonly redis: Redis,
+    private readonly live: LivePrices,
   ) {}
 
   /** Every coin with its latest price (null before the first tick) and its price 24 h ago. */
@@ -103,12 +107,14 @@ export class MarketService {
       this.prices.latest(),
       this.candleStore.opensSince(new Date(now - 24 * 60 * 60_000)),
     ]);
+    const providers = this.live.providers.map((p) => p.name);
     return COINS.map((code) => {
       const snapshot = latest.find((p) => p.coin === code);
       return {
         code,
         name: COIN_SPECS[code].name,
         live: isLive(code),
+        providers: isLive(code) ? providers : [],
         tick: snapshot
           ? {
               price: snapshot.price,

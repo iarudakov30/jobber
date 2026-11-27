@@ -4,7 +4,7 @@
 
 **Jobber** is a microservices-based application for **user authentication, background job management, and product data processing**. It's built as a distributed system using an **Nx monorepo** with independent backend services communicating over GraphQL, gRPC, Apache Pulsar and RabbitMQ, plus an **Angular web UI** for signing in and running jobs.
 
-The same repo hosts **NexusPay**, a wallet and payments learning project: a double-entry ledger (`wallet`), Stripe top-ups (`payments`), a simulated coin market (`market`), a WebSocket gateway (`realtime`) and a **React app** (`nexus`). It is documented in [docs/nexuspay](docs/nexuspay/README.md).
+The same repo hosts **NexusPay**, a wallet and payments learning project: a double-entry ledger (`wallet`), Stripe top-ups (`payments`), a paper-trading coin market with simulated coins and four real ones priced from public exchange data (`market`), a WebSocket gateway (`realtime`) and a **React app** (`nexus`). It is documented in [docs/nexuspay](docs/nexuspay/README.md).
 
 ---
 
@@ -88,7 +88,7 @@ apps/
 ├── products/   ← gRPC service, Drizzle ORM, PostgreSQL persistence             (port 3003, gRPC 5001)
 ├── wallet/     ← NexusPay ledger: balances, transfers, holds, trades           (port 3004, gRPC 5003)
 ├── payments/   ← NexusPay Stripe Checkout top-ups and webhooks                 (port 3005)
-├── market/     ← NexusPay price simulator, candles, quotes, orders             (port 3006, gRPC 5004)
+├── market/     ← NexusPay prices (simulated + exchanges), candles, orders      (port 3006, gRPC 5004)
 ├── realtime/   ← NexusPay WebSocket gateway: live prices, balances, fills     (port 3007)
 ├── ui-admin/   ← Angular web UI, Apollo Client against auth + jobs              (port 4200)
 ├── nexus/      ← React app for NexusPay (Vite)                                 (port 4300)

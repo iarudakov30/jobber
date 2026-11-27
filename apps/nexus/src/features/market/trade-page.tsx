@@ -21,6 +21,12 @@ import {
 } from './market-api';
 import { useSeedPrices } from './markets-page';
 import { OrderForm } from './order-form';
+import {
+  SourceBadge,
+  isPriceAvailable,
+  sourceLabel,
+  useNow,
+} from './price-status';
 
 // lightweight-charts is the app's biggest dependency and only this page draws a chart: load it
 // with the page, not with the app.
@@ -66,22 +72,33 @@ function Trade({ coin }: { coin: string }) {
     queryFn: () => fetchCandles(coin),
   });
   const bars = useMemo(() => toBars(candles.data ?? []), [candles.data]);
-  const name = coins.data?.find((c) => c.code === coin)?.name;
+  const spec = coins.data?.find((c) => c.code === coin);
+  const now = useNow();
+  const available = isPriceAvailable(tick, now);
 
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between">
         <h1 className="text-2xl font-semibold">
           {coin}{' '}
-          {name && (
-            <span className="text-base font-normal text-slate-500">{name}</span>
+          {spec && (
+            <span className="text-base font-normal text-slate-500">
+              {spec.name}
+            </span>
           )}
         </h1>
-        <p
-          className="text-2xl font-semibold tabular-nums"
-          data-testid="live-price"
-        >
-          {tick ? formatPrice(tick.price) : '—'}
+        <p className="flex items-center gap-2">
+          {available && <SourceBadge label={sourceLabel(spec, tick)} />}
+          <span
+            className={
+              available
+                ? 'text-2xl font-semibold tabular-nums'
+                : 'text-lg text-slate-500'
+            }
+            data-testid="live-price"
+          >
+            {available ? formatPrice(tick.price) : 'Price unavailable'}
+          </span>
         </p>
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
@@ -95,7 +112,7 @@ function Trade({ coin }: { coin: string }) {
         </Card>
         <div className="space-y-6">
           <Card title="Trade">
-            <OrderForm coin={coin} />
+            <OrderForm coin={coin} priceAvailable={available} />
           </Card>
           <BalancesCard coin={coin} />
         </div>

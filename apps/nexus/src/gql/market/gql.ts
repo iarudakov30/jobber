@@ -14,7 +14,7 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
-    "\n  query Coins {\n    coins {\n      code\n      name\n      tick {\n        price\n        seq\n        at\n      }\n      open24h\n    }\n  }\n": typeof types.CoinsDocument,
+    "\n  query Coins {\n    coins {\n      code\n      name\n      live\n      providers\n      tick {\n        price\n        seq\n        at\n        source\n      }\n      open24h\n    }\n  }\n": typeof types.CoinsDocument,
     "\n  query Candles($coin: String!) {\n    candles(coin: $coin) {\n      start\n      open\n      high\n      low\n      close\n    }\n  }\n": typeof types.CandlesDocument,
     "\n  mutation Quote($coin: String!, $side: TradeSide!, $qty: MinorUnits!) {\n    quote(coin: $coin, side: $side, qty: $qty) {\n      id\n      coin\n      side\n      qty\n      price\n      usdAmount\n      fee\n      total\n      expiresAt\n    }\n  }\n": typeof types.QuoteDocument,
     "\n  fragment OrderFields on Order {\n    id\n    type\n    coin\n    side\n    qty\n    limitPrice\n    fillPrice\n    usdAmount\n    fee\n    total\n    status\n    reason\n    expiresAt\n    createdAt\n  }\n": typeof types.OrderFieldsFragmentDoc,
@@ -23,7 +23,7 @@ type Documents = {
     "\n  query Orders($status: [OrderStatus!], $first: Int) {\n    orders(status: $status, first: $first) {\n      ...OrderFields\n    }\n  }\n": typeof types.OrdersDocument,
 };
 const documents: Documents = {
-    "\n  query Coins {\n    coins {\n      code\n      name\n      tick {\n        price\n        seq\n        at\n      }\n      open24h\n    }\n  }\n": types.CoinsDocument,
+    "\n  query Coins {\n    coins {\n      code\n      name\n      live\n      providers\n      tick {\n        price\n        seq\n        at\n        source\n      }\n      open24h\n    }\n  }\n": types.CoinsDocument,
     "\n  query Candles($coin: String!) {\n    candles(coin: $coin) {\n      start\n      open\n      high\n      low\n      close\n    }\n  }\n": types.CandlesDocument,
     "\n  mutation Quote($coin: String!, $side: TradeSide!, $qty: MinorUnits!) {\n    quote(coin: $coin, side: $side, qty: $qty) {\n      id\n      coin\n      side\n      qty\n      price\n      usdAmount\n      fee\n      total\n      expiresAt\n    }\n  }\n": types.QuoteDocument,
     "\n  fragment OrderFields on Order {\n    id\n    type\n    coin\n    side\n    qty\n    limitPrice\n    fillPrice\n    usdAmount\n    fee\n    total\n    status\n    reason\n    expiresAt\n    createdAt\n  }\n": types.OrderFieldsFragmentDoc,
@@ -49,7 +49,7 @@ export function graphql(source: string): unknown;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query Coins {\n    coins {\n      code\n      name\n      tick {\n        price\n        seq\n        at\n      }\n      open24h\n    }\n  }\n"): (typeof documents)["\n  query Coins {\n    coins {\n      code\n      name\n      tick {\n        price\n        seq\n        at\n      }\n      open24h\n    }\n  }\n"];
+export function graphql(source: "\n  query Coins {\n    coins {\n      code\n      name\n      live\n      providers\n      tick {\n        price\n        seq\n        at\n        source\n      }\n      open24h\n    }\n  }\n"): (typeof documents)["\n  query Coins {\n    coins {\n      code\n      name\n      live\n      providers\n      tick {\n        price\n        seq\n        at\n        source\n      }\n      open24h\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

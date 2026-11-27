@@ -31,7 +31,8 @@ a bank.
 
 A user signs up, tops up a USD wallet through Stripe Checkout (test mode), sends money to other
 users, and trades a handful of invented coins (NXC, BLIP, ORB, …) on a simulated market whose
-prices move every second. Trades fill against a simulated market maker, not other users. Every
+prices move every second, plus four real ones (BTC, ETH, HYPE, ZEC) priced from public exchange
+data (phase 4.5). Trades fill against a simulated market maker, not other users. Every
 balance change is a ledger transaction; every page updates live over a WebSocket.
 
 ## Architecture
@@ -299,7 +300,7 @@ matching engine is needed.
 | Screen      | Shows                                              | Exercises                        |
 | ----------- | -------------------------------------------------- | -------------------------------- |
 | Wallet      | Balances (available/held), top-up, history         | Stripe redirect, ledger queries  |
-| Markets     | Coins with live prices                             | WebSocket stream                 |
+| Markets     | Real and simulated coins with live prices          | WebSocket stream, provider badge |
 | Trade       | Candles, market/limit order form, quote countdown  | Quotes, holds, `Idempotency-Key` |
 | Portfolio   | Value over time, P/L per coin                      | Read models from entries         |
 | Send        | Transfer by email                                  | Concurrent transfers             |

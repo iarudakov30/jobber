@@ -77,13 +77,14 @@ acceptance tests pass.
 - **Done when:** a limit order holds, then fills, cancels or expires with correct balances, and
   clients survive a realtime replica being killed.
 
-## Phase 4.5 — Real prices (~3–5 days, in progress)
+## Phase 4.5 — Real prices (~3–5 days, done)
 
 Progress, step by step: [phase-4.5/README.md](phase-4.5/README.md). Step 1 (contracts: the four
 real coins as assets, a price source per coin, `source` on ticks), step 2 (Coinbase and
 Binance adapters with fake exchanges for tests), step 3 (per-coin failover and failback, the
-bad print guard, live ticks on the leader) and step 4 (history from the exchanges' candles, the
-last 24 h filled on leadership) are done.
+bad print guard, live ticks on the leader), step 4 (history from the exchanges' candles, the
+last 24 h filled on leadership) and step 5 (the React markets in two groups with a source
+badge and "Price unavailable", Playwright trades in BTC, the live check) are done.
 
 - Four real coins, BTC, ETH, HYPE and ZEC, priced from Binance (USDT pairs), with Coinbase Exchange
   (USD pairs) as a per-coin fallback and a failback once Binance is steadily healthy; the four

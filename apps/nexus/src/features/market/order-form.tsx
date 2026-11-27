@@ -64,8 +64,18 @@ function useClock(active: boolean): [number, () => void] {
  * again when it runs out (as long as nothing in the form changed). The quote's id is the order's
  * `Idempotency-Key`, so a retry of the same quote can't trade twice. A limit order gets one key
  * per side, quantity and price, kept until it is placed.
+ *
+ * Without a price (`priceAvailable` false: no tick for 10 s), the market can't quote: the form
+ * says so, drops any quote and asks for none. A limit order can still be placed; it fills once
+ * prices are back.
  */
-export function OrderForm({ coin }: { coin: string }) {
+export function OrderForm({
+  coin,
+  priceAvailable = true,
+}: {
+  coin: string;
+  priceAvailable?: boolean;
+}) {
   const queryClient = useQueryClient();
   const [side, setSide] = useState<Side>('BUY');
   const [kind, setKind] = useState<Kind>('MARKET');
@@ -137,11 +147,23 @@ export function OrderForm({ coin }: { coin: string }) {
 
   // Re-quote when the countdown reaches 0.
   useEffect(() => {
-    if (quote && secondsLeft === 0 && !inFlight.current) {
+    if (quote && secondsLeft === 0 && !inFlight.current && priceAvailable) {
       void getQuote(quote.qty);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft]);
+
+  // A quote on a price that has gone stale is worthless, and the market would refuse a new one.
+  // Adjusted while rendering (not in an effect), so the stale quote is never on screen.
+  const [hadPrice, setHadPrice] = useState(priceAvailable);
+  if (hadPrice !== priceAvailable) {
+    setHadPrice(priceAvailable);
+    if (!priceAvailable) {
+      setQuote(undefined);
+    }
+  }
+
+  const quoteBlocked = kind === 'MARKET' && !priceAvailable;
 
   async function run(work: () => Promise<Order | undefined>) {
     if (inFlight.current) {
@@ -209,6 +231,8 @@ export function OrderForm({ coin }: { coin: string }) {
     event.preventDefault();
     if (kind === 'LIMIT') {
       void submitLimit();
+    } else if (!priceAvailable) {
+      return;
     } else if (quote) {
       void submitMarket();
     } else {
@@ -310,9 +334,18 @@ export function OrderForm({ coin }: { coin: string }) {
         </dl>
       )}
 
+      {quoteBlocked && (
+        <p
+          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          data-testid="price-unavailable"
+        >
+          Price unavailable: market orders are off until prices come back. A
+          limit order can still be placed.
+        </p>
+      )}
       <FormError message={errors.form} />
       <FormSuccess message={success} />
-      <Button type="submit" disabled={busy} className="w-full">
+      <Button type="submit" disabled={busy || quoteBlocked} className="w-full">
         {kind === 'LIMIT'
           ? `Place limit ${action.toLowerCase()}`
           : quote

@@ -28,6 +28,11 @@ type Coin {
   open24h: MinorUnits
 
   """
+  For a real coin, the exchanges its price can come from, in order of preference: a tick from any but the first is a fallback. Empty for a simulated coin.
+  """
+  providers: [String!]!
+
+  """
   The latest price; null until the coin has ticked once (for a real coin, while no exchange answers).
   """
   tick: PriceTick
@@ -151,7 +156,7 @@ type PriceTick {
   seq: Int!
 
   """
-  Where the price came from: simulator (the invented coins), coinbase, or binance (the fallback for real coins).
+  Where the price came from: simulator (the invented coins), or the exchange that priced a real coin (binance or coinbase; see Coin.providers).
   """
   source: String!
 }

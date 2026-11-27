@@ -19,7 +19,7 @@ These documents let anyone (including future you) pick the project up cold and u
 | 4b  | [Phase 2 — step by step](phase-2/README.md)                | The same for phase 2                                                                                |
 | 4c  | [Phase 3 — step by step](phase-3/README.md)                | The same for phase 3                                                                                |
 | 4d  | [Phase 4 — step by step](phase-4/README.md)                | The same for phase 4                                                                                |
-| 4e  | [Phase 4.5 — step by step](phase-4.5/README.md)            | The same for phase 4.5 (real coin prices), as it's built                                            |
+| 4e  | [Phase 4.5 — step by step](phase-4.5/README.md)            | The same for phase 4.5 (real coin prices)                                                           |
 | 5   | [React app guide](react-app-guide.md)                      | How `apps/nexus` is structured and why, layer by layer, with Angular parallels — for learning React |
 | 6   | [Production drills](production-drills.md)                  | Four break-measure-fix experiments: rollout under load, event loop blocking, crashes, memory leaks  |
 
@@ -31,14 +31,14 @@ actually built, and the spec describes the plan.
 
 ## Status
 
-| Phase                | Content                                                                                                         | State                     |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done**                  |
-| 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **Done**                  |
-| 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | **Done** (5 steps)        |
-| 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | **Done** (7 steps)        |
-| 4.5 Real prices      | BTC, ETH, HYPE, ZEC from Binance with Coinbase fallback, next to the simulated coins; paper trading             | In progress (step 4 of 5) |
-| 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned                   |
+| Phase                | Content                                                                                                         | State              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1. Groundwork        | Pulsar consumer options + DLQ, transactional outbox, idempotent job acks, tracing + infra, React app with login | **Done**           |
+| 2. Ledger core       | `apps/wallet`, double-entry ledger, transfers, `libs/money`, `libs/idempotency`, Wallet/Send screens            | **Done**           |
+| 3. Stripe + RabbitMQ | `apps/payments`, Checkout, signed webhooks, `libs/rabbitmq`, email, delayed commands                            | **Done** (5 steps) |
+| 4. Market + realtime | `apps/market`, price simulator, orders and holds, `apps/realtime` WebSocket gateway                             | **Done** (7 steps) |
+| 4.5 Real prices      | BTC, ETH, HYPE, ZEC from Binance with Coinbase fallback, next to the simulated coins; paper trading             | **Done** (5 steps) |
+| 5. Hardening         | Refunds, disputes, reconciliation, airdrops, rate limits, roles, Ops screen, Helm                               | Planned            |
 
 ## Branches (phase 1)
 

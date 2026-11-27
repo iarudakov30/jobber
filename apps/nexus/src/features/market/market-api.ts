@@ -22,10 +22,13 @@ const COINS = graphql(`
     coins {
       code
       name
+      live
+      providers
       tick {
         price
         seq
         at
+        source
       }
       open24h
     }

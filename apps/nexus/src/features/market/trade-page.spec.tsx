@@ -1,7 +1,14 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { HttpResponse } from 'msw';
 import { graphql } from 'msw/graphql';
 
+import { fakeRealtime } from '../../testing/fake-socket';
 import {
   MARKET_URL,
   WALLET_URL,
@@ -57,7 +64,10 @@ function backend({
   placeOrder = (input: Record<string, unknown>): PlaceResult =>
     input['type'] === 'LIMIT' ? limitOrder(input) : order(),
   orders = [] as ReturnType<typeof order>[],
+  btcSource = 'binance',
+  tickAgeMs = 0,
 } = {}) {
+  const at = new Date(Date.now() - tickAgeMs).toISOString();
   const calls: Calls = { quotes: [], placed: [], cancelled: [] };
   server.use(
     market.query('Coins', () =>
@@ -67,8 +77,18 @@ function backend({
             {
               code: 'NXC',
               name: 'Nexus Coin',
-              tick: { price: '4200', seq: 1, at: '2026-11-26T12:00:00.000Z' },
+              live: false,
+              providers: [],
+              tick: { price: '4200', seq: 1, at, source: 'simulator' },
               open24h: '4000',
+            },
+            {
+              code: 'BTC',
+              name: 'Bitcoin',
+              live: true,
+              providers: ['binance', 'coinbase'],
+              tick: { price: '6000000', seq: 1, at, source: btcSource },
+              open24h: '5900000',
             },
           ],
         },
@@ -119,6 +139,13 @@ function backend({
   return calls;
 }
 
+// Each page gets its own price book: one shared across tests would keep an earlier test's tick
+// (a tick with the same seq never replaces it) and let it go stale.
+const renderTrade = (coin: string) =>
+  renderPage(() => <TradePage coin={coin} />, {
+    realtime: fakeRealtime().realtime,
+  });
+
 const form = () => screen.getByRole('form', { name: 'Order' });
 const typeQty = (value: string) =>
   fireEvent.change(within(form()).getByLabelText('Quantity (NXC)'), {
@@ -128,7 +155,7 @@ const click = (name: string | RegExp) =>
   fireEvent.click(within(form()).getByRole('button', { name }));
 
 async function openTrade() {
-  await renderPage(() => <TradePage coin="NXC" />);
+  await renderTrade('NXC');
   await screen.findByText('$42.00', { selector: '[data-testid="live-price"]' });
 }
 
@@ -292,7 +319,7 @@ describe('TradePage', () => {
         order({ id: 'done-1' }),
       ],
     });
-    await renderPage(() => <TradePage coin="NXC" />);
+    await renderTrade('NXC');
 
     const open = await screen.findByRole('list', { name: 'Open orders' });
     expect(within(open).getAllByTestId('order')).toHaveLength(1);
@@ -305,7 +332,88 @@ describe('TradePage', () => {
   });
 
   it('says so for a coin that does not exist', async () => {
-    await renderPage(() => <TradePage coin="DOGE" />);
+    await renderTrade('DOGE');
     expect(screen.getByText(/There is no coin called DOGE/)).toBeTruthy();
+  });
+});
+
+describe('TradePage for a real coin', () => {
+  const livePrice = () =>
+    screen.findByText('$60,000.00', {
+      selector: '[data-testid="live-price"]',
+    });
+
+  it('shows where the price comes from, and when that is the fallback', async () => {
+    backend({ btcSource: 'binance' });
+    await renderTrade('BTC');
+    await livePrice();
+    expect(screen.getByTestId('source').textContent).toBe('Binance');
+    cleanup();
+
+    backend({ btcSource: 'coinbase' });
+    await renderTrade('BTC');
+    await livePrice();
+    expect(screen.getByTestId('source').textContent).toBe(
+      'Coinbase · fallback',
+    );
+  });
+
+  it('asks for no quote without a price, but takes a limit order', async () => {
+    const calls = backend({ tickAgeMs: 30_000 });
+    await renderTrade('BTC');
+
+    await screen.findByText('Price unavailable', {
+      selector: '[data-testid="live-price"]',
+    });
+    expect(screen.queryByTestId('source')).toBeNull();
+    expect(screen.getByTestId('price-unavailable').textContent).toContain(
+      'market orders are off',
+    );
+    const getQuote = within(form()).getByRole('button', { name: 'Get quote' });
+    expect((getQuote as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(form());
+    expect(calls.quotes).toEqual([]);
+
+    fireEvent.click(within(form()).getByRole('radio', { name: 'Limit' }));
+    expect(screen.queryByTestId('price-unavailable')).toBeNull();
+    fireEvent.change(within(form()).getByLabelText('Quantity (BTC)'), {
+      target: { value: '0.001' },
+    });
+    fireEvent.change(within(form()).getByLabelText(/Limit price/), {
+      target: { value: '55000' },
+    });
+    click('Place limit buy');
+    await waitFor(() =>
+      expect(calls.placed.map((p) => p.input)).toEqual([
+        {
+          type: 'LIMIT',
+          coin: 'BTC',
+          side: 'BUY',
+          qty: '100000',
+          limitPrice: '5500000',
+        },
+      ]),
+    );
+  });
+
+  it('drops the quote when the price goes stale while the page is open', async () => {
+    // 8 s old: available now, stale (over 10 s) two seconds later.
+    const calls = backend({ tickAgeMs: 8_000 });
+    await renderTrade('BTC');
+    await livePrice();
+    fireEvent.change(within(form()).getByLabelText('Quantity (BTC)'), {
+      target: { value: '0.001' },
+    });
+    click('Get quote');
+    await screen.findByTestId('quote');
+
+    await screen.findByText(
+      'Price unavailable',
+      { selector: '[data-testid="live-price"]' },
+      { timeout: 4_000 },
+    );
+    expect(screen.queryByTestId('quote')).toBeNull();
+    expect(screen.getByTestId('price-unavailable')).toBeTruthy();
+    expect(calls.quotes).toHaveLength(1);
   });
 });

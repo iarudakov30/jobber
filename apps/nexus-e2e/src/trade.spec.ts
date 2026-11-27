@@ -6,7 +6,9 @@ import { E2eUser, e2eUsers } from './users';
 
 // Phase 4 against the real auth, wallet, market and realtime gateway: trades whose results
 // arrive on the user feed (no reload anywhere), and acceptance test 10, a gateway that dies
-// under an open tab. The tests share one trader, who starts with $100.00, and run in order.
+// under an open tab. Phase 4.5's test 7 trades BTC the same way, at the exchanges' price
+// (skipped when the market has no BTC price). The tests share one trader, who starts with
+// $100.00, and run in order.
 test.describe.configure({ mode: 'serial' });
 
 const { trader, ownsGateway } = e2eUsers();
@@ -131,6 +133,99 @@ test('the portfolio values the coins at live prices', async ({ browser }) => {
   await expect(row).toContainText('0.11 NXC');
   await expect(row.getByTestId('value')).toHaveText(/^\$\d+\.\d{2}$/);
   await expect(row.getByTestId('pl')).toHaveText(/^[+-]\$\d+\.\d{2}$/);
+});
+
+// ---- a real coin (phase 4.5, acceptance test 7) ------------------------------------------------
+
+const btc = (page: Page) => page.getByTestId('trade-balance-BTC').locator('dd');
+
+/**
+ * The BTC trade page, or a skip unless the market prices BTC: that needs MARKET_LIVE_PRICES=on
+ * and an exchange answering.
+ */
+async function openBtc(page: Page): Promise<void> {
+  await page.goto('/trade/BTC');
+  await expect(connection(page)).toHaveAttribute('data-status', 'open');
+  const priced = await expect(page.getByTestId('live-price'))
+    .toHaveText(/\$\d/, { timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+  test.skip(
+    !priced,
+    'BTC has no price: start the market with MARKET_LIVE_PRICES=on, with an exchange reachable.',
+  );
+}
+
+test('acceptance test 7: a BTC market buy, like NXC: quote, fill, balances on the user feed', async ({
+  browser,
+}) => {
+  const page = await signedInPage(browser, trader);
+  await page.goto('/markets');
+  const real = page.getByRole('table', { name: 'Real prices' });
+  await expect(real.getByTestId('coin-BTC')).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Simulated' }).getByTestId('coin-NXC'),
+  ).toBeVisible();
+
+  await openBtc(page);
+  await expect(page.getByTestId('source')).toHaveText(
+    /^(Binance|Coinbase)( · fallback)?$/,
+  );
+  const before = dollars(await usd(page).textContent());
+
+  await orderForm(page).getByLabel('Quantity (BTC)').fill('0.0001');
+  await orderForm(page).getByRole('button', { name: 'Get quote' }).click();
+  await expect(page.getByTestId('quote-countdown')).toHaveText(
+    /Quote valid for \d+ s/,
+  );
+  await orderForm(page).getByRole('button', { name: 'Buy BTC' }).click();
+
+  const done = orderForm(page).getByRole('status');
+  await expect(done).toHaveText(/^Bought 0\.0001 BTC for \$[\d,]+\.\d{2}\.$/);
+  const paid = dollars(await done.textContent());
+  await expect(page.getByTestId('toast').last()).toContainText(
+    `Bought 0.0001 BTC for $${paid.toFixed(2)}`,
+  );
+  await expect(usd(page)).toHaveText(`$${(before - paid).toFixed(2)}`);
+  await expect(btc(page)).toHaveText('0.0001 BTC');
+});
+
+test('acceptance test 7: a BTC limit order holds its USD until it is cancelled', async ({
+  browser,
+}) => {
+  const page = await signedInPage(browser, trader);
+  await openBtc(page);
+  const price = dollars(await page.getByTestId('live-price').textContent());
+  const before = dollars(await usd(page).textContent());
+
+  // Half the price, in whole hundreds of dollars: 0.0001 BTC of it is whole cents, and it
+  // stays far below the price, so it doesn't fill.
+  const limit = Math.floor(price / 200) * 100;
+  const costCents = limit / 100;
+  // The fee: 0.5% of the amount, rounded up to a cent.
+  const held = (costCents + Math.ceil((costCents * 5) / 1_000)) / 100;
+  await orderForm(page).getByRole('radio', { name: 'Limit' }).click();
+  await orderForm(page).getByLabel('Quantity (BTC)').fill('0.0001');
+  await orderForm(page)
+    .getByLabel('Limit price (USD per coin)')
+    .fill(limit.toFixed(2));
+  await orderForm(page)
+    .getByRole('button', { name: 'Place limit buy' })
+    .click();
+
+  await expect(orderForm(page).getByRole('status')).toHaveText(
+    /^Limit order placed: buy 0\.0001 BTC at \$[\d,]+\.00\.$/,
+  );
+  await expect(usd(page)).toHaveText(
+    `$${(before - held).toFixed(2)} + $${held.toFixed(2)} held`,
+  );
+  const open = page.getByRole('list', { name: 'Open orders' });
+  await expect(open.getByTestId('order')).toHaveCount(1);
+
+  await open.getByRole('button', { name: 'Cancel' }).click();
+
+  await expect(page.getByText('No open orders.')).toBeVisible();
+  await expect(usd(page)).toHaveText(`$${before.toFixed(2)}`);
 });
 
 test('acceptance test 10: when its gateway dies, the tab reconnects, resubscribes and refetches', async ({
