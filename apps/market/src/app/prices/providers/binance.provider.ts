@@ -23,15 +23,17 @@ export const BINANCE_REST_URL = 'https://data-api.binance.vision';
 export const BINANCE_KLINES_PER_REQUEST = 1000;
 
 /**
- * Binance's public market data (no API key), USDT pairs (`BTCUSDT`): the fallback. USDT is used
- * as USD (normally within 0.1%).
+ * Binance's public market data (no API key), USDT pairs (`BTCUSDT`), the preferred provider by
+ * default. USDT is used as USD (normally within 0.1%).
  *
- * - **Stream:** one combined-stream connection, `/stream?streams=btcusdt@miniTicker/…`. Each
- *   mini-ticker comes once a second with the last price (`c`) and the event time (`E`). Binance
- *   has no heartbeat message, but four symbols ticking every second keep the connection
- *   `alive`; its ping frames (every 20 s) are answered by `ws` and count against stalling. A
- *   connection lasts at most 24 h, and `serverShutdown` announces a planned close: both just
- *   reconnect, the second at once.
+ * - **Stream:** one combined-stream connection, `/stream?streams=btcusdt@kline_1s/…`. The
+ *   1-second kline comes every second per symbol, trades or not, its close (`k.c`) the last
+ *   trade's price and `E` the event time. A second without trades carries the last close, so a
+ *   quiet pair (HYPE) keeps a fresh price and needs no heartbeat; a pair whose stream stops goes
+ *   stale. (The mini-ticker and the book ticker both skip seconds without a change: HYPE's went
+ *   over 10 s quiet and failed over to Coinbase.) Binance's ping frames (every 20 s) are answered
+ *   by `ws` and count against stalling. A connection lasts at most 24 h, and `serverShutdown`
+ *   announces a planned close: both just reconnect, the second at once.
  * - **Candles:** `GET /api/v3/klines?interval=1m`, at most 1,000 per request, oldest first, each
  *   `[open time (ms), open, high, low, close, …]`.
  */
@@ -57,7 +59,7 @@ export class BinanceProvider implements PriceProvider {
       coins.map((coin) => [liveSymbols(coin).binance, coin]),
     );
     const streams = [...bySymbol.keys()]
-      .map((symbol) => `${symbol.toLowerCase()}@miniTicker`)
+      .map((symbol) => `${symbol.toLowerCase()}@kline_1s`)
       .join('/');
     this.socket.start({
       url: () => `${this.options.wsUrl}/stream?streams=${streams}`,
@@ -129,16 +131,15 @@ export class BinanceProvider implements PriceProvider {
     // Combined streams wrap each event as { stream, data }.
     const event = (message['data'] ?? message) as Record<string, unknown>;
     switch (event['e']) {
-      case '24hrMiniTicker': {
+      case 'kline': {
         const coin = bySymbol.get(String(event['s']));
-        const price = floatCentsOf(event['c']);
+        const kline = event['k'] as Record<string, unknown> | undefined;
+        const price = floatCentsOf(kline?.['c']);
         const at = Number(event['E']);
         if (coin && price !== null && Number.isSafeInteger(at) && at > 0) {
           onPrice(coin, price, at);
         } else {
-          this.logger.warn(
-            `Ignored a malformed mini-ticker: ${text.slice(0, 200)}`,
-          );
+          this.logger.warn(`Ignored a malformed kline: ${text.slice(0, 200)}`);
         }
         return;
       }

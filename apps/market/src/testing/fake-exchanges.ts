@@ -320,9 +320,10 @@ export class FakeCoinbase extends FakeExchange {
 }
 
 /**
- * Binance's combined stream and klines: `/stream?streams=btcusdt@miniTicker/…`, a mini-ticker
- * per symbol every `tickMs` (and on every `setPrice`) as `{ stream, data }`; `shutdownNotice()`
- * sends `serverShutdown`. Klines oldest first, `[open time, open, high, low, close, …]` as
+ * Binance's combined stream and klines: `/stream?streams=btcusdt@kline_1s/…`, a 1-second kline
+ * per symbol every `tickMs` (and on every `setPrice`) as `{ stream, data }`, its close the
+ * current price, trades or not (`n`: 1 after a `setPrice`, else 0); `shutdownNotice()` sends
+ * `serverShutdown`. Klines over REST oldest first, `[open time, open, high, low, close, …]` as
  * strings, `limit` at most.
  */
 export class FakeBinance extends FakeExchange {
@@ -351,8 +352,8 @@ export class FakeBinance extends FakeExchange {
     return new Set(
       streams
         .split('/')
-        .filter((s) => s.endsWith('@miniTicker'))
-        .map((s) => s.slice(0, -'@miniTicker'.length).toUpperCase()),
+        .filter((s) => s.endsWith('@kline_1s'))
+        .map((s) => s.slice(0, -'@kline_1s'.length).toUpperCase()),
     );
   }
 
@@ -361,25 +362,38 @@ export class FakeBinance extends FakeExchange {
   }
 
   protected priceMessage(symbol: string, price: string): string {
-    return JSON.stringify({
-      stream: `${symbol.toLowerCase()}@miniTicker`,
-      data: {
-        e: '24hrMiniTicker',
-        E: Date.now(),
-        s: symbol,
-        c: price,
-        o: price,
-        h: price,
-        l: price,
-        v: '100',
-        q: '1000000',
-      },
-    });
+    return this.kline(symbol, price, 1);
   }
 
   protected tickMessage(symbol: string): string | null {
     const price = this.prices.get(symbol);
-    return price ? this.priceMessage(symbol, price) : null;
+    return price ? this.kline(symbol, price, 0) : null;
+  }
+
+  private kline(symbol: string, price: string, trades: number): string {
+    const now = Date.now();
+    const second = Math.floor(now / 1_000) * 1_000;
+    return JSON.stringify({
+      stream: `${symbol.toLowerCase()}@kline_1s`,
+      data: {
+        e: 'kline',
+        E: now,
+        s: symbol,
+        k: {
+          t: second,
+          T: second + 999,
+          s: symbol,
+          i: '1s',
+          o: price,
+          c: price,
+          h: price,
+          l: price,
+          v: trades ? '0.5' : '0',
+          n: trades,
+          x: false,
+        },
+      },
+    });
   }
 
   protected rest(url: URL): { status: number; body: unknown } {

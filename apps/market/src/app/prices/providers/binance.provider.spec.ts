@@ -37,7 +37,7 @@ describe('BinanceProvider', () => {
     );
 
   describe('stream', () => {
-    it('opens one combined stream of mini-tickers and reports each symbol in cents', async () => {
+    it('opens one combined stream of 1-second klines and reports each symbol in cents', async () => {
       fake.setPrice('BTCUSDT', '60490.12');
       fake.setPrice('HYPEUSDT', '35.1');
       connect();
@@ -50,7 +50,7 @@ describe('BinanceProvider', () => {
         'BTC and HYPE',
       );
       expect(fake.streamQueries).toEqual([
-        'btcusdt@miniTicker/ethusdt@miniTicker/hypeusdt@miniTicker/zecusdt@miniTicker',
+        'btcusdt@kline_1s/ethusdt@kline_1s/hypeusdt@kline_1s/zecusdt@kline_1s',
       ]);
       const btc = prices.find((p) => p.coin === 'BTC');
       expect(btc?.price).toBeCloseTo(6049012, 6);
@@ -60,6 +60,20 @@ describe('BinanceProvider', () => {
         false,
       );
       expect(provider.alive).toBe(true);
+    });
+
+    it('keeps reporting a pair through seconds without trades: the kline carries its close', async () => {
+      fake.setPrice('HYPEUSDT', '35.10'); // one trade, then none
+      connect();
+      await waitFor(
+        () => prices.filter((p) => p.coin === 'HYPE').length >= 4,
+        2_000,
+        'four HYPE prices',
+      );
+
+      const hype = prices.filter((p) => p.coin === 'HYPE');
+      expect(hype.every((p) => p.price === 3510)).toBe(true);
+      expect(hype.every((p, i) => i === 0 || p.at > hype[i - 1].at)).toBe(true);
     });
 
     it('is not alive when the stream goes quiet, and replaces the connection', async () => {
@@ -111,15 +125,27 @@ describe('BinanceProvider', () => {
     it('ignores messages it cannot use', async () => {
       connect();
       await waitFor(() => fake.open === 1, 2_000, 'connected');
-      const ticker = (data: object) =>
+      const kline = (s: string, c: unknown, E: unknown = Date.now()) =>
         JSON.stringify({
           stream: 'x',
-          data: { e: '24hrMiniTicker', E: Date.now(), ...data },
+          data: { e: 'kline', E, s, k: { i: '1s', c } },
         });
       fake.sendRaw('not json');
-      fake.sendRaw(ticker({ s: 'DOGEUSDT', c: '0.1' }));
-      fake.sendRaw(ticker({ s: 'BTCUSDT', c: '-5' }));
-      fake.sendRaw(ticker({ s: 'BTCUSDT', c: '60000', E: 'now' }));
+      fake.sendRaw(kline('DOGEUSDT', '0.1'));
+      fake.sendRaw(kline('BTCUSDT', '-5'));
+      fake.sendRaw(kline('BTCUSDT', '60000', 'now'));
+      fake.sendRaw(
+        JSON.stringify({
+          stream: 'x',
+          data: { e: 'kline', E: 1, s: 'BTCUSDT' },
+        }),
+      );
+      fake.sendRaw(
+        JSON.stringify({
+          stream: 'x',
+          data: { e: '24hrMiniTicker', E: 1, s: 'BTCUSDT', c: '1' },
+        }),
+      );
       fake.sendRaw(JSON.stringify({ result: null, id: 1 }));
       fake.setPrice('ETHUSDT', '3001.5');
 

@@ -106,15 +106,13 @@ This applies to every coin. A simulated coin goes stale only when no replica lea
 
 ## Open
 
-- **HYPE on Binance goes quiet.** While the market ran for the e2e runs and the live check
-  (about 7 minutes), Binance sent no HYPE mini-ticker for over 10 s four times, so HYPE failed
-  over to Coinbase each time and came back after the 30 s failback: Coinbase priced it for about
-  3 of those minutes. The picker does
-  what it should (a silent pair is the halted-pair case), but Binance's mini-ticker seems to skip
-  a second with no change, and HYPE is quiet enough to skip ten. Options: count Binance's other
-  symbols arriving as a heartbeat for a quiet one (a halted pair would then keep its last price),
-  a longer stale window for Binance, or a Binance stream that speaks more often (`@bookTicker`).
-  Not changed in this phase.
+- **HYPE on Binance went quiet; fixed after this step.** While the market ran for the e2e runs
+  and the live check (about 7 minutes), Binance sent no HYPE mini-ticker for over 10 s four times,
+  so HYPE failed over to Coinbase each time and came back after the 30 s failback: Coinbase priced
+  it for about 3 of those minutes. The mini-ticker comes only in a second with a trade. The
+  provider now reads `@kline_1s`, which comes every second, trades or not
+  ([02-providers.md](02-providers.md#the-two-exchanges)): the next 5 minutes against the real
+  exchanges had no failover, and test 1 again showed every coin from Binance within 0.05%.
 - Binance's separate API terms are still unread ([02-providers.md](02-providers.md#terms-of-use)).
 
 ## Lessons

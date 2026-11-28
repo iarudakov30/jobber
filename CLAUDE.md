@@ -396,7 +396,8 @@ changes balances: trades settle through the wallet's gRPC (`WALLET_GRPC_SERVICE_
   `SIMULATED_COINS`, `LIVE_COINS`, `simulated(coin)`, `liveSymbols(coin)`.
 - **Price providers** (`prices/providers/`, phase 4.5 step 2): `PriceProvider` with
   `CoinbaseProvider` (`ticker` + `heartbeat` on `ws-feed.exchange.coinbase.com`, candles 300 per
-  request) and `BinanceProvider` (combined `miniTicker` stream and `klines` on the
+  request) and `BinanceProvider` (combined `kline_1s` stream, a kline per symbol every second even
+  without trades, so no heartbeat; `klines` over REST; on the
   `*.binance.vision` market-data hosts). Prices leave a provider as unrounded cents (`floatCentsOf`
   moves the decimal point in the text), candles as `bigint` cents (`centsOf`). Both share
   `ReconnectingSocket` (1 s → 30 s jitter backoff, `alive` = a message in the last 5 s, a silent

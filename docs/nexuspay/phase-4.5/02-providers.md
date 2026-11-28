@@ -24,7 +24,7 @@ Nothing runs the providers yet: step 3 connects them on the simulator leader.
 | `prices/providers/price-provider.ts`      | `PriceProvider` (`name`, `connect(coins, onPrice)`, `disconnect()`, `alive`, `candles(coin, from, to)`), `ProviderError` (with the HTTP status), `ProviderOptions` |
 | `prices/providers/reconnecting-socket.ts` | A `ws` client that reconnects (1 s → 30 s, ×0.5–1 jitter), tracks `alive`, replaces a connection that has gone silent, and can reconnect at once                   |
 | `prices/providers/coinbase.provider.ts`   | Coinbase Exchange: `ticker` + `heartbeat` subscription, `/products/{id}/candles` in windows of 300                                                                 |
-| `prices/providers/binance.provider.ts`    | Binance: one combined `miniTicker` stream, `serverShutdown`, `/api/v3/klines` in pages of 1,000                                                                    |
+| `prices/providers/binance.provider.ts`    | Binance: one combined stream (`kline_1s` since step 5, first `miniTicker`), `serverShutdown`, `/api/v3/klines` in pages of 1,000                                   |
 | `prices/providers/cents.ts`, `http.ts`    | Decimal strings to cents without floating point; GET with a timeout; candle validation                                                                             |
 | `src/testing/fake-exchanges.ts`           | `FakeCoinbase`, `FakeBinance`, `fakeDay()`                                                                                                                         |
 | `src/testing/wait-for.ts`                 | `waitFor` and `sleep`, shared with `market.api.spec.ts`                                                                                                            |
@@ -36,15 +36,25 @@ Nothing runs the providers yet: step 3 connects them on the simulator leader.
 
 |                | Coinbase Exchange                                                                                                 | Binance                                                                                                                 |
 | -------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Stream         | `wss://ws-feed.exchange.coinbase.com`, subscribe message                                                          | `wss://data-stream.binance.vision/stream?streams=btcusdt@miniTicker/…`                                                  |
-| Price messages | `ticker` on every trade (and once after subscribing)                                                              | `24hrMiniTicker` every second: last price `c`, event time `E`                                                           |
-| Keep-alive     | `heartbeat` every second per product                                                                              | four symbols ticking every second; ping frames every 20 s; 24 h max per connection                                      |
+| Stream         | `wss://ws-feed.exchange.coinbase.com`, subscribe message                                                          | `wss://data-stream.binance.vision/stream?streams=btcusdt@kline_1s/…`                                                    |
+| Price messages | `ticker` on every trade (and once after subscribing)                                                              | `kline` (1 s) every second, trades or not: close `k.c` = last price, event time `E`                                     |
+| Keep-alive     | `heartbeat` every second per product                                                                              | a kline per symbol every second; ping frames every 20 s; 24 h max per connection                                        |
 | Candles        | `GET /products/{id}/candles?granularity=60`, 300 per request: 5 a day; `[time s, low, high, open, close, volume]` | `GET /api/v3/klines?interval=1m`, 1,000 per request: 2 a day; `[open time ms, open, high, low, close, …]`, oldest first |
 | Limits         | public REST 10 requests/s per IP                                                                                  | klines weight 2 of 6,000/min per IP                                                                                     |
 
 Binance's defaults are its market-data-only hosts, `data-stream.binance.vision` and
 `data-api.binance.vision`: the same public data as `stream.binance.com` and `api.binance.com`, with
 no account features. Step 3 makes all four URLs configurable.
+
+**The Binance stream changed after step 5.** It was `@miniTicker`, which this step's docs
+assumed came every second. It comes only in a second with a trade, and HYPE can go over 10 s
+without one: it failed over to Coinbase four times in about 7 minutes. `@bookTicker` (best bid
+and ask) as a heartbeat cut that to once in 5 minutes: it skips seconds without a change too
+(7.7 s measured). Measured on HYPE over 3 minutes, `@kline_1s` and `@depth5@1000ms` both came
+every second (longest gap 1.1 s). `@kline_1s` replaced `@miniTicker`: one stream per symbol, its
+close is the last trade's price (equal to the mini-ticker's in every second compared), and a
+second without trades carries the last close, so no heartbeat is needed and a pair whose stream
+stops still goes stale. No failover in the next 5 minutes.
 
 A price leaves a provider as **cents, not rounded**: `"60510.855"` becomes `6051085.5`. The tick
 rounds once, in step 3. The decimal point is moved in the text, because `35.12 * 100` is
@@ -87,7 +97,8 @@ internet; run twice):
   being alive and is replaced after the stall timeout; after a drop it backs off through refused
   upgrades (503), reconnects and subscribes again; malformed tickers, unknown products, zero
   prices and `error` messages are ignored; nothing after `disconnect()`.
-- Binance: one combined stream with the four lowercase `@miniTicker` names; the same failure
+- Binance: one combined stream with the four lowercase `@kline_1s` names (`@miniTicker` in this
+  step); the same failure
   cases (451 on the upgrade); `serverShutdown` reconnects at once although the backoff is 10 s.
 - Candles: a day is 1,440 candles in five Coinbase requests (the first ends at 04:59) or two
   Binance requests (the second starts at minute 1,000); the range is kept (`from` rounded up to a
@@ -105,12 +116,12 @@ confirmed to be trading on both (Coinbase `online`, Binance `TRADING`).
 
 Both exchanges' public market data needs no key, but it comes with terms. Read on 2026-11-27:
 
-|                  | Binance                                                                                                            | Coinbase                                                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| Document         | Terms of Use (ADGM entities, effective 27 October 2026); APIs are "subject to separate API terms", not yet read    | Market Data Terms of Use (last updated 7 August 2026)                                                                            |
-| Licence          | Non-commercial personal or internal business use                                                                   | Personal or research use only; not for an application with end users other than you                                             |
-| Showing it       | Within that licence                                                                                                | Not to anyone outside your organisation without written consent: neither the data nor anything derived from it (charts, candles) |
-| Also prohibited  | Getting around the List of Prohibited Countries (a VPN, for example)                                               | "Generic or fair value prices" and valuations of digital currencies, "whether for internal use or otherwise"; any use for AI     |
+|                 | Binance                                                                                                         | Coinbase                                                                                                                         |
+| --------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Document        | Terms of Use (ADGM entities, effective 27 October 2026); APIs are "subject to separate API terms", not yet read | Market Data Terms of Use (last updated 7 August 2026)                                                                            |
+| Licence         | Non-commercial personal or internal business use                                                                | Personal or research use only; not for an application with end users other than you                                              |
+| Showing it      | Within that licence                                                                                             | Not to anyone outside your organisation without written consent: neither the data nor anything derived from it (charts, candles) |
+| Also prohibited | Getting around the List of Prohibited Countries (a VPN, for example)                                            | "Generic or fair value prices" and valuations of digital currencies, "whether for internal use or otherwise"; any use for AI     |
 
 What follows for NexusPay:
 
